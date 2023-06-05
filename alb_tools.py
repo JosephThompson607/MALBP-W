@@ -25,6 +25,7 @@ def parse_alb(alb_file_name):
     
     #Task_times 
     task_times = re.search('<task times>(.|\n)+?<', alb_file)
+    
     #Get lines in this regex ignoring the first and last 2
     task_times = task_times.group(0).split('\n')[1:-2]
     task_times = {task.split()[0]:int(task.split()[1]) for task in task_times}
