@@ -1,4 +1,5 @@
 .DS_Store
+/SALBP_benchmark/
 precedence_graph.png
 version1.mps
 __pycache__/alb_tools.cpython-39.pyc
