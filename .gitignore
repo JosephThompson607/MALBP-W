@@ -3,6 +3,7 @@
 *.lp
 precedence_graph.png
 version1.mps
+/__pycache__/
 __pycache__/alb_tools.cpython-39.pyc
 SALBP_benchmark/.DS_Store
 SALBP_benchmark/~$Details of the small data set (n=20).xlsx
