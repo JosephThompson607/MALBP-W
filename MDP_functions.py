@@ -23,19 +23,19 @@ def task_to_stations(task, station, old_partition):
 def task_partitioning(partitions, old_partition, old_tasks, no_stations, instance):
     if not old_tasks:
         # Below are some checks that reduce the universe of possible partitions
-        # checks if all lists in partition are non-empty
-        if all(partition for partition in old_partition):
+        # # checks if all lists in partition are non-empty
+        # if all(partition for partition in old_partition):
             # checks if partition respects precedence constraints
-            if check_precedence_constraints(
-                old_partition, instance["precedence_relations"], no_stations
+        if check_precedence_constraints(
+            old_partition, instance["precedence_relations"], no_stations
+        ):
+            if check_takt_time_constraints(
+                old_partition,
+                instance["task_times"],
+                instance["cycle_time"],
+                instance["max_workers"],
             ):
-                if check_takt_time_constraints(
-                    old_partition,
-                    instance["task_times"],
-                    instance["cycle_time"],
-                    instance["max_workers"],
-                ):
-                    partitions.append(old_partition)
+                partitions.append(old_partition)
         return
     tasks = old_tasks.copy()
     task_to_assign = tasks.pop(0)
@@ -104,19 +104,21 @@ def check_precedence_constraints(partition, precedence_constraints, NO_S):
 #             action[station] += [ task]
 #             print('action after', action)
 #             generate_actions(action, actions_list, all_tasks_copy,  number_of_stations, number_of_models)
-# def calculate_time_and_workers(tasks, instance, model, takt_time, max_workers):
-#     total_time = 0
-#     for task in tasks:
-#         total_time += instance[model]['task_times'][task]
-#     workers = 1
 
-#     while total_time / workers > takt_time:
-#         workers += 1
-#         if workers > max_workers:
-#              return total_time, None, None
-#     reduced_time = total_time / workers
-#     return total_time, reduced_time, workers
-# Function that generates all possible actions
+def calculate_time_and_workers(tasks, instance, model, takt_time, max_workers):
+    total_time = 0
+    for task in tasks:
+        total_time += instance[model]['task_times'][task]
+    workers = 1
+
+    while total_time / workers > takt_time:
+        workers += 1
+        if workers > max_workers:
+             return total_time, None, None
+    reduced_time = total_time / workers
+    return total_time, reduced_time, workers
+
+#Function that generates all possible actions
 def create_A(D, model_histories, instances, all_tasks, TAKT_TIME, MAX_L, NO_S):
     def create_action(
         d,

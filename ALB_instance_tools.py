@@ -77,15 +77,19 @@ def eliminate_tasks(old_instance, elim_interval=(0.6, 0.8), seed=None):
     )
     # nx.draw_planar(p_graph, with_labels=True)
     for index, model in enumerate(instance):
+        # Remove node from task times list
         entries_to_remove(
             to_remove, instance[index]["task_times"]
-        )  # Remove node from task times list
+        )  
+        # change precedence graph
         instance[index]["precedence_relations"] = reconstruct_precedence_constraints(
             instance[index]["precedence_relations"], to_remove
-        )  # change precedence graph
+        )  
+        #update number of tasks
         instance[index]["num_tasks"] = len(
             instance[index]["task_times"]
-        )  # Correct number of tasks
+        )  
+        
     return instance
 
 
@@ -213,3 +217,8 @@ def generate_equipment_cost(
         size=(number_of_stations, number_of_pieces),
     )
     return equipment_cost_matrix
+
+def get_task_intersection(test_instance, model_1, model_2):
+    '''Returns the intersection of tasks between two models'''
+    return  set(test_instance[model_1]['task_times']).intersection(set(test_instance[model_2]['task_times']))
+    
