@@ -22,7 +22,12 @@ def parse_alb(alb_file_name):
 
     # Order Strength
     order_strength = re.search("<order strength>\n(\d*,\d*)", alb_file)
-    parse_dict["order_strength"] = float(order_strength.group(1).replace(",", "."))
+    
+    if order_strength:
+        parse_dict["order_strength"] = float(order_strength.group(1).replace(",", "."))
+    else:
+        order_strength = re.search("<order strength>\n(\d*.\d*)", alb_file)
+        parse_dict["order_strength"] = float(order_strength.group(1))
 
     # Task_times
     task_times = re.search("<task times>(.|\n)+?<", alb_file)
@@ -39,6 +44,13 @@ def parse_alb(alb_file_name):
     parse_dict["precedence_relations"] = precedence_relations
     return parse_dict
 
+
+#function that returns names of all files in a directory with a given extension
+def get_instance_list(directory, keep_directory_location = True,  extension='.alb'):
+    if keep_directory_location:
+        return [{'name': f.split("=")[1].split(".")[0], 'location': directory + '/' + f} for f in os.listdir(directory) if f.endswith(extension)]
+    else:
+        return [{'name': f.split("=")[1].split(".")[0], 'location':f} for f in os.listdir(directory) if f.endswith(extension)]
 
 def rand_pert_precedence(p_graph_orig, seed=None):
     # randomly change at least 1 edge in the precedence graph
