@@ -543,3 +543,9 @@ SALBP_benchmark/small data set_n=20/instance_n=20_522.alb
 SALBP_benchmark/small data set_n=20/instance_n=20_523.alb
 SALBP_benchmark/small data set_n=20/instance_n=20_524.alb
 SALBP_benchmark/small data set_n=20/instance_n=20_525.alb
+ALBP_1_solutions.csv
+.gitignore
+gurobi.log
+test_graph
+.gitignore
+test_graph.gexf
