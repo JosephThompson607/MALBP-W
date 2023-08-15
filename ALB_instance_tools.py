@@ -153,6 +153,7 @@ def change_task_times(instance, perc_reduct_interval=(0.40, 0.60), seed=None):
     return new_task_times
 
 
+
 def create_instance_pairs(instance_names, size_pair=2):
     instance_pairs = []
     instance_groups = [
@@ -166,6 +167,17 @@ def create_instance_pairs(instance_names, size_pair=2):
             parsed_instances.append(parsed_instance)
         instance_pairs.append(parsed_instances)
     return instance_pairs
+
+def create_instance_pair_stochastic(instance_dicts):
+    '''read .alb files, create a dictionary for each model, and include model name and probability
+     input: list of dictionaries with keys 'name' 'location' and probability '''
+    parsed_instances = {}
+    for instance in instance_dicts:
+        parsed_instances[instance['name']] = {}
+        parsed_instance = parse_alb(instance['fp'])
+        parsed_instances[instance['name']].update(parsed_instance)
+        parsed_instances[instance['name']]['probability'] = instance['probability']
+    return parsed_instances
 
 
 def list_all_tasks(instance):
@@ -181,6 +193,8 @@ def linear_reduction(old_task_times, number_of_workers):
     INPUT: task times dictionary, number_of_workers int
     OUTPUT: new task_times dictonary with reduced times
     """
+    if number_of_workers == 0:
+        return old_task_times
     task_times = old_task_times.copy()
     for key, values in task_times.items():
         task_times[key] = values / number_of_workers
@@ -230,7 +244,27 @@ def generate_equipment_cost(
     )
     return equipment_cost_matrix
 
+
+def generate_equipment_2(NO_EQUIPMENT, NO_STATIONS,NO_TASKS, seed = None):
+    np.random.seed(seed)
+    equipment_matrix = np.random.randint(0, 2, size=(NO_EQUIPMENT, NO_TASKS))
+    equipment_prices = np.zeros((NO_STATIONS,NO_EQUIPMENT))
+    print(equipment_matrix)
+    print(np.sum(equipment_matrix, axis=1))
+    for equipment in range(NO_EQUIPMENT):
+        for station in range(NO_STATIONS):
+            equipment_prices[ station, equipment] =int((100+np.random.randn()*15 ))* np.sum(equipment_matrix,axis=1)[equipment]
+    print(equipment_prices)
+    instance = 1
+    #TODO: Check for dominated equipment, create function that generates a random instance
+    equipment_instance = {instance:{ 'equipment_matrix': equipment_matrix, 'equipment_prices': equipment_prices}}
+    return equipment_instance
+
 def get_task_intersection(test_instance, model_1, model_2):
     '''Returns the intersection of tasks between two models'''
     return  set(test_instance[model_1]['task_times']).intersection(set(test_instance[model_2]['task_times']))
+
+def get_task_union(test_instance, model_1, model_2):
+    '''Returns the union of tasks between two models'''
+    return  set(test_instance[model_1]['task_times']).union(set(test_instance[model_2]['task_times']))
     
