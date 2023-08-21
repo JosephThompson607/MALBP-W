@@ -245,7 +245,7 @@ def generate_equipment_cost(
     return equipment_cost_matrix
 
 
-def generate_equipment_2(NO_EQUIPMENT, NO_STATIONS,NO_TASKS, seed = None):
+def generate_equipment_2(NO_EQUIPMENT, NO_STATIONS,NO_TASKS,instance_number=0, mean=100, variance=15, seed = None):
     np.random.seed(seed)
     equipment_matrix = np.random.randint(0, 2, size=(NO_EQUIPMENT, NO_TASKS))
     equipment_prices = np.zeros((NO_STATIONS,NO_EQUIPMENT))
@@ -253,11 +253,10 @@ def generate_equipment_2(NO_EQUIPMENT, NO_STATIONS,NO_TASKS, seed = None):
     print(np.sum(equipment_matrix, axis=1))
     for equipment in range(NO_EQUIPMENT):
         for station in range(NO_STATIONS):
-            equipment_prices[ station, equipment] =int((100+np.random.randn()*15 ))* np.sum(equipment_matrix,axis=1)[equipment]
+            equipment_prices[ station, equipment] =int((mean+np.random.randn()*variance ))* np.sum(equipment_matrix,axis=1)[equipment]
     print(equipment_prices)
-    instance = 1
     #TODO: Check for dominated equipment, create function that generates a random instance
-    equipment_instance = {instance:{ 'equipment_matrix': equipment_matrix, 'equipment_prices': equipment_prices}}
+    equipment_instance = {instance_number:{ 'equipment_matrix': equipment_matrix, 'equipment_prices': equipment_prices}}
     return equipment_instance
 
 def get_task_intersection(test_instance, model_1, model_2):
