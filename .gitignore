@@ -549,3 +549,5 @@ test_graph
 test_graph.gexf
 labor_assignment.csv
 *.csv
+model_runs/dynamic_model_small_instances_C1000_L4_T4_S4_W500/~$dynamic_model_depedent_A_60_B40_S4_C1000.xlsx
+*.xlsx

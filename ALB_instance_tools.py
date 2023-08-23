@@ -267,3 +267,9 @@ def get_task_union(test_instance, model_1, model_2):
     '''Returns the union of tasks between two models'''
     return  set(test_instance[model_1]['task_times']).union(set(test_instance[model_2]['task_times']))
     
+def construct_precedence_matrix(instance):
+    '''constructs a precedence matrix representation of a model's precedence relations'''
+    precedence_matrix = np.zeros((len(instance['task_times'].keys()), len(instance['task_times'].keys())))
+    for precedence in instance['precedence_relations']:
+        precedence_matrix[int(precedence[0]) - 1][int(precedence[1]) - 1] = 1
+    return precedence_matrix
