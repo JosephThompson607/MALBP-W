@@ -263,9 +263,14 @@ def get_task_intersection(test_instance, model_1, model_2):
     '''Returns the intersection of tasks between two models'''
     return  set(test_instance[model_1]['task_times']).intersection(set(test_instance[model_2]['task_times']))
 
-def get_task_union(test_instance, model_1, model_2):
-    '''Returns the union of tasks between two models'''
-    return  set(test_instance[model_1]['task_times']).union(set(test_instance[model_2]['task_times']))
+def get_task_union(test_instance, *args):
+    '''Returns the union of tasks between all models, input is a series of models to check'''
+    for index, model in enumerate(args):
+        if index == 0:
+            task_union = set(test_instance[model]['task_times'])
+        else:
+            task_union = task_union.union(set(test_instance[model]['task_times']))
+    return  task_union
     
 def construct_precedence_matrix(instance):
     '''constructs a precedence matrix representation of a model's precedence relations'''
