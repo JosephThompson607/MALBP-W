@@ -7,7 +7,265 @@ import os
 import glob
 import copy
 
+class MultiModelInstance:
+    def __init__(self, model_dicts, takt_time=None, max_workers = None, no_stations=None, n_takts=None,  instance_type = 'alb'):
+        self.instances = {}
+        self.takt_time = takt_time
+        self.max_workers = max_workers
+        self.no_stations = no_stations
+        self.model_dicts = model_dicts
+        self.no_models = len(model_dicts)
+        print('model dicts', model_dicts)
+        self.data = create_instance_pair_stochastic(model_dicts)
+        self.scenario_tree = None
+        self.n_takts = n_takts
+        self.all_tasks = get_task_union(self.data, *list(self.data.keys()) )
+        self.no_tasks = len(self.all_tasks)
+        
+    # def create_instance_pair_stochastic(self, model_dicts):
+    #     '''read .alb files, create a dictionary for each model, and include model name and probability
+    #      input: list of dictionaries with keys 'name' 'location' and probability '''
+    #     parsed_instances = {}
+    #     print('model dicts', model_dicts)
+    #     for instance_name, instance  in model_dicts.items():
+    #         print('instance', instance)
+    #         print('instance_name', instance_name)
+    #         parsed_instances[instance_name] = {'instance':SALBP_Instance(instance_name, instance['fp'], takt_time=self.takt_time)}
+    #         parsed_instances[instance_name]['probability'] = instance['probability']
+    #     return parsed_instances
+    
+    def generate_scenario_tree(self,scenario_tree_generator, **kwargs):
+        '''Generates a scenario tree for the instance, based on the model mixtures'''
+        self.scenario_tree = scenario_tree_generator(self.n_takts, self.model_mixtures, **kwargs)
+
+        
+
+class SALBP_Instance:
+    def __init__(self, instance_name, instance_location, takt_time=None, instance_type = 'alb'):
+        self.name = instance_name
+        self.location = instance_location
+        self.task_times = {}
+        self.precedence_relations = []
+        self.num_tasks = 0
+        self.cycle_time = takt_time
+        self.order_strength = 0
+        self.model_no = 0
+        if instance_type == 'alb':
+            self.parse_alb()
+
+    def parse_alb(self):
+        """Reads assembly line balancing instance .alb file, returns dictionary with the information"""
+        alb_file = open(self.location).read()
+        # Get number of tasks
+        num_tasks = re.search("<number of tasks>\n(\d*)", alb_file)
+        self.num_tasks = int(num_tasks.group(1))
+
+        # Get cycle time if not already set
+        if self.cycle_time == None:
+            cycle_time = re.search("<cycle time>\n(\d*)", alb_file)
+            self.cycle_time = int(cycle_time.group(1))
+
+        # Order Strength
+        order_strength = re.search("<order strength>\n(\d*,\d*)", alb_file)
+        if order_strength:
+            self.order_strength = float(order_strength.group(1).replace(",", "."))
+        else:
+            order_strength = re.search("<order strength>\n(\d*.\d*)", alb_file)
+            self.order_strength = float(order_strength.group(1))
+
+        # Task_times
+        task_times = re.search("<task times>(.|\n)+?<", alb_file)
+
+        # Get lines in this regex ignoring the first and last 2
+        task_times = task_times.group(0).split("\n")[1:-2]
+        task_times = {task.split()[0]: int(task.split()[1]) for task in task_times}
+        self.task_times = task_times
+
+        # Precedence relations
+        precedence_relations = re.search("<precedence relations>(.|\n)+?<", alb_file)
+        precedence_relations = precedence_relations.group(0).split("\n")[1:-2]
+        precedence_relations = [task.split(",") for task in precedence_relations]
+        self.precedence_relations = precedence_relations
+
+
+
+## Scenario Tree Generation
+def sum_prob(sequences):
+    '''function for sanity checking that the probabilities sum to 1'''
+    total = 0
+    for seq in sequences:
+        total += sequences[seq]['probability']
+    return total
+
+def make_consecutive_luxury_models_restricted_scenario_tree(n_takts, entry_probabilities, max_consecutive=3, luxury_models=['B']):
+    """
+    Creates a scenario tree for the given number of takts, instance and entry probabilities. 
+    This scenario tree restricts the number of consective times a set of  model, the "luxury" models, can enter the line
+    """
+    # Create a directed graph
+    G = nx.DiGraph()
+    # Add the root node
+    G.add_node('R', stage=0, scenario=0)
+    #Create a list of final sequences
+    final_sequences = {}
+    def add_nodes(n_takts, entry_probabilities, graph, final_sequences, probability=1, parent=0, sequence = [], current_stage=0, counter=[0], consecutive=0):
+        if current_stage == n_takts:
+            final_sequences[counter[0]] = {'sequence':sequence, 'probability': probability}
+            counter[0] += 1
+            return
+        else:
+            #Handle case where the model is the first one or is not the luxury model
+            if len(sequence) == 0 or sequence[-1] not in  luxury_models:
+                for model, prob in entry_probabilities.items():
+                    new_sequence = sequence.copy()
+                    new_sequence.append(model)
+                    node_name = str(parent)+ str(model) 
+                    graph.add_node(node_name, stage = current_stage, scenario = new_sequence)
+                    graph.add_edge(parent, node_name, probability = probability)
+                    add_nodes(n_takts, entry_probabilities, graph, final_sequences, probability* prob,node_name, new_sequence, current_stage+1, consecutive=1)
+            else:
+                #Create a dictionary of models that excludes the previous model
+                entry_probabilities_excluding_previous = entry_probabilities.copy()
+                entry_probabilities_excluding_previous.pop(sequence[-1], None)
+                #Handle case where the model is the same as the previous one
+                if consecutive < max_consecutive:
+                    new_sequence = sequence.copy()
+                    model = new_sequence[-1]
+                    prob = entry_probabilities[model]
+                    new_sequence.append(model)
+                    node_name = str(parent)+ str(model) 
+                    graph.add_node(node_name, stage = current_stage, scenario = new_sequence)
+                    graph.add_edge(parent, node_name, probability = probability)
+                    add_nodes(n_takts, entry_probabilities, graph, final_sequences, probability* prob,node_name, new_sequence, current_stage+1, consecutive=consecutive+1)
+                else:
+                    #If there are too many of this model, ignore it Change the entry probabilities of the other models proportional to their probability
+                    total_prob = sum(entry_probabilities_excluding_previous.values())
+                    for model, prob in entry_probabilities_excluding_previous.items():
+                        entry_probabilities_excluding_previous[model] = prob/total_prob
+                for model, prob in entry_probabilities_excluding_previous.items():
+                    new_sequence = sequence.copy()
+                    new_sequence.append(model)
+                    node_name = str(parent)+ str(model) 
+                    graph.add_node(node_name, stage = current_stage, scenario = new_sequence)
+                    graph.add_edge(parent, node_name, probability = probability)
+                    add_nodes(n_takts, entry_probabilities, graph, final_sequences, probability* prob,node_name, new_sequence, current_stage+1, consecutive=1)
+    add_nodes(n_takts, entry_probabilities, G, final_sequences, parent='R')
+    return G, final_sequences
+
+def make_consecutive_model_restricted_scenario_tree(n_takts, entry_probabilities, max_consecutive=3):
+    """
+    Creates a scenario tree for the given number of takts, instance and entry probabilities. 
+    This scenario tree restricts the number of consective times a model can enter the line
+    """
+    # Create a directed graph
+    G = nx.DiGraph()
+    # Add the root node
+    G.add_node('R', stage=0, scenario=0)
+    #Create a list of final sequences
+    final_sequences = {}
+    def add_nodes(n_takts, entry_probabilities, graph, final_sequences, probability=1, parent=0, sequence = [], current_stage=0, counter=[0], consecutive=0):
+        if current_stage == n_takts:
+            final_sequences[counter[0]] = {'sequence':sequence, 'probability': probability}
+            counter[0] += 1
+            return
+        else:
+            #Handle case where the model is the first one
+            if len(sequence) == 0:
+                for model, prob in entry_probabilities.items():
+                    new_sequence = sequence.copy()
+                    new_sequence.append(model)
+                    node_name = str(parent)+ str(model) 
+                    graph.add_node(node_name, stage = current_stage, scenario = new_sequence)
+                    graph.add_edge(parent, node_name, probability = probability)
+                    add_nodes(n_takts, entry_probabilities, graph, final_sequences, probability* prob,node_name, new_sequence, current_stage+1, consecutive=1)
+            else:
+                #Create a dictionary of models that excludes the previous model
+                entry_probabilities_excluding_previous = entry_probabilities.copy()
+                entry_probabilities_excluding_previous.pop(sequence[-1], None)
+                #Handle case where the model is the same as the previous one
+                if consecutive < max_consecutive:
+                    new_sequence = sequence.copy()
+                    model = new_sequence[-1]
+                    prob = entry_probabilities[model]
+                    new_sequence.append(model)
+                    node_name = str(parent)+ str(model) 
+                    graph.add_node(node_name, stage = current_stage, scenario = new_sequence)
+                    graph.add_edge(parent, node_name, probability = probability)
+                    add_nodes(n_takts, entry_probabilities, graph, final_sequences, probability* prob,node_name, new_sequence, current_stage+1, consecutive=consecutive+1)
+                else:
+                    #If there are too many of this model, ignore it Change the entry probabilities of the other models proportional to their probability
+                    total_prob = sum(entry_probabilities_excluding_previous.values())
+                    for model, prob in entry_probabilities_excluding_previous.items():
+                        entry_probabilities_excluding_previous[model] = prob/total_prob
+                for model, prob in entry_probabilities_excluding_previous.items():
+                    new_sequence = sequence.copy()
+                    new_sequence.append(model)
+                    node_name = str(parent)+ str(model) 
+                    graph.add_node(node_name, stage = current_stage, scenario = new_sequence)
+                    graph.add_edge(parent, node_name, probability = probability)
+                    add_nodes(n_takts, entry_probabilities, graph, final_sequences, probability* prob,node_name, new_sequence, current_stage+1, consecutive=1)
+    add_nodes(n_takts, entry_probabilities, G, final_sequences, parent='R')
+    return G, final_sequences
+
+def make_scenario_tree(n_takts, entry_probabilities):
+    """
+    Creates a scenario tree for the given number of takts, instance and entry probabilities.
+    """
+    # Create a directed graph
+    G = nx.DiGraph()
+    # Add the root node
+    G.add_node('R', stage=0, scenario=0)
+    #Create a list of final sequences
+    final_sequences = {}
+    def add_nodes(n_takts, entry_probabilities, graph, final_sequences, probability=1, parent=0, sequence = [], current_stage=0, counter=[0]):
+        if current_stage == n_takts:
+            final_sequences[counter[0]] = {'sequence':sequence, 'probability': probability}
+            counter[0] += 1
+            return
+        else:
+            for model, prob in entry_probabilities.items():
+                new_sequence = sequence.copy()
+                new_sequence.append(model)
+                node_name = str(parent)+ str(model) 
+                graph.add_node(node_name, stage = current_stage, scenario = new_sequence)
+                graph.add_edge(parent, node_name, probability = probability)
+                add_nodes(n_takts, entry_probabilities, graph, final_sequences, probability* prob,node_name, new_sequence, current_stage+1)
+    add_nodes(n_takts, entry_probabilities, G, final_sequences, parent='R')
+    return G, final_sequences
 # READING OF INSTANCES, MODIFICATION
+# def pair_instances(instance_list, MODEL_MIXTURES):
+#    '''takes a list of .alb filenames and a set of model mixtures 
+#    (dictionary containing model names and probabilities) and 
+#    returns a list of dictionaries containing the filenames and probabilities of the instances'''
+#    instance_groups = []
+#    for i in range(len(instance_list)-len(MODEL_MIXTURES)):
+#       instance_dict = {}
+#       for j in range(i, i+ len(MODEL_MIXTURES)):
+#          model_name = list(MODEL_MIXTURES.keys())[j-i]
+#          instance_dict[model_name] = {'fp':instance_list[j], 'name':model_name, 'probability':MODEL_MIXTURES[model_name]}
+         
+#       instance_groups.append(instance_dict)
+#    return instance_groups
+
+def pair_instances(instance_list, MODEL_MIXTURES):
+      '''returns a list of lists of multi-model instances, where each list of instances is a list of instances that will be run together'''
+      instance_groups = []
+      for i in range(len(instance_list)-len(MODEL_MIXTURES)+1):
+         instance_group= []
+         for j in range(i, i+ len(MODEL_MIXTURES)):
+            model_name = list(MODEL_MIXTURES.keys())[j-i]
+            instance_group.append({'fp':instance_list[j], 'name':model_name, 'probability':MODEL_MIXTURES[model_name]})
+         instance_groups.append(instance_group)
+      return instance_groups
+
+def read_instance_folder(folder_loc):
+   '''looks in folder_loc for all .alb files and returns a list of filepaths to the .alb files'''
+   instance_list = []
+   for file in glob.glob(f"{folder_loc}*.alb"):
+      instance_list.append(file)
+   instance_list.sort(key = lambda file: int(file.split("_")[-1].split(".")[0]))
+   return instance_list
+
 def parse_alb(alb_file_name):
     """Reads assembly line balancing instance .alb file, returns dictionary with the information"""
     parse_dict = {}
@@ -152,7 +410,25 @@ def change_task_times(instance, perc_reduct_interval=(0.40, 0.60), seed=None):
     print(new_task_times)
     return new_task_times
 
+def get_task_intersection(test_instance, model_1, model_2):
+    '''Returns the intersection of tasks between two models'''
+    return  set(test_instance[model_1]['task_times']).intersection(set(test_instance[model_2]['task_times']))
 
+def get_task_union(test_instance, *args):
+    '''Returns the union of tasks between all models, input is a series of models to check'''
+    for index, model in enumerate(args):
+        if index == 0:
+            task_union = set(test_instance[model]['task_times'])
+        else:
+            task_union = task_union.union(set(test_instance[model]['task_times']))
+    return  task_union
+    
+def construct_precedence_matrix(instance):
+    '''constructs a precedence matrix representation of a model's precedence relations'''
+    precedence_matrix = np.zeros((len(instance['task_times'].keys()), len(instance['task_times'].keys())))
+    for precedence in instance['precedence_relations']:
+        precedence_matrix[int(precedence[0]) - 1][int(precedence[1]) - 1] = 1
+    return precedence_matrix
 
 def create_instance_pairs(instance_names, size_pair=2):
     instance_pairs = []
@@ -259,22 +535,8 @@ def generate_equipment_2(NO_EQUIPMENT, NO_STATIONS,NO_TASKS,instance_number=0, m
     equipment_instance = {instance_number:{ 'equipment_matrix': equipment_matrix, 'equipment_prices': equipment_prices}}
     return equipment_instance
 
-def get_task_intersection(test_instance, model_1, model_2):
-    '''Returns the intersection of tasks between two models'''
-    return  set(test_instance[model_1]['task_times']).intersection(set(test_instance[model_2]['task_times']))
+class Equipment():
+    def __init__(self, all_tasks, NO_STATIONS, NO_EQUIPMENT, generation_method, seed= 42):
+        self.c_se, self.r_oe = generation_method(NO_EQUIPMENT, NO_STATIONS, all_tasks, seed=seed)
 
-def get_task_union(test_instance, *args):
-    '''Returns the union of tasks between all models, input is a series of models to check'''
-    for index, model in enumerate(args):
-        if index == 0:
-            task_union = set(test_instance[model]['task_times'])
-        else:
-            task_union = task_union.union(set(test_instance[model]['task_times']))
-    return  task_union
-    
-def construct_precedence_matrix(instance):
-    '''constructs a precedence matrix representation of a model's precedence relations'''
-    precedence_matrix = np.zeros((len(instance['task_times'].keys()), len(instance['task_times'].keys())))
-    for precedence in instance['precedence_relations']:
-        precedence_matrix[int(precedence[0]) - 1][int(precedence[1]) - 1] = 1
-    return precedence_matrix
+
