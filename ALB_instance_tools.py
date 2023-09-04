@@ -8,19 +8,32 @@ import glob
 import copy
 
 class MultiModelInstance:
-    def __init__(self, model_dicts, takt_time=None, max_workers = None, no_stations=None, n_takts=None,  instance_type = 'alb'):
+    def __init__(self, model_dicts, name = None, takt_time=None, max_workers = None, no_stations=None, sequence_length=None, worker_cost=None, no_equipment=None, instance_type = 'alb'):
         self.instances = {}
         self.takt_time = takt_time
         self.max_workers = max_workers
         self.no_stations = no_stations
         self.model_dicts = model_dicts
+        self.worker_cost = worker_cost
+        self.no_equipment = no_equipment
         self.no_models = len(model_dicts)
-        print('model dicts', model_dicts)
         self.data = create_instance_pair_stochastic(model_dicts)
         self.scenario_tree = None
-        self.n_takts = n_takts
+        self.sequence_length = sequence_length
         self.all_tasks = get_task_union(self.data, *list(self.data.keys()) )
         self.no_tasks = len(self.all_tasks)
+        if not name:
+            self.name = self.generate_name()
+
+    def generate_name(self):
+        '''generates name from the filename of the .albp problem. The name is from the two numbers before the .albp extension'''
+        name = ''
+        print('data', self.data)
+        for model in self.model_dicts:
+
+            name += model['fp'].split('/')[-1].split('.')[0].split('_')[-2]+ '_'+ model['fp'].split('/')[-1].split('.')[0].split('_')[-1] + '_'
+        return name
+
         
     # def create_instance_pair_stochastic(self, model_dicts):
     #     '''read .alb files, create a dictionary for each model, and include model name and probability
@@ -206,6 +219,14 @@ def make_consecutive_model_restricted_scenario_tree(n_takts, entry_probabilities
                     add_nodes(n_takts, entry_probabilities, graph, final_sequences, probability* prob,node_name, new_sequence, current_stage+1, consecutive=1)
     add_nodes(n_takts, entry_probabilities, G, final_sequences, parent='R')
     return G, final_sequences
+
+
+def check_scenarios(prod_sequence1,prod_sequence2,t):
+    '''compares two production sequences up to time t and returns true if they are the same'''
+    if prod_sequence1[:t+1] == prod_sequence2[:t+1]:
+        return True
+    else:
+        return False
 
 def make_scenario_tree(n_takts, entry_probabilities):
     """
@@ -536,7 +557,7 @@ def generate_equipment_2(NO_EQUIPMENT, NO_STATIONS,NO_TASKS,instance_number=0, m
     return equipment_instance
 
 class Equipment():
-    def __init__(self, all_tasks, NO_STATIONS, NO_EQUIPMENT, generation_method, seed= 42):
-        self.c_se, self.r_oe = generation_method(NO_EQUIPMENT, NO_STATIONS, all_tasks, seed=seed)
+    def __init__(self, all_tasks, NO_STATIONS, NO_EQUIPMENT, generation_method, seed= 42, **kwargs):
+        self.c_se, self.r_oe = generation_method(NO_EQUIPMENT, NO_STATIONS, all_tasks, seed=seed, **kwargs)
 
 
