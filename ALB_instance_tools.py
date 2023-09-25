@@ -8,13 +8,14 @@ import glob
 import copy
 
 class MultiModelInstance:
-    def __init__(self, model_dicts, name = None, takt_time=None, max_workers = None, no_stations=None, sequence_length=None, worker_cost=None, no_equipment=None, instance_type = 'alb'):
+    def __init__(self, model_dicts, name = None, takt_time=None, max_workers = None, no_stations=None, sequence_length=None, worker_cost=None,recourse_cost = None, no_equipment=None, instance_type = 'alb'):
         self.instances = {}
         self.takt_time = takt_time
         self.max_workers = max_workers
         self.no_stations = no_stations
         self.model_dicts = model_dicts
         self.worker_cost = worker_cost
+        self.recourse_cost = recourse_cost
         self.no_equipment = no_equipment
         self.no_models = len(model_dicts)
         self.data = create_instance_pair_stochastic(model_dicts)
