@@ -676,8 +676,6 @@ class model_dependent_problem_linear_labour_recourse(MMALBP_LP_Problem):
         #Defining LP problem
         self.prob = plp.LpProblem("model_dependent_eq_problem", plp.LpMinimize)
         #Objective function
-        print('this is my equipment', self.equipment)
-        print('these are my stations',self.stations)
         self.prob += (plp.lpSum([self.c_se[s][e]*self.u_se[s][e]
                             for s in self.stations
                             for e in self.equipment]
