@@ -6,33 +6,102 @@ import matplotlib.pyplot as plt
 import os
 import glob
 import copy
+import yaml
+import warnings
 
 class MultiModelInstance:
-    def __init__(self, model_dicts, name = None, takt_time=None, max_workers = None, no_stations=None, sequence_length=None, worker_cost=None,recourse_cost = None, no_equipment=None, instance_type = 'alb'):
+    def __init__(self,  init_type='from_model_dicts',  instance_config_yaml = None, model_yaml = None, model_dicts=None, 
+                 name = None, takt_time=None, max_workers = None, no_stations=None, 
+                 sequence_length=None, worker_cost=None,recourse_cost = None, no_equipment=None, instance_type = 'alb'):
         self.instances = {}
         self.takt_time = takt_time
+        self.no_models = None
         self.max_workers = max_workers
         self.no_stations = no_stations
         self.model_dicts = model_dicts
+        self.model_mixtures = {}
         self.worker_cost = worker_cost
         self.recourse_cost = recourse_cost
         self.no_equipment = no_equipment
-        self.no_models = len(model_dicts)
-        self.data = create_instance_pair_stochastic(model_dicts)
+        self.instance_config_yaml = instance_config_yaml
+
+        if init_type == 'from_model_dicts':
+            self.data = create_instance_pair_stochastic(model_dicts)
+            self.no_models = len(model_dicts)
+            if not name:
+                self.name = self.generate_name()
+        elif init_type == 'instance_from_yaml':
+            #Reads config data from a yaml then model data from the model file 
+            self.instance_config_from_yaml(instance_config_yaml)
+            self.model_data_from_yaml(model_yaml)
+        elif init_type == 'model_data_from_yaml':
+            #Only reads data on models from a yaml file
+            self.model_data_from_yaml(model_yaml)
+        else:
+            raise ValueError('init_type must be either from_model_dicts or from yaml files')
+        #Make sure that config data is set correctly
+        self.config_check()
         self.scenario_tree = None
         self.sequence_length = sequence_length
         self.all_tasks = get_task_union(self.data, *list(self.data.keys()) )
         self.no_tasks = len(self.all_tasks)
-        if not name:
-            self.name = self.generate_name()
+        
+    def instance_config_from_yaml(self, malbpw_yaml_file):
+         '''Gets all instance data from a yaml file'''
+         with open(malbpw_yaml_file) as file:
+             malbpw_yaml = yaml.load(file, Loader=yaml.FullLoader)
+             self.max_workers = malbpw_yaml['max_workers']
+             self.no_stations = malbpw_yaml['no_stations']
+             self.worker_cost = malbpw_yaml['worker_cost']
+             self.recourse_cost = malbpw_yaml['recourse_cost']
+             self.equipment_file = malbpw_yaml['equipment_file']
+             self.sequence_length = malbpw_yaml['sequence_length']
+             
+
+    def config_check(self):
+        #Check that the total probability of entering is equal to 1
+        total_probability = 0
+        for model in self.data:
+            total_probability += self.data[model]['probability']
+        if total_probability != 1:
+            warnings.warn('Model probabilities do not sum to 1')
+        #Check that the total task time is less than the takt time * number of stations * max workers
+        for model in self.data:
+            total_task_time = 0
+            for task in self.data[model]['task_times']:
+                total_task_time += self.data[model]['task_times'][task]
+            if total_task_time > self.takt_time * self.no_stations * self.max_workers:
+                warnings.warn(f"Total task time for model {model} exceeds the takt time * number of stations * max workers,\n \
+                               consider increasing the number of stations")
+
+    def model_data_from_yaml(self, model_yaml_file):
+        '''This function reads a model_yaml_file and uses it to fill in the model 
+        data for the MultiModelInstance object'''
+        with open(model_yaml_file) as file:
+            mm_yaml = yaml.load(file, Loader=yaml.FullLoader)
+            self.takt_time = mm_yaml['takt_time']
+            self.data = mm_yaml['model_data']
+            self.no_models = len(mm_yaml['model_data'])
+            self.name = mm_yaml['name']
+            self.model_mixtures = {}
+            for model in self.data:
+                self.model_mixtures[model] = self.data[model]['probability']
+                
+
+    def model_data_to_yaml(self, fp=None):
+        '''This function writes a MultiModelInstance object to a yaml file'''
+        mmi_dict = {'name':self.name, 'model_data':self.data, 'takt_time':self.takt_time}
+        my_yaml = open(fp + f'{self.name}.yaml', 'w')
+        yaml.dump(mmi_dict, my_yaml)
 
     def generate_name(self):
         '''generates name from the filename of the .albp problem. The name is from the two numbers before the .albp extension'''
         name = ''
-        print('data', self.data)
         for model in self.model_dicts:
 
             name += model['fp'].split('/')[-1].split('.')[0].split('_')[-2]+ '_'+ model['fp'].split('/')[-1].split('.')[0].split('_')[-1] + '_'
+        #remove last character of name string
+        name = name[:-1]
         return name
 
         
@@ -328,9 +397,9 @@ def parse_alb(alb_file_name):
 #function that returns names of all files in a directory with a given extension
 def get_instance_list(directory, keep_directory_location = True,  extension='.alb'):
     if keep_directory_location:
-        return [{'name': f.split("=")[1].split(".")[0], 'location': directory + '/' + f} for f in os.listdir(directory) if f.endswith(extension)]
+        return [ directory + '/' + f for f in os.listdir(directory) if f.endswith(extension)]
     else:
-        return [{'name': f.split("=")[1].split(".")[0], 'location':f} for f in os.listdir(directory) if f.endswith(extension)]
+        return [f for f in os.listdir(directory) if f.endswith(extension)]
 
 def rand_pert_precedence(p_graph_orig, seed=None):
     # randomly change at least 1 edge in the precedence graph
@@ -473,6 +542,8 @@ def create_instance_pair_stochastic(instance_dicts):
     for instance in instance_dicts:
         parsed_instances[instance['name']] = {}
         parsed_instance = parse_alb(instance['fp'])
+        #Cycle time will be set to the same for all models
+        del parsed_instance['cycle_time']
         parsed_instances[instance['name']].update(parsed_instance)
         parsed_instances[instance['name']]['probability'] = instance['probability']
     return parsed_instances
@@ -501,7 +572,7 @@ def linear_reduction(old_task_times, number_of_workers):
 
 # EQUIPMENT SECTION
 def generate_equipment(
-    number_of_pieces, number_of_stations, all_tasks, cost_range=[100, 300], seed=None
+    number_of_pieces, number_of_stations, no_tasks, cost_range=[100, 300], seed=None
 ):
     """Generates equipment cost and r_oe matrices. Returns equipment cost and roe matrix"""
     rng = np.random.default_rng(seed=seed)
@@ -509,13 +580,13 @@ def generate_equipment(
         number_of_pieces, number_of_stations, rng, cost_range
     )
     r_oe_matrix = generate_r_oe(
-        equipment_cost_matrix, all_tasks, number_of_pieces, rng
+        equipment_cost_matrix, no_tasks, number_of_pieces, rng
     )
     return equipment_cost_matrix, r_oe_matrix
 
 
 def generate_r_oe(
-    equipment_cost_matrix, all_tasks, number_of_pieces, rng
+    equipment_cost_matrix, no_tasks, number_of_pieces, rng
 ):
     mean_cost = equipment_cost_matrix.mean()
     equip_avg = equipment_cost_matrix.mean(0)
@@ -527,7 +598,7 @@ def generate_r_oe(
     # not the average, has problem that it sometimes generates infeasible
     # r_oes
     # equip_val = equipment_cost_matrix.sum(0)/equipment_cost_matrix.sum()
-    random_matrix = rng.random((len(all_tasks), number_of_pieces))
+    random_matrix = rng.random((no_tasks, number_of_pieces))
     r_oe = random_matrix < equip_val
     return r_oe
 
@@ -543,22 +614,65 @@ def generate_equipment_cost(
     return equipment_cost_matrix
 
 
-def generate_equipment_2(NO_EQUIPMENT, NO_STATIONS,NO_TASKS,instance_number=0, mean=100, variance=15, seed = None):
-    np.random.seed(seed)
-    equipment_matrix = np.random.randint(0, 2, size=(NO_EQUIPMENT, NO_TASKS))
-    equipment_prices = np.zeros((NO_STATIONS,NO_EQUIPMENT))
-    print(equipment_matrix)
-    print(np.sum(equipment_matrix, axis=1))
-    for equipment in range(NO_EQUIPMENT):
-        for station in range(NO_STATIONS):
-            equipment_prices[ station, equipment] =int((mean+np.random.randn()*variance ))* np.sum(equipment_matrix,axis=1)[equipment]
-    print(equipment_prices)
-    #TODO: Check for dominated equipment, create function that generates a random instance
-    equipment_instance = {instance_number:{ 'equipment_matrix': equipment_matrix, 'equipment_prices': equipment_prices}}
-    return equipment_instance
+def generate_equipment_2(no_equipment, no_stations,no_tasks,mean=100, variance=15, seed = None):
+    rng = np.random.default_rng(seed=seed)
+    r_oe =rng.integers(low=0, high=2, size=( no_tasks, no_equipment))
+    while np.sum(r_oe,axis=1).min() == 0:
+        warnings.warn('infeasible equipment, trying random seed again')
+        rng = np.random.default_rng()
+        #makes sure we have feasible equipment
+        r_oe =rng.integers(low=0, high=2, size=( no_tasks, no_equipment))
+        print(np.sum(r_oe,axis=1))
+    c_se = np.zeros((no_stations,no_equipment))
+    for equipment in range(no_equipment):
+        for station in range(no_stations):
+            c_se[ station, equipment] =int((mean+np.random.randn()*variance ))* np.sum(r_oe,axis=0)[equipment]    
+    return c_se,r_oe
 
 class Equipment():
-    def __init__(self, all_tasks, NO_STATIONS, NO_EQUIPMENT, generation_method, seed= 42, **kwargs):
-        self.c_se, self.r_oe = generation_method(NO_EQUIPMENT, NO_STATIONS, all_tasks, seed=seed, **kwargs)
+    def __init__(self,no_tasks = None, no_stations = None, no_equipment = None, generation_method = None, equipment_file = None, seed= 42, **kwargs):
+        self.no_tasks = no_tasks
+        self.no_stations = no_stations
+        self.no_equipment = no_equipment
+        if generation_method == 'import_yaml':
+            self.from_yaml(equipment_file)
+        elif generation_method == 'cost_based':
+            print('doing cost based')
+            self.name = f'cost_based_O{no_tasks}_E{no_equipment}_S{no_stations}_seed{seed}'
+            self.c_se, self.r_oe = generate_equipment(no_equipment, no_stations, no_tasks, seed=seed, **kwargs)
+        else:
+            print('doing new method')
+            self.name = f'random_O{no_tasks}_E{no_equipment}_S{no_stations}_seed{seed}'
+            self.c_se, self.r_oe = generate_equipment_2(no_equipment, no_stations, no_tasks, seed=seed, **kwargs)
 
+    def from_yaml(self, file_name):
+        '''reads equipment from a yaml file'''
+        with open(file_name) as file:
+            equipment_yaml = yaml.load(file, Loader=yaml.FullLoader)
+            self.no_equipment = equipment_yaml['no_equipment']
+            self.no_stations = equipment_yaml['no_stations']
+            self.no_tasks = equipment_yaml['no_tasks']
+            self.c_se = np.array(equipment_yaml['c_se'])
+            self.r_oe =np.array( equipment_yaml['r_oe'])
 
+            self.name = equipment_yaml['name']
+    
+    def to_yaml(self, fp):
+        '''writes equipment to a yaml file'''
+        equipment_dict = { 'name':self.name, 'no_equipment': self.no_equipment, 'no_stations': self.no_stations, 'no_tasks':self.no_tasks, 'c_se':self.c_se.tolist(), 'r_oe':self.r_oe.tolist(),}
+        my_yaml = open(fp + self.name + '.yaml', 'w')
+        yaml.dump(equipment_dict, my_yaml)
+
+def save_MALBPW_config(config_name, no_workers, no_stations, worker_cost, recourse_cost, sequence_length, file_name, equipment_files = None, instance_files = None):
+   '''Saves config data to a yaml file'''
+   config_dict = {'config_name': config_name,
+                  'no_workers': no_workers, 
+                  'no_stations': no_stations, 
+                  'worker_cost': worker_cost, 
+                  'recourse_cost': recourse_cost,  
+                  'sequence_length': sequence_length,
+                  'equipment_files': equipment_files, 
+                  'model_files': instance_files}
+   with open(file_name, 'w') as file:
+      documents = yaml.dump(config_dict, file)
+   return documents
