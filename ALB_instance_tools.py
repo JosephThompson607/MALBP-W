@@ -9,6 +9,9 @@ import copy
 import yaml
 import warnings
 
+
+
+
 class MultiModelInstance:
     def __init__(self,  init_type='from_model_dicts',  instance_config_yaml = None, model_yaml = None, model_dicts=None, 
                  name = None, takt_time=None, max_workers = None, no_stations=None, 
@@ -24,38 +27,44 @@ class MultiModelInstance:
         self.recourse_cost = recourse_cost
         self.no_equipment = no_equipment
         self.instance_config_yaml = instance_config_yaml
-
+        self.all_tasks = None
+        self.no_tasks = None
         if init_type == 'from_model_dicts':
             self.data = create_instance_pair_stochastic(model_dicts)
             self.no_models = len(model_dicts)
+            self.all_tasks = get_task_union(self.data, *list(self.data.keys()) )
+            self.no_tasks = len(self.all_tasks)
             if not name:
                 self.name = self.generate_name()
         elif init_type == 'instance_from_yaml':
             #Reads config data from a yaml then model data from the model file 
             self.instance_config_from_yaml(instance_config_yaml)
             self.model_data_from_yaml(model_yaml)
+            self.config_check()
         elif init_type == 'model_data_from_yaml':
             #Only reads data on models from a yaml file
             self.model_data_from_yaml(model_yaml)
+            self.config_check()
         else:
             raise ValueError('init_type must be either from_model_dicts or from yaml files')
         #Make sure that config data is set correctly
-        self.config_check()
+        
         self.scenario_tree = None
         self.sequence_length = sequence_length
-        self.all_tasks = get_task_union(self.data, *list(self.data.keys()) )
-        self.no_tasks = len(self.all_tasks)
+        
         
     def instance_config_from_yaml(self, malbpw_yaml_file):
          '''Gets all instance data from a yaml file'''
          with open(malbpw_yaml_file) as file:
-             malbpw_yaml = yaml.load(file, Loader=yaml.FullLoader)
-             self.max_workers = malbpw_yaml['max_workers']
-             self.no_stations = malbpw_yaml['no_stations']
-             self.worker_cost = malbpw_yaml['worker_cost']
-             self.recourse_cost = malbpw_yaml['recourse_cost']
-             self.equipment_file = malbpw_yaml['equipment_file']
-             self.sequence_length = malbpw_yaml['sequence_length']
+            malbpw_yaml = yaml.load(file, Loader=yaml.FullLoader)
+            self.max_workers = malbpw_yaml['max_workers']
+            self.no_stations = malbpw_yaml['no_stations']
+            self.worker_cost = malbpw_yaml['worker_cost']
+            self.recourse_cost = malbpw_yaml['recourse_cost']
+             # if equipment file exists
+            if 'equipment_file' in malbpw_yaml:
+                self.equipment_file = malbpw_yaml['equipment_file']
+            self.sequence_length = malbpw_yaml['sequence_length']
              
 
     def config_check(self):
@@ -77,21 +86,27 @@ class MultiModelInstance:
     def model_data_from_yaml(self, model_yaml_file):
         '''This function reads a model_yaml_file and uses it to fill in the model 
         data for the MultiModelInstance object'''
+        print('using this file', model_yaml_file)
         with open(model_yaml_file) as file:
+
             mm_yaml = yaml.load(file, Loader=yaml.FullLoader)
             self.takt_time = mm_yaml['takt_time']
             self.data = mm_yaml['model_data']
             self.no_models = len(mm_yaml['model_data'])
+
+            self.no_tasks = mm_yaml['no_tasks']
             self.name = mm_yaml['name']
             self.model_mixtures = {}
             for model in self.data:
                 self.model_mixtures[model] = self.data[model]['probability']
                 
 
-    def model_data_to_yaml(self, fp=None):
+    def model_data_to_yaml(self, fp=None, name=None):
         '''This function writes a MultiModelInstance object to a yaml file'''
-        mmi_dict = {'name':self.name, 'model_data':self.data, 'takt_time':self.takt_time}
-        my_yaml = open(fp + f'{self.name}.yaml', 'w')
+        mmi_dict = {'name':self.name, 'model_data':self.data, 'takt_time':self.takt_time, 'no_tasks' : self.no_tasks}
+        if not name:
+            name = self.name
+        my_yaml = open(fp + f'{name}.yaml', 'w')
         yaml.dump(mmi_dict, my_yaml)
 
     def generate_name(self):
@@ -103,6 +118,57 @@ class MultiModelInstance:
         #remove last character of name string
         name = name[:-1]
         return name
+    
+class MultiModelTaskTimesInstance(MultiModelInstance):
+    '''This is the same as the multi-model class, but task times depend on the number of workers, and does not need to be linear'''
+    def __init__(self,  init_type='from_model_dicts',  instance_config_yaml = None, model_yaml = None, model_dicts=None, 
+                 name = None, takt_time=None, max_workers = None, no_stations=None, 
+                 sequence_length=None, worker_cost=None,recourse_cost = None, no_equipment=None, instance_type = 'alb'):
+        super(MultiModelTaskTimesInstance, self).__init__(init_type, instance_config_yaml, model_yaml, model_dicts, 
+                 name, takt_time, max_workers, no_stations, 
+                 sequence_length, worker_cost,recourse_cost, no_equipment, instance_type)
+        
+       
+    def genererate_task_times(self,  change_func, **kwargs):
+        '''Takes task times for 1 worker and calculates task time for groups of workers, based on the change func.
+                Change func is the function that changes the task time, depending on the number of workers and the kwargs'''
+        self.all_tasks = set()
+        for model in self.data:
+                task_times = self.data[model]['task_times'].copy()
+                self.all_tasks.update(task_times.keys())
+                self.data[model]['task_times'] = {}
+                self.data[model]['task_times'][1] = task_times
+
+                for worker in range(2,self.max_workers+1):
+                    self.data[model]['task_times'][worker]= change_func(task_times, worker, **kwargs)
+        self.no_tasks = len(self.all_tasks)
+
+
+    def config_check(self):
+        #Check that the total probability of entering is equal to 1
+        total_probability = 0
+        for model in self.data:
+            total_probability += self.data[model]['probability']
+        if total_probability != 1:
+            warnings.warn('Model probabilities do not sum to 1')
+        #Check that the total task time is less than the takt time * number of stations * max workers
+        for model in self.data:
+            total_task_time = 0
+            for task_time in self.data[model]['task_times'][1].values():
+                total_task_time += task_time
+            if total_task_time > self.takt_time * self.no_stations * self.max_workers:
+                warnings.warn(f"Total task time for model {model} exceeds the takt time * number of stations * max workers,\n \
+                                consider increasing the number of stations")
+
+
+def change_task_times_linear( task_times, no_workers, **kwargs):
+    '''divides the task times by the number of workers'''
+    new_task_times = task_times.copy()
+    for task in new_task_times:
+        new_task_times[task] = new_task_times[task]/no_workers
+    return new_task_times
+
+   
 
         
     # def create_instance_pair_stochastic(self, model_dicts):
@@ -348,6 +414,14 @@ def pair_instances(instance_list, MODEL_MIXTURES):
             instance_group.append({'fp':instance_list[j], 'name':model_name, 'probability':MODEL_MIXTURES[model_name]})
          instance_groups.append(instance_group)
       return instance_groups
+
+def make_instance_pair(instance_list, MODEL_MIXTURES):
+    '''returns a list of lists of multi-model instances, where each list of instances is a list of instances that will be run together'''
+    instance_group= []
+    for j in range(len(MODEL_MIXTURES)):
+        model_name = list(MODEL_MIXTURES.keys())[j]
+        instance_group.append({'fp':instance_list[j], 'name':model_name, 'probability':MODEL_MIXTURES[model_name]})
+    return instance_group
 
 def read_instance_folder(folder_loc):
    '''looks in folder_loc for all .alb files and returns a list of filepaths to the .alb files'''
@@ -630,7 +704,7 @@ def generate_equipment_2(no_equipment, no_stations,no_tasks,mean=100, variance=1
     return c_se,r_oe
 
 class Equipment():
-    def __init__(self,no_tasks = None, no_stations = None, no_equipment = None, generation_method = None, equipment_file = None, seed= 42, **kwargs):
+    def __init__(self,no_tasks = None,  no_equipment = None,no_stations = None, generation_method = None, equipment_file = None, seed= 42, **kwargs):
         self.no_tasks = no_tasks
         self.no_stations = no_stations
         self.no_equipment = no_equipment
@@ -657,10 +731,12 @@ class Equipment():
 
             self.name = equipment_yaml['name']
     
-    def to_yaml(self, fp):
+    def to_yaml(self, fp, name=None):
         '''writes equipment to a yaml file'''
-        equipment_dict = { 'name':self.name, 'no_equipment': self.no_equipment, 'no_stations': self.no_stations, 'no_tasks':self.no_tasks, 'c_se':self.c_se.tolist(), 'r_oe':self.r_oe.tolist(),}
-        my_yaml = open(fp + self.name + '.yaml', 'w')
+        if not name:
+            name = self.name
+        equipment_dict = { 'name':name, 'no_equipment': self.no_equipment, 'no_stations': self.no_stations, 'no_tasks':self.no_tasks, 'c_se':self.c_se.tolist(), 'r_oe':self.r_oe.tolist(),}
+        my_yaml = open(fp + name + '.yaml', 'w')
         yaml.dump(equipment_dict, my_yaml)
 
 def save_MALBPW_config(config_name, no_workers, no_stations, worker_cost, recourse_cost, sequence_length, file_name, equipment_files = None, instance_files = None):
