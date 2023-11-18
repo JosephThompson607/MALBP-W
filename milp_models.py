@@ -23,19 +23,6 @@ class MMALBP_LP_Problem:
         self.obj_value = None
         self.solver_status = None
         
-
-    def get_obj_val_dict_old(self):
-        '''generate a dictionary resluts from the solved problem'''
-        obj_val_dict = {}
-        for i, input_instance in enumerate(self.problem_instance.model_dicts):
-            obj_val_dict['file_'+ str(i)] = input_instance['fp']
-            model = list(self.problem_instance.data.keys())[i]
-            for key, value in self.problem_instance.data[model].items():
-                obj_val_dict[model+'_'+key] = value
-        obj_val_dict['name'] = self.problem_instance.name
-        obj_val_dict['obj_value'] = self.obj_value
-        obj_val_dict['solver_status'] = self.solver_status
-        return obj_val_dict
     
     def get_obj_val_dict(self):
         '''generate a dictionary resluts from the solved problem'''
