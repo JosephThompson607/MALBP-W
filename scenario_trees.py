@@ -1,4 +1,6 @@
 import networkx as nx
+import random
+
 
 def make_scenario_tree(n_takts, entry_probabilities):
     """
@@ -145,4 +147,21 @@ def check_scenarios(prod_sequence1,prod_sequence2,t):
     else:
         return False
 
+
+def monte_carlo_tree(n_takts, entry_probabilities, enum_depth=0, n_samples = 100):
+    '''Generates a scenario tree by sampling from the entry probabilities'''
+    #enumerates the fist enum_depth takts
+    _, final_sequences = make_scenario_tree(enum_depth, entry_probabilities)
+    #randomly sample from the final sequences dictionary of dictionaries, based off of the probabilities
+    sampled_sequences = {}
+    for i in range(n_samples):
+        seq = random.choices(list(final_sequences.values()),[x['probability'] for x in final_sequences.values()])[0]['sequence'].copy()
+        print("seq", seq)
+        print("i", i)
+        for j in range(n_takts-enum_depth):
+            print("j", j)
+            seq.append(random.choices(list(entry_probabilities.keys()),[x for x in entry_probabilities.values()])[0])
+        sampled_sequences[i] = {'sequence':seq, 'probability': 1/n_samples}
+  
+    return None, sampled_sequences
 

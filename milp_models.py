@@ -1,9 +1,10 @@
 from ALB_instance_tools import *
 import pandas as pd
 import pulp as plp
+from scenario_trees import check_scenarios
 
 class MMALBP_LP_Problem:
-    def __init__(self, problem_instance, equipment_instance, sequence_length) -> None:
+    def __init__(self, problem_instance, equipment_instance, sequence_length, **kwargs) -> None:
         self.problem_instance = problem_instance
         self.equipment_instance = equipment_instance
         self.sequence_length = sequence_length
@@ -332,7 +333,7 @@ class dynamic_problem_linear_labor_recourse(MMALBP_LP_Problem):
                     if 0<= t-s < self.sequence_length:
                         j = t-s
                         model = self.prod_sequences[w]['sequence'][j]
-                        task_times = self.problem_instance.data[model]['task_times']
+                        task_times = self.problem_instance.data[model]['task_times'][1]
                         self.prob += (plp.lpSum([task_times[o]*self.x_wsoj[w][s][int(o)-1][j] 
                                             for o in task_times]) 
                                             <= 
@@ -357,8 +358,7 @@ class dynamic_problem_linear_labor_recourse(MMALBP_LP_Problem):
             for w_prime in self.prod_sequences.keys():
                 if w_prime > w:
                     self.add_non_anticipation(w, w_prime , self.prod_sequences, self.problem_instance, self.x_wsoj, self.sequence_length,self.problem_instance.no_stations)
-
-        print('prob', self.prob)             
+    
         return 
     
     def add_non_anticipation(self, w, w_prime , prod_sequences, problem_instance, x_wsoj, sequence_length, num_stations):
@@ -384,14 +384,13 @@ class dynamic_problem_linear_labor_recourse(MMALBP_LP_Problem):
         fixed_labor = 0
         for v in self.prob.variables():
             if round(v.varValue) > 0:
-                print('variable values', v.name, v.value())
                 if 'x_wsoj' in v.name:
                     sequence = int(v.name.split('_')[2])
                     item = int(v.name.split('_')[5])
                     model = self.prod_sequences[sequence]['sequence'][item]
                     #change the task number to match with the instances
                     task = str(int(v.name.split('_')[4])+1)
-                    task_time = self.problem_instance.data[model]['task_times'][task]
+                    task_time = self.problem_instance.data[model]['task_times'][1][task]
                     assignment = {'scenario':v.name.split('_')[2], 'station': v.name.split('_')[3],'sequence_loc':str(item), 'model':model  , 'task': task, 'task_times': task_time}
                     task_assignments.append(assignment)
                 elif 'l_wts' in v.name:
@@ -881,7 +880,7 @@ class model_dependent_problem_linear_labor_recourse(MMALBP_LP_Problem):
                     if 0<= t-s < self.sequence_length:
                         j = t-s
                         model = self.prod_sequences[w]['sequence'][j]
-                        task_times = self.problem_instance.data[model]['task_times']
+                        task_times = self.problem_instance.data[model]['task_times'][1]
                         self.prob += (plp.lpSum([task_times[o]*self.x_soi[s][int(o)-1][model] 
                                             for o in task_times]) 
                                             <= 
@@ -918,12 +917,11 @@ class model_dependent_problem_linear_labor_recourse(MMALBP_LP_Problem):
         fixed_labor = 0
         for v in self.prob.variables():
             if round(v.varValue) > 0:
-                print(v.name, v.value())
                 if 'x_soi' in v.name:
                     model = v.name.split('_')[4]
                     #change the task number to match with the instances
                     task = str(int(v.name.split('_')[3])+1)
-                    task_time = self.problem_instance.data[model]['task_times'][task]
+                    task_time = self.problem_instance.data[model]['task_times'][1][task]
                     assignment = {'station': v.name.split('_')[2],'model':model  , 'task': task, 'task_times': task_time}
                     task_assignments.append(assignment)
                 elif 'l_wts' in v.name:
@@ -1111,7 +1109,6 @@ class model_dependent_problem_multi_labor_recourse(MMALBP_LP_Problem):
         fixed_labor = 0
         for v in self.prob.variables():
             if round(v.varValue) > 0:
-                print(v.name, v.value())
                 if 'x_lsoi' in v.name:
                     workers = int(v.name.split('_')[2])
                     model = v.name.split('_')[5]
