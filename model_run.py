@@ -4,7 +4,7 @@ import pandas as pd
 import pulp as plp
 import networkx as nx
 from ALB_instance_tools import *
-from report_functions import *
+#from report_functions import *
 from milp_models import *
 from scenario_trees import *
 from collections import namedtuple
@@ -18,7 +18,7 @@ from timeit import default_timer as timer
 import argparse
 
 
-def run_from_config(config_file, seed = None, base_file_name = 'test'):
+def run_from_config(config_file, run_time = 600, seed = None, base_file_name = 'test'):
    test_instances = []
    with open(config_file) as f:
       print('Opening config file', config_file)
@@ -118,7 +118,7 @@ def run_from_config(config_file, seed = None, base_file_name = 'test'):
                                    sequence_length=SEQUENCE_LENGTH, 
                                    prod_sequences=final_sequences)
             start = timer()
-            solver = plp.GUROBI_CMD(options=[ ('TimeLimit', 600), ('LogFile', file_name+conf_name + str(group_counter) + ".log")])#
+            solver = plp.GUROBI_CMD(options=[ ('TimeLimit', run_time), ('LogFile', file_name+conf_name + str(group_counter) + ".log")])#
             milp_prob.solve(solver=solver, 
                             file_name=file_name + conf_name+ str(group_counter))
             end = timer()
@@ -155,6 +155,7 @@ if __name__ == "__main__":
     parser.add_argument('config_file', type=str, help='config file to run')
     parser.add_argument('--seed', type=int, help='seed for random number generator')
     parser.add_argument('--xp_name', type=str, help='directory to save results')
+    parser.add_argument('--run_time', type=int, help='time limit for solver')
     args = parser.parse_args()
     today = datetime.today().strftime('%Y_%m_%d')
     if args.xp_name:
@@ -162,9 +163,10 @@ if __name__ == "__main__":
         if not os.path.exists('model_runs/'+str(today)+args.xp_name):
             os.makedirs('model_runs/'+str(today)+args.xp_name)
         file_name = 'model_runs/'+str(today)+args.xp_name
-        run_from_config(args.config_file, seed=args.seed, base_file_name=file_name)
+        run_from_config(args.config_file, seed=args.seed,run_time=args.run_time, base_file_name=file_name)
     else:
         if not os.path.exists('model_runs/test'):
             os.makedirs('model_runs/test')
         file_name = 'model_runs/'+str(today)+ 'test'
-        run_from_config(args.config_file, seed=args.seed, file_name=file_name)
+        print("args.run_time", args.run_time)
+        run_from_config(args.config_file, seed=args.seed, run_time=args.run_time, file_name=file_name)

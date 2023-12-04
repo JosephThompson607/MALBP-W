@@ -1,9 +1,11 @@
 from ALB_instance_tools import *
 import pandas as pd
 import pulp as plp
+import csv
 from scenario_trees import check_scenarios
 
 class MMALBP_LP_Problem:
+    '''Base class for the linear programming problem for the multi-model assembly line balancing problem'''
     def __init__(self, problem_instance, equipment_instance, sequence_length, **kwargs) -> None:
         self.problem_instance = problem_instance
         self.equipment_instance = equipment_instance
@@ -18,6 +20,7 @@ class MMALBP_LP_Problem:
         self.b_wtsl = None
         self.x_wsoj = None
         self.Y_w = None
+        self.Y  = None
         self.make_lp_variables()
         #Results info
         self.obj_value = None
@@ -36,6 +39,162 @@ class MMALBP_LP_Problem:
         obj_val_dict['obj_value'] = self.obj_value
         obj_val_dict['solver_status'] = self.solver_status
         return obj_val_dict
+    
+    def x_soi_to_csv(self, file_name):
+        '''saves the task assignment to a csv file'''
+        task_assignments = []
+        for station in self.stations:
+            for model in self.problem_instance.data.keys():
+                for task in range(self.problem_instance.data[model]['num_tasks']):
+                        task_assignments.append({'station':station, 'model':model, 'task':task, 'value':self.x_soi[station][task][model].value()})
+        task_assignments_df = pd.DataFrame(task_assignments)
+        task_assignments_df.to_csv(file_name + 'x_soi.csv', index=False, sep=' ')
+
+    def x_wsoj_to_csv(self, file_name):
+        '''saves the task assignment to a csv file'''
+        task_assignments = []
+        for w in self.prod_sequences.keys():
+            for s in self.stations:
+                for o in range(self.problem_instance.no_tasks):
+                    for j, task_var in self.x_wsoj[w][s][o].items():
+                        task_assigned = task_var.value()
+                        task_assignments.append({'scenario':w, 'station':s, 'task':o, 'stage':j, 'value':task_assigned})
+        task_assignments_df = pd.DataFrame(task_assignments)
+        task_assignments_df.to_csv(file_name + 'x_wsoj.csv', index=False, sep=' ')
+
+    def u_se_to_csv(self, file_name):
+        '''saves the equipment variables to a csv file'''
+        equipment_assignments = []
+        for station in self.stations:
+            for equip_id in self.equipment:
+                equipment_assignments.append({'station':station, 'equipment':equip_id, 'value':self.u_se[station][equip_id].value()})
+        equipment_assignments_df = pd.DataFrame(equipment_assignments)
+        equipment_assignments_df.to_csv(file_name + f'u_se.csv',index=False, sep=' ')
+    
+    def l_wts_to_csv(self, file_name):
+        '''saves the labor assignment to a csv file'''
+        labor_assignments = []
+        for w in self.prod_sequences.keys():
+            for t in self.takts:
+                for s in self.stations:
+                    labor_assignments.append({'scenario':w, 'stage':t, 'station':s, 'value':self.l_wts[w][t][s].value()})
+        labor_assignments_df = pd.DataFrame(labor_assignments)
+        labor_assignments_df.to_csv(file_name + f'l_wts.csv', index=False, sep=' ')
+    
+    def Y_Y_w_to_csv(self, file_name):
+        '''saves the recourse labor hire to a csv file'''
+        labor_hire_assignments = []
+        for w in self.prod_sequences.keys():
+            labor_hire_assignments.append({'scenario':w, 'value':self.Y_w[w].value()})
+        #adds in the fixed labor to the csv
+        labor_hire_assignments.append({'scenario':'fixed', 'value':self.Y.value()})
+        labor_hire_df = pd.DataFrame(labor_hire_assignments)
+        labor_hire_df.to_csv(file_name + f'Y_Y_w.csv', index=False, sep=' ')
+
+    def set_u_se_from_df(self, u_se_df, fixed = False):
+        '''sets the u_se variables to the values in u_se_df'''
+        for index, row in u_se_df.iterrows():
+            station = int(row['station'])
+            equipment = int(row['equipment'])
+            self.u_se[station][equipment].setInitialValue(round(row['value']))
+            if fixed:
+                self.u_se[row['station']][row['equipment']].fixValue()
+
+    def set_l_wts_from_df(self, l_wts_df, fixed = False):
+        '''sets the l_wts variables to the values in l_wts_df'''
+        for index, row in l_wts_df.iterrows():
+            self.l_wts[row['scenario']][row['stage']][row['station']].setInitialValue(round(row['value']))
+            if fixed:
+                self.l_wts[row['scenario']][row['stage']][row['station']].fixValue()
+    
+    def set_b_wtsl_from_df(self, b_wtsl_df, fixed = False):
+        '''sets the b_wtsl variables to the values in b_wtsl_df'''
+        for index, row in b_wtsl_df.iterrows():
+            self.b_wtsl[row['scenario']][row['stage']][row['station']][row['workers']].setInitialValue(round(row['value']))
+            if fixed:
+                self.b_wtsl[row['scenario']][row['stage']][row['station']][row['workers']].fixValue()
+
+    def set_x_soi_from_df(self, x_soi_df, fixed = False):
+        '''sets the w_soi variables to the values in w_soi_df'''
+        for index, row in x_soi_df.iterrows():
+            self.x_soi[row['station']][row['task']][row['model']].setInitialValue(round(row['value']))
+            if fixed:
+                self.x_soi[row['station']][row['task']][row['model']].fixValue()
+    
+    def set_Y_Y_w_from_df(self, Y_Y_w_df, fixed = False):
+        '''sets the Y_w variables to the values in Y_w_df'''
+        for index, row in Y_Y_w_df.iterrows():
+            if row['scenario'] == 'fixed':
+                self.Y.setInitialValue(round(row['value']))
+                if fixed:
+                    self.Y.fixValue()
+            else:
+                self.Y_w[int(row['scenario'])].setInitialValue(round(row['value']))
+                if fixed:
+                    self.Y_w[row['scenario']].fixValue()
+
+    def set_u_se(self, u_se, fixed = False):
+        '''sets the u_se variables to the values in u_se'''
+        for s, equipment_dict in u_se.items():
+            for equip_id in equipment_dict:
+                e = int(equip_id)
+                self.u_se[s][e].setInitialValue(round(u_se[s][equip_id].value()))
+                if fixed:
+                    self.u_se[s][e].fixValue()
+    
+    def set_l_wts(self, l_wts, fixed = False):
+        '''sets the l_wts variables to the values in l_wts'''
+        for w in l_wts.keys():
+            for t in l_wts[w].keys():
+                for s in l_wts[w][t].keys():
+                    self.l_wts[w][t][s].setInitialValue(round(l_wts[w][t][s].value()))
+                    if fixed:
+                        self.l_wts[w][t][s].fixValue()
+    
+    def set_b_wtsl(self, b_wtsl, fixed = False):
+        '''sets the b_wtsl variables to the values in b_wtsl'''
+        for w in b_wtsl.keys():
+            for t in b_wtsl[w].keys():
+                for s in b_wtsl[w][t].keys():
+                    for l, labor_var in b_wtsl[w][t][s].items():
+                        labor_val = labor_var.value()
+                        self.b_wtsl[w][t][s][l].setInitialValue(round(labor_val))
+                        if fixed:
+                            self.b_wtsl[w][t][s][l].fixValue()
+
+    def set_x_soi(self, x_soi, fixed = False):
+        '''sets the w_soi variables to the values in w_soi'''
+        for station in x_soi.keys():
+            for task in x_soi[station].keys():
+                for model, task_var in x_soi[station][task].items():
+                    task_assigned = task_var.value()
+                    self.x_soi[station][task][model].setInitialValue(round(task_assigned))
+                    if fixed:
+                        self.x_soi[station][task][model].fixValue()
+    
+    def set_x_wsoj(self, x_wsoj, fixed = False):
+        '''sets the x_wsoj variables to the values in x_wsoj'''
+        for w in x_wsoj.keys():
+            for s in x_wsoj[w].keys():
+                for o in x_wsoj[w][s].keys():
+                    for j, task_var in x_wsoj[w][s][o].items():
+                        task_assigned = task_var.value()
+                        self.x_wsoj[w][s][o][j].setInitialValue(round(task_assigned))
+                        if fixed:
+                            self.x_wsoj[w][s][o][j].fixValue()
+    
+    def set_Y_w(self, Y_w, fixed = False):
+        '''sets the Y_w variables to the values in Y_w'''
+        for w in Y_w.keys():
+            self.Y_w[w].setInitialValue(round(Y_w[w].value()))
+            if fixed:
+                self.Y_w[w].fixValue()
+
+    def set_Y(self, Y, fixed = False):
+        '''sets the Y variables to the values in Y'''
+        self.Y.setInitialValue(round(Y.value()))
+        if fixed:
+            self.Y.fixValue()
 
     def solve(self, solver=None, generate_report =True, file_name = ''):
         self.make_lp_problem()
@@ -283,6 +442,67 @@ class dynamic_problem_linear_labor_recourse(MMALBP_LP_Problem):
         self.Y_w = plp.LpVariable.dicts('Y_w', (self.prod_sequences.keys()), lowBound=0, cat='Integer')
         self.Y = plp.LpVariable('Y', lowBound=0, cat='Integer')
 
+    def x_soi_to_x_wsoj(self, x_soi_df, fixed = False):
+        '''converts model dependent x_soi to dynamic x_wsoj'''
+        for w in self.prod_sequences.keys():
+                    for t in self.takts:
+                        for s in self.stations:
+                            #Get the model at the current scenario, stage, and station
+                            print("This is s", s)
+                            print("x_w", self.x_wsoj[w])
+                            if 0<= t-s < self.sequence_length:
+                                j = t-s
+                                model = self.prod_sequences[w]['sequence'][j]
+                                for o in range(self.problem_instance.no_tasks):
+                                    df_result = x_soi_df.loc[(x_soi_df['station'] == s) & (x_soi_df['model'] == model) & (x_soi_df['task'] == o)]['value'].values[0]
+                                    #Gets value of datafram at the current scenario, stage, station, and task
+                                    self.x_wsoj[w][s][o][j].setInitialValue(round(df_result))
+                                    if fixed:
+                                        self.x_wsoj[w][s][o][j].fixValue()
+
+
+    def set_up_from_model_dependent(self, md_results_folder, fixed = False):
+        print('loading results from', md_results_folder)
+        if os.path.exists(md_results_folder + 'u_se.csv'):
+            print('loading u_se.csv')
+            md_u_se = pd.read_csv(md_results_folder + 'u_se.csv', sep=' ')
+            self.set_u_se_from_df(md_u_se, fixed)
+        if os.path.exists(md_results_folder + 'l_wts.csv'):
+            print('loading l_wts.csv')
+            md_l_wts = pd.read_csv(md_results_folder + 'l_wts.csv', sep=' ')
+            self.set_l_wts_from_df(md_l_wts, fixed)
+        if os.path.exists(md_results_folder + 'x_soi.csv'):
+            print('loading x_soi.csv')
+            x_soi_df = pd.read_csv(md_results_folder + 'x_soi.csv', sep=' ')
+            self.x_soi_to_x_wsoj(x_soi_df, fixed)
+        if os.path.exists(md_results_folder + 'Y_Y_w.csv'):
+            print('loading Y_Y_w.csv')
+            md_Y_Y_w = pd.read_csv(md_results_folder + 'Y_Y_w.csv', sep=' ')
+            self.set_Y_Y_w_from_df(md_Y_Y_w, fixed)
+
+
+    def save_variables(self, file_name):
+        '''calls the x_soi_to_csv, l_wts_to_csv, and Y_Y_w_to_csv functions'''
+        self.x_wsoj_to_csv(file_name)
+        self.l_wts_to_csv(file_name)
+        self.Y_Y_w_to_csv(file_name)
+        self.u_se_to_csv(file_name)
+        
+    
+
+    def set_variables(self, u_se =None, l_wts = None, x_wsoj= None, Y_w = None, Y= None, fixed=False):
+        """Sets variables before solving the problem. If fixed is true, then the variables are fixed to their initial values. Input is a dictionary of LpVariable"""
+        if u_se is not None:
+            self.set_u_se(u_se, fixed)
+        if l_wts is not None:
+            self.set_b_wtsl(l_wts, fixed)
+        if x_wsoj is not None:
+            self.set_x_wsoj(x_wsoj, fixed)
+        if Y_w is not None:
+            self.set_Y_w(Y_w, fixed)
+        if Y is not None:
+            self.set_Y(Y, fixed)
+
     def make_lp_problem(self):
         #Defining LP problem
         self.prob = plp.LpProblem("stochastic_problem", plp.LpMinimize)
@@ -332,7 +552,8 @@ class dynamic_problem_linear_labor_recourse(MMALBP_LP_Problem):
                 for s in self.stations:
                     for o in range(self.problem_instance.no_tasks):
                         self.prob += self.x_wsoj[w][s][o][j] <= plp.lpSum([self.R_oe[o][e]*self.u_se[s][e] for  e in self.equipment]), f'equipment_wsoj_{w}_{s}_{o}_{j}'
-            #Constraint 6 -- precedence constraints
+        
+        #Constraint 6 -- precedence constraints
         for w in self.prod_sequences.keys():
             for j, model in enumerate(self.prod_sequences[w]['sequence']):
                 for (pred, suc) in self.problem_instance.data[model]['precedence_relations']:
@@ -340,7 +561,8 @@ class dynamic_problem_linear_labor_recourse(MMALBP_LP_Problem):
                             <=  
                             plp.lpSum([ (s+1)  * self.x_wsoj[w][s][int(suc)-1][j] for s in self.stations]), 
                             f'task{pred} before task{suc} for model{model}, item {j} seq {w}' )
-            #Constraint 7 -- non-anticipativity constraints
+                    
+        #Constraint 7 -- non-anticipativity constraints
         for w in self.prod_sequences.keys():
             for w_prime in self.prod_sequences.keys():
                 if w_prime > w:
@@ -404,7 +626,7 @@ class dynamic_problem_linear_labor_recourse(MMALBP_LP_Problem):
         labor_hire_df = pd.DataFrame(labor_hire_assignments)
         labor_hire_df['fixed_workers'] = fixed_labor
         #concatenates the 'task' column in task_assignments_df if the 'station' and 'model' columns are the same
-        task_assignments_df = task_assignments_df.groupby(['scenario','station', 'sequence_loc','model'])['task', 'task_times'].agg({'task':lambda x: ','.join(x.astype(str)), 'task_times': sum }).reset_index()
+        task_assignments_df = task_assignments_df.groupby(['scenario','station', 'sequence_loc','model'])[['task', 'task_times']].agg({'task':lambda x: ','.join(x.astype(str)), 'task_times': sum }).reset_index()
         #labor_assignments_df['sequence_loc'] = labor_assignments_df['stage'].astype(int) - labor_assignments_df['station'].astype(int)
         #labor_assignments_df = labor_assignments_df[labor_assignments_df['sequence_loc'] >= 0]
         task_seq = task_assignments_df[['scenario','station', 'task','task_times', 'sequence_loc']]
@@ -579,7 +801,7 @@ class dynamic_problem_multi_labor_recourse(MMALBP_LP_Problem):
         labor_hire_df = pd.DataFrame(labor_hire_assignments)
         labor_hire_df['fixed_workers'] = fixed_labor
         #concatenates the 'task' column in task_assignments_df if the 'station' and 'model' columns are the same
-        task_assignments_df = task_assignments_df.groupby(['scenario','station', 'sequence_loc','model'])['task', 'task_times'].agg({'task':lambda x: ','.join(x.astype(str)), 'task_times': sum }).reset_index()
+        task_assignments_df = task_assignments_df.groupby(['scenario','station', 'sequence_loc','model'])[['task', 'task_times']].agg({'task':lambda x: ','.join(x.astype(str)), 'task_times': sum }).reset_index()
         #labor_assignments_df['sequence_loc'] = labor_assignments_df['stage'].astype(int) - labor_assignments_df['station'].astype(int)
         #labor_assignments_df = labor_assignments_df[labor_assignments_df['sequence_loc'] >= 0]
         task_seq = task_assignments_df[['scenario','station', 'task','task_times', 'sequence_loc']]
@@ -749,7 +971,7 @@ class dynamic_problem_multi_labor_recourse(MMALBP_LP_Problem):
 #         labor_assignments_df = pd.DataFrame(labor_assignments)
 #         labor_hire_df = pd.DataFrame(labor_hire_assignments)
 #         #concatenates the 'task' column in task_assignments_df if the 'station' and 'model' columns are the same
-#         task_assignments_df = task_assignments_df.groupby(['station', 'model'])['task', 'task_times'].agg({'task':lambda x: ','.join(x.astype(str)), 'task_times': sum }).reset_index()
+#         task_assignments_df = task_assignments_df.groupby(['station', 'model'])[['task', 'task_times']].agg({'task':lambda x: ','.join(x.astype(str)), 'task_times': sum }).reset_index()
 #         labor_assignments_df['sequence_loc'] = labor_assignments_df['stage'].astype(int) - labor_assignments_df['station'].astype(int)
 #         labor_assignments_df = labor_assignments_df[labor_assignments_df['sequence_loc'] >= 0]
 #         task_seq = task_assignments_df[['station', 'model','task','task_times']]
@@ -793,44 +1015,33 @@ class model_dependent_problem_linear_labor_recourse(MMALBP_LP_Problem):
         self.x_soi = plp.LpVariable.dicts('x_soi', ( self.stations, range(self.problem_instance.no_tasks), self.problem_instance.data.keys() ), lowBound=0, cat='Binary')
         self.Y_w = plp.LpVariable.dicts('Y_w', (self.prod_sequences.keys()), lowBound=0, cat='Integer')
         self.Y = plp.LpVariable('Y', lowBound=0, cat='Integer')
+    
 
-    def set_variables(self, u_se =None, l_wts = None, x_wsoj= None, x_soi=None, Y_w = None, fixed=False):
+
+    def save_variables(self, file_name):
+        '''calls the x_soi_to_csv, l_wts_to_csv, and Y_Y_w_to_csv functions'''
+        self.x_soi_to_csv(file_name)
+        self.l_wts_to_csv(file_name)
+        self.Y_Y_w_to_csv(file_name)
+        self.u_se_to_csv(file_name)
+    
+
+    def set_variables(self, u_se =None, l_wts = None, x_wsoj= None, x_soi=None, Y_w = None,Y = None, fixed=False):
         '''Sets variables before solving the problem. If fixed is true, then the variables are fixed to their initial values. Input is a dictionary of LpVariable'''
         if u_se is not None:
-            for s, equipment_dict in u_se.items():
-                for equip_id in equipment_dict:
-                    e = int(equip_id)
-                    self.u_se[s][e].setInitialValue(round(u_se[s][equip_id].value()))
-                if fixed:
-                    self.u_se[s][e].fixValue()
+            self.set_u_se(u_se, fixed)
         if l_wts is not None:
-            for w in l_wts.keys():
-                for t in l_wts[w].keys():
-                    for s in l_wts[w][t].keys():
-                        labor_val = l_wts[w][t][s].value()
-                        if labor_val > 0:
-                            self.l_wts[w][t][s].setInitialValue(round(labor_val))
-                            if fixed:
-                                self.l_wts[w][t][s].fixValue()
+            self.set_l_wts(l_wts, fixed)
         if x_soi is not None:
-            for s in x_soi.keys():
-                for o in x_soi[s].keys():
-                    for i, model in x_soi[s][o].items():
-                        task_assigned = model.value()
-                        self.x_soi[s][o][i].setInitialValue(round(task_assigned))
-                        if fixed:
-                            self.x_soi[s][o][i].fixValue()
-
+            self.set_xsoi(x_soi, fixed)
         if Y_w is not None:
-            for w in Y_w.keys():
-                self.Y_w[w].setInitialValue(round(Y_w[w].value()))
-                if fixed:
-                    self.Y_w[w].fixValue()
+            self.set_Y_w(Y_w, fixed)
+        if Y is not None:
+           self.set_Y(Y, fixed)
 
 
 
     def make_lp_problem(self):
-        
         #Defining LP problem
         self.prob = plp.LpProblem("model_dependent_eq_problem", plp.LpMinimize)
         #Objective function
@@ -928,7 +1139,7 @@ class model_dependent_problem_linear_labor_recourse(MMALBP_LP_Problem):
         labor_hire_df = pd.DataFrame(labor_hire_assignments)
         labor_hire_df['fixed_workers'] = fixed_labor
         #concatenates the 'task' column in task_assignments_df if the 'station' and 'model' columns are the same
-        task_assignments_df = task_assignments_df.groupby(['station', 'model'])['task', 'task_times'].agg({'task':lambda x: ','.join(x.astype(str)), 'task_times': sum }).reset_index()
+        task_assignments_df = task_assignments_df.groupby(['station', 'model'])[['task', 'task_times']].agg({'task':lambda x: ','.join(x.astype(str)), 'task_times': sum }).reset_index()
         labor_assignments_df['sequence_loc'] = labor_assignments_df['stage'].astype(int) - labor_assignments_df['station'].astype(int)
         labor_assignments_df = labor_assignments_df[labor_assignments_df['sequence_loc'] >= 0]
         task_seq = task_assignments_df[['station', 'model','task','task_times']]
@@ -1121,7 +1332,7 @@ class model_dependent_problem_multi_labor_recourse(MMALBP_LP_Problem):
         labor_hire_df = pd.DataFrame(labor_hire_assignments)
         labor_hire_df['fixed_workers'] = fixed_labor
         #concatenates the 'task' column in task_assignments_df if the 'station' and 'model' columns are the same
-        task_assignments_df = task_assignments_df.groupby(['station', 'model'])['task', 'task_times'].agg({'task':lambda x: ','.join(x.astype(str)), 'task_times': sum }).reset_index()
+        task_assignments_df = task_assignments_df.groupby(['station', 'model'])[['task', 'task_times']].agg({'task':lambda x: ','.join(x.astype(str)), 'task_times': sum }).reset_index()
         labor_assignments_df['sequence_loc'] = labor_assignments_df['stage'].astype(int) - labor_assignments_df['station'].astype(int)
         labor_assignments_df = labor_assignments_df[labor_assignments_df['sequence_loc'] >= 0]
         task_seq = task_assignments_df[['station', 'model','task','task_times']]
