@@ -448,8 +448,6 @@ class dynamic_problem_linear_labor_recourse(MMALBP_LP_Problem):
                     for t in self.takts:
                         for s in self.stations:
                             #Get the model at the current scenario, stage, and station
-                            print("This is s", s)
-                            print("x_w", self.x_wsoj[w])
                             if 0<= t-s < self.sequence_length:
                                 j = t-s
                                 model = self.prod_sequences[w]['sequence'][j]
