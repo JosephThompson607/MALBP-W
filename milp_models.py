@@ -19,8 +19,8 @@ class MMALBP_LP_Problem:
         self.u_se = None
         self.b_wtsl = None
         self.x_wsoj = None
-        self.Y_w = None
-        self.Y  = None
+        self.y_w = None
+        self.y  = None
         self.make_lp_variables()
         #Results info
         self.obj_value = None
@@ -81,15 +81,15 @@ class MMALBP_LP_Problem:
         labor_assignments_df = pd.DataFrame(labor_assignments)
         labor_assignments_df.to_csv(file_name + f'l_wts.csv', index=False, sep=' ')
     
-    def Y_Y_w_to_csv(self, file_name):
+    def y_y_w_to_csv(self, file_name):
         '''saves the recourse labor hire to a csv file'''
         labor_hire_assignments = []
         for w in self.prod_sequences.keys():
-            labor_hire_assignments.append({'scenario':w, 'value':self.Y_w[w].value()})
+            labor_hire_assignments.append({'scenario':w, 'value':self.y_w[w].value()})
         #adds in the fixed labor to the csv
-        labor_hire_assignments.append({'scenario':'fixed', 'value':self.Y.value()})
+        labor_hire_assignments.append({'scenario':'fixed', 'value':self.y.value()})
         labor_hire_df = pd.DataFrame(labor_hire_assignments)
-        labor_hire_df.to_csv(file_name + f'Y_Y_w.csv', index=False, sep=' ')
+        labor_hire_df.to_csv(file_name + f'y_y_w.csv', index=False, sep=' ')
 
     def set_u_se_from_df(self, u_se_df, fixed = False):
         '''sets the u_se variables to the values in u_se_df'''
@@ -121,22 +121,22 @@ class MMALBP_LP_Problem:
             if fixed:
                 self.x_soi[row['station']][row['task']][row['model']].fixValue()
     
-    def set_Y_Y_w_from_df(self, Y_Y_w_df, fixed = False):
-        '''sets the Y_w variables to the values in Y_w_df'''
-        for index, row in Y_Y_w_df.iterrows():
+    def set_y_y_w_from_df(self, y_y_w_df, fixed = False):
+        '''sets the y_w variables to the values in y_w_df'''
+        for index, row in y_y_w_df.iterrows():
             if row['scenario'] == 'fixed':
-                self.Y.setInitialValue(round(row['value']))
+                self.y.setInitialValue(round(row['value']))
                 if fixed:
-                    self.Y.fixValue()
+                    self.y.fixValue()
             else:
-                self.Y_w[int(row['scenario'])].setInitialValue(round(row['value']))
+                self.y_w[int(row['scenario'])].setInitialValue(round(row['value']))
                 if fixed:
-                    self.Y_w[row['scenario']].fixValue()
+                    self.y_w[row['scenario']].fixValue()
 
     def set_u_se(self, u_se, fixed = False):
         '''sets the u_se variables to the values in u_se'''
-        for s, equipment_dict in u_se.items():
-            for equip_id in equipment_dict:
+        for s in u_se:
+            for equip_id in u_se[s]:
                 e = int(equip_id)
                 self.u_se[s][e].setInitialValue(round(u_se[s][equip_id].value()))
                 if fixed:
@@ -144,57 +144,61 @@ class MMALBP_LP_Problem:
     
     def set_l_wts(self, l_wts, fixed = False):
         '''sets the l_wts variables to the values in l_wts'''
-        for w in l_wts.keys():
-            for t in l_wts[w].keys():
-                for s in l_wts[w][t].keys():
+        for w in l_wts:
+            for t in l_wts[w]:
+                for s in l_wts[w][t]:
                     self.l_wts[w][t][s].setInitialValue(round(l_wts[w][t][s].value()))
                     if fixed:
                         self.l_wts[w][t][s].fixValue()
     
-    def set_b_wtsl(self, b_wtsl, fixed = False):
-        '''sets the b_wtsl variables to the values in b_wtsl'''
-        for w in b_wtsl.keys():
-            for t in b_wtsl[w].keys():
-                for s in b_wtsl[w][t].keys():
-                    for l, labor_var in b_wtsl[w][t][s].items():
-                        labor_val = labor_var.value()
-                        self.b_wtsl[w][t][s][l].setInitialValue(round(labor_val))
-                        if fixed:
-                            self.b_wtsl[w][t][s][l].fixValue()
+    # def set_b_wtsl(self, b_wtsl, fixed = False):
+    #     '''sets the b_wtsl variables to the values in b_wtsl'''
+    #     for w in b_wtsl:
+    #         print('w', w)
+    #         print('b_wtsl[w]', b_wtsl[w])
+    #         for t in b_wtsl[w]:
+    #             for s in b_wtsl[w][t]:
+    #                 for l in b_wtsl[w][t][s]:
+    #                     b_wtsl_val = b_wtsl[w][t][s][l].value()
+    #                     self.b_wtsl[w][t][s][l].setInitialValue(round(b_wtsl_val))
+    #                     if fixed:
+    #                         self.b_wtsl[w][t][s][l].fixValue()
+
+
 
     def set_x_soi(self, x_soi, fixed = False):
         '''sets the w_soi variables to the values in w_soi'''
-        for station in x_soi.keys():
+        for station in x_soi:
             for task in x_soi[station].keys():
-                for model, task_var in x_soi[station][task].items():
-                    task_assigned = task_var.value()
+                for model in x_soi[station][task]:
+                    task_assigned = x_soi[station][task][model].value()
                     self.x_soi[station][task][model].setInitialValue(round(task_assigned))
                     if fixed:
                         self.x_soi[station][task][model].fixValue()
     
     def set_x_wsoj(self, x_wsoj, fixed = False):
         '''sets the x_wsoj variables to the values in x_wsoj'''
-        for w in x_wsoj.keys():
-            for s in x_wsoj[w].keys():
-                for o in x_wsoj[w][s].keys():
-                    for j, task_var in x_wsoj[w][s][o].items():
-                        task_assigned = task_var.value()
+        for w in x_wsoj:
+            for s in x_wsoj[w]:
+                for o in x_wsoj[w][s]:
+                    for j in x_wsoj[w][s][o]:
+                        task_assigned = x_wsoj[w][s][o][j].value()
                         self.x_wsoj[w][s][o][j].setInitialValue(round(task_assigned))
                         if fixed:
                             self.x_wsoj[w][s][o][j].fixValue()
     
-    def set_Y_w(self, Y_w, fixed = False):
-        '''sets the Y_w variables to the values in Y_w'''
-        for w in Y_w.keys():
-            self.Y_w[w].setInitialValue(round(Y_w[w].value()))
+    def set_y_w(self, y_w, fixed = False):
+        '''sets the y_w variables to the values in y_w'''
+        for w in y_w:
+            self.y_w[w].setInitialValue(round(y_w[w].value()))
             if fixed:
-                self.Y_w[w].fixValue()
+                self.y_w[w].fixValue()
 
-    def set_Y(self, Y, fixed = False):
-        '''sets the Y variables to the values in Y'''
-        self.Y.setInitialValue(round(Y.value()))
+    def set_y(self, y, fixed = False):
+        '''sets the y variables to the values in y'''
+        self.y.setInitialValue(round(y.value()))
         if fixed:
-            self.Y.fixValue()
+            self.y.fixValue()
 
     def solve(self, solver=None, generate_report =True, file_name = ''):
         self.make_lp_problem()
@@ -229,7 +233,7 @@ class MMALBP_LP_Problem:
 #         self.u_se = None
 #         self.b_wtsl = None
 #         self.x_wsoj = None
-#         self.Y_w = None
+#         self.y_w = None
 #         self.make_lp_variables()
 #         #Results info
 #         self.obj_value = None
@@ -239,10 +243,10 @@ class MMALBP_LP_Problem:
 #         self.u_se = plp.LpVariable.dicts('u_se', (self.stations, self.equipment), lowBound=0, cat='Binary')
 #         self.b_wtsl = plp.LpVariable.dicts('b_wtsl', (self.prod_sequences.keys(), self.takts, self.stations, self.workers), lowBound=0, cat='Binary')
 #         self.x_wsoj = plp.LpVariable.dicts('x_wsoj', (self.prod_sequences.keys(), self.stations, range(self.problem_instance.no_tasks), range(self.sequence_length) ), lowBound=0, cat='Binary')
-#         self.Y_w = plp.LpVariable.dicts('Y_w', (self.prod_sequences.keys()), lowBound=0, cat='Integer')
+#         self.y_w = plp.LpVariable.dicts('y_w', (self.prod_sequences.keys()), lowBound=0, cat='Integer')
 
 
-#     def set_variables(self, u_se =None, b_wtsl = None, x_wsoj= None, x_soi=None, Y_w = None, fixed=False):
+#     def set_variables(self, u_se =None, b_wtsl = None, x_wsoj= None, x_soi=None, y_w = None, fixed=False):
 #         '''Sets variables before solving the problem. If fixed is true, then the variables are fixed to their initial values. Input is a dictionary of LpVariable'''
 #         if u_se is not None:
 #             for s, equipment_dict in u_se.items():
@@ -283,11 +287,11 @@ class MMALBP_LP_Problem:
 #                             self.x_wsoj[w][s][o][j].setInitialValue(round(task_assigned))
 #                             if fixed:
 #                                 self.x_wsoj[w][s][o][j].fixValue()
-#         if Y_w is not None:
-#             for w in Y_w.keys():
-#                 self.Y_w[w].setInitialValue(round(Y_w[w].value()))
+#         if y_w is not None:
+#             for w in y_w.keys():
+#                 self.y_w[w].setInitialValue(round(y_w[w].value()))
 #                 if fixed:
-#                     self.Y_w[w].fixValue()
+#                     self.y_w[w].fixValue()
 
 #     def add_non_anticipation(self, w, w_prime , prod_sequences, problem_instance, x_wsoj, sequence_length, num_stations):
 #         '''adds the non anticipation constraint for two scenarios w and w_prime'''
@@ -311,15 +315,15 @@ class MMALBP_LP_Problem:
 #                             for s in self.stations
 #                             for e in self.equipment]
 #                         +
-#                         [self.prod_sequences[w]['probability']*self.Y_w[w]* self.problem_instance.worker_cost
+#                         [self.prod_sequences[w]['probability']*self.y_w[w]* self.problem_instance.worker_cost
 #                             for w in self.prod_sequences.keys()
 #                             ]),
 #                     "Total cost")
 #         #Constraints
-#         #Constraint 1 -- Must hire Y workers if we use Y workers in a given takt
+#         #Constraint 1 -- Must hire y workers if we use y workers in a given takt
 #         for w in self.prod_sequences.keys():
 #             for t in self.takts:
-#                 self.prob += (plp.lpSum([l*self.b_wtsl[w][t][s][l] for s in self.stations for l in self.workers]) <= self.Y_w[w], f'Y_w_{w}_{t}')
+#                 self.prob += (plp.lpSum([l*self.b_wtsl[w][t][s][l] for s in self.stations for l in self.workers]) <= self.y_w[w], f'y_w_{w}_{t}')
 #         #Constraint 2 -- can only assign l number of workers to a station for a given scenario and stage
 #         for w in self.prod_sequences.keys():
 #             for t in self.takts:
@@ -392,7 +396,7 @@ class MMALBP_LP_Problem:
 #                                 'station':str(station), 'model':model, 'sequence_loc':str(sequence_loc), 'workers': int(v.name.split('_')[5]) }
 #                         print('labor', labor)
 #                         labor_assignments.append(labor)
-#                 elif 'Y_w' in v.name:
+#                 elif 'y_w' in v.name:
 #                     labor_hire = {'scenario':v.name.split('_')[2], 'scenario_workers': int(v.value()) }
 #                     labor_hire_assignments.append(labor_hire)
 
@@ -428,8 +432,8 @@ class dynamic_problem_linear_labor_recourse(MMALBP_LP_Problem):
         self.u_se = None
         self.b_wtsl = None
         self.x_wsoj = None
-        self.Y_w = None
-        self.Y = None
+        self.y_w = None
+        self.y = None
         self.make_lp_variables()
         #Results info
         self.obj_value = None
@@ -439,8 +443,8 @@ class dynamic_problem_linear_labor_recourse(MMALBP_LP_Problem):
         self.u_se = plp.LpVariable.dicts('u_se', (self.stations, self.equipment), lowBound=0, cat='Binary')
         self.l_wts = plp.LpVariable.dicts('l_wts', (self.prod_sequences.keys(), self.takts, self.stations), lowBound=0, cat='Integer')
         self.x_wsoj = plp.LpVariable.dicts('x_wsoj', (self.prod_sequences.keys(), self.stations, range(self.problem_instance.no_tasks), range(self.sequence_length) ), lowBound=0, cat='Binary')
-        self.Y_w = plp.LpVariable.dicts('Y_w', (self.prod_sequences.keys()), lowBound=0, cat='Integer')
-        self.Y = plp.LpVariable('Y', lowBound=0, cat='Integer')
+        self.y_w = plp.LpVariable.dicts('y_w', (self.prod_sequences.keys()), lowBound=0, cat='Integer')
+        self.y = plp.LpVariable('y', lowBound=0, cat='Integer')
 
     def x_soi_to_x_wsoj(self, x_soi_df, fixed = False):
         '''converts model dependent x_soi to dynamic x_wsoj'''
@@ -473,33 +477,41 @@ class dynamic_problem_linear_labor_recourse(MMALBP_LP_Problem):
             print('loading x_soi.csv')
             x_soi_df = pd.read_csv(md_results_folder + 'x_soi.csv', sep=' ')
             self.x_soi_to_x_wsoj(x_soi_df, fixed)
-        if os.path.exists(md_results_folder + 'Y_Y_w.csv'):
-            print('loading Y_Y_w.csv')
-            md_Y_Y_w = pd.read_csv(md_results_folder + 'Y_Y_w.csv', sep=' ')
-            self.set_Y_Y_w_from_df(md_Y_Y_w, fixed)
+        if os.path.exists(md_results_folder + 'y_y_w.csv'):
+            print('loading y_y_w.csv')
+            md_y_y_w = pd.read_csv(md_results_folder + 'y_y_w.csv', sep=' ')
+            self.set_y_y_w_from_df(md_y_y_w, fixed)
 
 
     def save_variables(self, file_name):
-        '''calls the x_soi_to_csv, l_wts_to_csv, and Y_Y_w_to_csv functions'''
+        '''calls the x_soi_to_csv, l_wts_to_csv, and y_y_w_to_csv functions'''
         self.x_wsoj_to_csv(file_name)
         self.l_wts_to_csv(file_name)
-        self.Y_Y_w_to_csv(file_name)
+        self.y_y_w_to_csv(file_name)
         self.u_se_to_csv(file_name)
         
-    
 
-    def set_variables(self, u_se =None, l_wts = None, x_wsoj= None, Y_w = None, Y= None, fixed=False):
+    def get_variables(self):
+        '''returns the x_wsoj, u_se, l_wts, y_w, and y variables'''
+        x_wsoj = self.x_wsoj
+        u_se = self.u_se
+        l_wts = self.l_wts
+        y_w = self.y_w
+        y = self.y 
+        return x_wsoj, u_se, l_wts, y_w, y
+
+    def set_variables(self, x_wsoj= None, u_se =None, l_wts = None,  y_w = None, y= None, fixed=False):
         """Sets variables before solving the problem. If fixed is true, then the variables are fixed to their initial values. Input is a dictionary of LpVariable"""
         if u_se is not None:
             self.set_u_se(u_se, fixed)
         if l_wts is not None:
-            self.set_b_wtsl(l_wts, fixed)
+            self.set_l_wts(l_wts, fixed)
         if x_wsoj is not None:
             self.set_x_wsoj(x_wsoj, fixed)
-        if Y_w is not None:
-            self.set_Y_w(Y_w, fixed)
-        if Y is not None:
-            self.set_Y(Y, fixed)
+        if y_w is not None:
+            self.set_y_w(y_w, fixed)
+        if y is not None:
+            self.set_y(y, fixed)
 
     def make_lp_problem(self):
         #Defining LP problem
@@ -509,17 +521,17 @@ class dynamic_problem_linear_labor_recourse(MMALBP_LP_Problem):
                             for s in self.stations
                             for e in self.equipment]
                         +
-                        self.Y*self.problem_instance.worker_cost 
+                        self.y*self.problem_instance.worker_cost 
                         +
-                        [self.prod_sequences[w]['probability']*self.Y_w[w]* self.problem_instance.recourse_cost
+                        [self.prod_sequences[w]['probability']*self.y_w[w]* self.problem_instance.recourse_cost
                             for w in self.prod_sequences.keys()
                             ]),
                     "Total cost")
         #Constraints
-        #Constraint 1 -- Must hire Y workers if we use Y workers in a given takt
+        #Constraint 1 -- Must hire y workers if we use y workers in a given takt
         for w in self.prod_sequences.keys():
             for t in self.takts:
-                self.prob += (plp.lpSum([self.l_wts[w][t][s] for s in self.stations ]) <= plp.lpSum([self.Y_w[w] + self.Y]) , f'Y_w_{w}_{t}')
+                self.prob += (plp.lpSum([self.l_wts[w][t][s] for s in self.stations ]) <= plp.lpSum([self.y_w[w] + self.y]) , f'y_w_{w}_{t}')
         #Constraint 2 -- can only assign l number of workers to a station for a given scenario and stage
         for w in self.prod_sequences.keys():
             for t in self.takts:
@@ -610,11 +622,11 @@ class dynamic_problem_linear_labor_recourse(MMALBP_LP_Problem):
                         labor = {'scenario':v.name.split('_')[2], 'stage':str(stage), 
                                 'station':str(station), 'model':model, 'sequence_loc':str(sequence_loc), 'workers': workers }
                         labor_assignments.append(labor)
-                elif 'Y_w' in v.name:
+                elif 'y_w' in v.name:
                     pass
-                elif 'Y' in v.name:
+                elif 'y' in v.name:
                     fixed_labor = int(v.value())
-            if 'Y_w' in v.name:
+            if 'y_w' in v.name:
                     labor_hire = {'scenario':v.name.split('_')[2], 'scenario_workers': int(v.value()) }
                     labor_hire_assignments.append(labor_hire)
 
@@ -653,8 +665,8 @@ class dynamic_problem_multi_labor_recourse(MMALBP_LP_Problem):
         self.u_se = None
         self.b_wtsl = None
         self.x_wlsoj = None
-        self.Y_w = None
-        self.Y = None
+        self.y_w = None
+        self.y = None
         self.make_lp_variables()
         #Results info
         self.obj_value = None
@@ -664,8 +676,8 @@ class dynamic_problem_multi_labor_recourse(MMALBP_LP_Problem):
         self.u_se = plp.LpVariable.dicts('u_se', (self.stations, self.equipment), lowBound=0, cat='Binary')
         self.l_wts = plp.LpVariable.dicts('l_wts', (self.prod_sequences.keys(), self.takts, self.stations), lowBound=0, cat='Integer')
         self.x_wlsoj = plp.LpVariable.dicts('x_wlsoj', (self.prod_sequences.keys(), self.workers, self.stations, range(self.problem_instance.no_tasks), range(self.sequence_length) ), lowBound=0, cat='Binary')
-        self.Y_w = plp.LpVariable.dicts('Y_w', (self.prod_sequences.keys()), lowBound=0, cat='Integer')
-        self.Y = plp.LpVariable('Y', lowBound=0, cat='Integer')
+        self.y_w = plp.LpVariable.dicts('y_w', (self.prod_sequences.keys()), lowBound=0, cat='Integer')
+        self.y = plp.LpVariable('y', lowBound=0, cat='Integer')
 
     def make_lp_problem(self):
         #Defining LP problem
@@ -675,17 +687,17 @@ class dynamic_problem_multi_labor_recourse(MMALBP_LP_Problem):
                             for s in self.stations
                             for e in self.equipment]
                         +
-                        self.Y*self.problem_instance.worker_cost 
+                        self.y*self.problem_instance.worker_cost 
                         +
-                        [self.prod_sequences[w]['probability']*self.Y_w[w]* self.problem_instance.recourse_cost
+                        [self.prod_sequences[w]['probability']*self.y_w[w]* self.problem_instance.recourse_cost
                             for w in self.prod_sequences.keys()
                             ]),
                     "Total cost")
         #Constraints
-        #Constraint 1 -- Must hire Y workers if we use Y workers in a given takt
+        #Constraint 1 -- Must hire y workers if we use y workers in a given takt
         for w in self.prod_sequences.keys():
             for t in self.takts:
-                self.prob += (plp.lpSum([self.l_wts[w][t][s] for s in self.stations ]) <= plp.lpSum([self.Y_w[w] + self.Y]) , f'Y_w_{w}_{t}')
+                self.prob += (plp.lpSum([self.l_wts[w][t][s] for s in self.stations ]) <= plp.lpSum([self.y_w[w] + self.y]) , f'y_w_{w}_{t}')
         #Constraint 2 -- can only assign l number of workers to a station for a given scenario and stage
         for w in self.prod_sequences.keys():
             for t in self.takts:
@@ -785,11 +797,11 @@ class dynamic_problem_multi_labor_recourse(MMALBP_LP_Problem):
                         labor = {'scenario':v.name.split('_')[2], 'stage':str(stage), 
                                 'station':str(station), 'model':model, 'sequence_loc':str(sequence_loc), 'workers': workers }
                         labor_assignments.append(labor)
-                elif 'Y_w' in v.name:
+                elif 'y_w' in v.name:
                     pass
-                elif 'Y' in v.name:
+                elif 'y' in v.name:
                     fixed_labor = int(v.value())
-            if 'Y_w' in v.name:
+            if 'y_w' in v.name:
                     labor_hire = {'scenario':v.name.split('_')[2], 'scenario_workers': int(v.value()) }
                     labor_hire_assignments.append(labor_hire)
 
@@ -828,7 +840,7 @@ class dynamic_problem_multi_labor_recourse(MMALBP_LP_Problem):
 #         self.u_se = None
 #         self.b_wtsl = None
 #         self.x_soi = None
-#         self.Y_w = None
+#         self.y_w = None
 #         self.fixed_assignment = fixed_assignment
 #         self.make_lp_variables()
 #         #Results info
@@ -839,10 +851,10 @@ class dynamic_problem_multi_labor_recourse(MMALBP_LP_Problem):
 #         self.u_se = plp.LpVariable.dicts('u_se', (self.stations, self.equipment), lowBound=0, cat='Binary')
 #         self.b_wtsl = plp.LpVariable.dicts('b_wtsl', (self.prod_sequences.keys(), self.takts, self.stations, self.workers), lowBound=0, cat='Binary')
 #         self.x_soi = plp.LpVariable.dicts('x_soi', ( self.stations, range(self.problem_instance.no_tasks), self.problem_instance.data.keys() ), lowBound=0, cat='Binary')
-#         self.Y_w = plp.LpVariable.dicts('Y_w', (self.prod_sequences.keys()), lowBound=0, cat='Integer')
+#         self.y_w = plp.LpVariable.dicts('y_w', (self.prod_sequences.keys()), lowBound=0, cat='Integer')
 
 
-#     def set_variables(self, u_se =None, b_wtsl = None, x_wsoj= None, x_soi=None, Y_w = None, fixed=False):
+#     def set_variables(self, u_se =None, b_wtsl = None, x_wsoj= None, x_soi=None, y_w = None, fixed=False):
 #         '''Sets variables before solving the problem. If fixed is true, then the variables are fixed to their initial values. Input is a dictionary of LpVariable'''
 #         if u_se is not None:
 #             for s, equipment_dict in u_se.items():
@@ -870,11 +882,11 @@ class dynamic_problem_multi_labor_recourse(MMALBP_LP_Problem):
 #                         if fixed:
 #                             self.x_soi[s][o][i].fixValue()
 
-#         if Y_w is not None:
-#             for w in Y_w.keys():
-#                 self.Y_w[w].setInitialValue(round(Y_w[w].value()))
+#         if y_w is not None:
+#             for w in y_w.keys():
+#                 self.y_w[w].setInitialValue(round(y_w[w].value()))
 #                 if fixed:
-#                     self.Y_w[w].fixValue()
+#                     self.y_w[w].fixValue()
 
 
 
@@ -886,15 +898,15 @@ class dynamic_problem_multi_labor_recourse(MMALBP_LP_Problem):
 #                             for s in self.stations
 #                             for e in self.equipment]
 #                         +
-#                         [self.prod_sequences[w]['probability']*self.Y_w[w]* self.problem_instance.worker_cost
+#                         [self.prod_sequences[w]['probability']*self.y_w[w]* self.problem_instance.worker_cost
 #                             for w in self.prod_sequences.keys()
 #                             ]),
 #                     "Total cost")
 #         #Constraints
-#         #Constraint 1 -- Must hire Y workers if we use Y workers in a given takt
+#         #Constraint 1 -- Must hire y workers if we use y workers in a given takt
 #         for w in self.prod_sequences.keys():
 #             for t in self.takts:
-#                 self.prob += (plp.lpSum([l*self.b_wtsl[w][t][s][l] for s in self.stations for l in self.workers]) <= self.Y_w[w], f'Y_w_{w}_{t}')
+#                 self.prob += (plp.lpSum([l*self.b_wtsl[w][t][s][l] for s in self.stations for l in self.workers]) <= self.y_w[w], f'y_w_{w}_{t}')
 
 #         #Constraint 2 -- can only assign l number of workers to a station for a given scenario and stage
 #         for w in self.prod_sequences.keys():
@@ -960,7 +972,7 @@ class dynamic_problem_multi_labor_recourse(MMALBP_LP_Problem):
 #                     model = self.prod_sequences[int(v.name.split('_')[2])]['sequence'][int(v.name.split('_')[4])]
 #                     labor = {'scenario':v.name.split('_')[2], 'stage':v.name.split('_')[3], 'station': v.name.split('_')[4], 'model':model, 'workers': int(v.name.split('_')[5]) }
 #                     labor_assignments.append(labor)
-#                 elif 'Y_w' in v.name:
+#                 elif 'y_w' in v.name:
 #                     labor_hire = {'scenario':v.name.split('_')[2], 'scenario_workers': int(v.value()) }
 #                     labor_hire_assignments.append(labor_hire)
 
@@ -999,8 +1011,8 @@ class model_dependent_problem_linear_labor_recourse(MMALBP_LP_Problem):
         self.u_se = None
         self.b_wtsl = None
         self.x_soi = None
-        self.Y_w = None
-        self.Y = None
+        self.y_w = None
+        self.y = None
         self.fixed_assignment = fixed_assignment
         self.make_lp_variables()
         #Results info
@@ -1011,20 +1023,20 @@ class model_dependent_problem_linear_labor_recourse(MMALBP_LP_Problem):
         self.u_se = plp.LpVariable.dicts('u_se', (self.stations, self.equipment), lowBound=0, cat='Binary')
         self.l_wts = plp.LpVariable.dicts('l_wts', (self.prod_sequences.keys(), self.takts, self.stations), lowBound=0, cat='Integer')
         self.x_soi = plp.LpVariable.dicts('x_soi', ( self.stations, range(self.problem_instance.no_tasks), self.problem_instance.data.keys() ), lowBound=0, cat='Binary')
-        self.Y_w = plp.LpVariable.dicts('Y_w', (self.prod_sequences.keys()), lowBound=0, cat='Integer')
-        self.Y = plp.LpVariable('Y', lowBound=0, cat='Integer')
+        self.y_w = plp.LpVariable.dicts('y_w', (self.prod_sequences.keys()), lowBound=0, cat='Integer')
+        self.y = plp.LpVariable('y', lowBound=0, cat='Integer')
     
 
 
     def save_variables(self, file_name):
-        '''calls the x_soi_to_csv, l_wts_to_csv, and Y_Y_w_to_csv functions'''
+        '''calls the x_soi_to_csv, l_wts_to_csv, and y_y_w_to_csv functions'''
         self.x_soi_to_csv(file_name)
         self.l_wts_to_csv(file_name)
-        self.Y_Y_w_to_csv(file_name)
+        self.y_y_w_to_csv(file_name)
         self.u_se_to_csv(file_name)
     
 
-    def set_variables(self, u_se =None, l_wts = None, x_wsoj= None, x_soi=None, Y_w = None,Y = None, fixed=False):
+    def set_variables(self, u_se =None, l_wts = None, x_wsoj= None, x_soi=None, y_w = None,y = None, fixed=False):
         '''Sets variables before solving the problem. If fixed is true, then the variables are fixed to their initial values. Input is a dictionary of LpVariable'''
         if u_se is not None:
             self.set_u_se(u_se, fixed)
@@ -1032,10 +1044,10 @@ class model_dependent_problem_linear_labor_recourse(MMALBP_LP_Problem):
             self.set_l_wts(l_wts, fixed)
         if x_soi is not None:
             self.set_xsoi(x_soi, fixed)
-        if Y_w is not None:
-            self.set_Y_w(Y_w, fixed)
-        if Y is not None:
-           self.set_Y(Y, fixed)
+        if y_w is not None:
+            self.set_y_w(y_w, fixed)
+        if y is not None:
+           self.set_y(y, fixed)
 
 
 
@@ -1047,17 +1059,17 @@ class model_dependent_problem_linear_labor_recourse(MMALBP_LP_Problem):
                             for s in self.stations
                             for e in self.equipment]
                         +
-                        self.Y*self.problem_instance.worker_cost
+                        self.y*self.problem_instance.worker_cost
                         +
-                        [self.prod_sequences[w]['probability']*self.Y_w[w]* self.problem_instance.recourse_cost
+                        [self.prod_sequences[w]['probability']*self.y_w[w]* self.problem_instance.recourse_cost
                             for w in self.prod_sequences.keys()
                             ]),
                     "Total cost")
         #Constraints
-        #Constraint 1 -- Must hire Y workers if we use Y workers in a given takt
+        #Constraint 1 -- Must hire y workers if we use y workers in a given takt
         for w in self.prod_sequences.keys():
             for t in self.takts:
-                self.prob += (plp.lpSum([self.l_wts[w][t][s] for s in self.stations]) <= plp.lpSum([self.Y_w[w] + self.Y]), f'Y_w_{w}_{t}')
+                self.prob += (plp.lpSum([self.l_wts[w][t][s] for s in self.stations]) <= plp.lpSum([self.y_w[w] + self.y]), f'y_w_{w}_{t}')
 
         #Constraint 2 -- can only assign up to l_max number of workers to a station for a given scenario and stage
         for w in self.prod_sequences.keys():
@@ -1124,11 +1136,11 @@ class model_dependent_problem_linear_labor_recourse(MMALBP_LP_Problem):
                     model = self.prod_sequences[int(v.name.split('_')[2])]['sequence'][int(v.name.split('_')[4])]
                     labor = {'scenario':v.name.split('_')[2], 'stage':v.name.split('_')[3], 'station': v.name.split('_')[4], 'model':model, 'workers': int(v.value()) }
                     labor_assignments.append(labor)
-                elif 'Y_w' in v.name: #otherwise 'Y" catches the scenario workers
+                elif 'y_w' in v.name: #otherwise 'y" catches the scenario workers
                     pass
-                elif 'Y' in v.name:
+                elif 'y' in v.name:
                     fixed_labor = int(v.value())
-            if 'Y_w' in v.name:
+            if 'y_w' in v.name:
                 labor_hire = {'scenario':v.name.split('_')[2], 'scenario_workers': int(v.value()) }
                 labor_hire_assignments.append(labor_hire)
     #turns task_assignments into a dataframe
@@ -1167,8 +1179,8 @@ class model_dependent_problem_multi_labor_recourse(MMALBP_LP_Problem):
         self.u_se = None
         self.b_wtsl = None
         self.x_soi = None
-        self.Y_w = None
-        self.Y = None
+        self.y_w = None
+        self.y = None
         self.fixed_assignment = fixed_assignment
         self.make_lp_variables()
         #Results info
@@ -1179,11 +1191,11 @@ class model_dependent_problem_multi_labor_recourse(MMALBP_LP_Problem):
         self.u_se = plp.LpVariable.dicts('u_se', (self.stations, self.equipment), lowBound=0, cat='Binary')
         self.l_wts = plp.LpVariable.dicts('l_wts', (self.prod_sequences.keys(), self.takts, self.stations), lowBound=0, cat='Integer')
         self.x_lsoi = plp.LpVariable.dicts('x_lsoi', (self.workers, self.stations, range(self.problem_instance.no_tasks), self.problem_instance.data.keys() ), lowBound=0, cat='Binary')
-        self.Y_w = plp.LpVariable.dicts('Y_w', (self.prod_sequences.keys()), lowBound=0, cat='Integer')
-        self.Y = plp.LpVariable('Y', lowBound=0, cat='Integer')
+        self.y_w = plp.LpVariable.dicts('y_w', (self.prod_sequences.keys()), lowBound=0, cat='Integer')
+        self.y = plp.LpVariable('y', lowBound=0, cat='Integer')
 
     #TODO fix this
-    def set_variables(self, u_se =None, l_wts = None, x_lsoj= None, x_soi=None, Y_w = None, fixed=False):
+    def set_variables(self, u_se =None, l_wts = None, x_lsoj= None, x_soi=None, y_w = None, fixed=False):
         '''Sets variables before solving the problem. If fixed is true, then the variables are fixed to their initial values. Input is a dictionary of LpVariable'''
         if u_se is not None:
             for s, equipment_dict in u_se.items():
@@ -1210,11 +1222,11 @@ class model_dependent_problem_multi_labor_recourse(MMALBP_LP_Problem):
                         if fixed:
                             self.x_soi[s][o][i].fixValue()
 
-        if Y_w is not None:
-            for w in Y_w.keys():
-                self.Y_w[w].setInitialValue(round(Y_w[w].value()))
+        if y_w is not None:
+            for w in y_w.keys():
+                self.y_w[w].setInitialValue(round(y_w[w].value()))
                 if fixed:
-                    self.Y_w[w].fixValue()
+                    self.y_w[w].fixValue()
 
 
 
@@ -1226,17 +1238,17 @@ class model_dependent_problem_multi_labor_recourse(MMALBP_LP_Problem):
                             for s in self.stations
                             for e in self.equipment]
                         +
-                        self.Y*self.problem_instance.worker_cost
+                        self.y*self.problem_instance.worker_cost
                         +
-                        [self.prod_sequences[w]['probability']*self.Y_w[w]* self.problem_instance.recourse_cost
+                        [self.prod_sequences[w]['probability']*self.y_w[w]* self.problem_instance.recourse_cost
                             for w in self.prod_sequences.keys()
                             ]),
                     "Total cost")
         #Constraints
-        #Constraint 1 -- Must hire Y workers if we use Y workers in a given takt
+        #Constraint 1 -- Must hire y workers if we use y workers in a given takt
         for w in self.prod_sequences.keys():
             for t in self.takts:
-                self.prob += (plp.lpSum([self.l_wts[w][t][s] for s in self.stations]) <= plp.lpSum([self.Y_w[w] + self.Y]), f'Y_w_{w}_{t}')
+                self.prob += (plp.lpSum([self.l_wts[w][t][s] for s in self.stations]) <= plp.lpSum([self.y_w[w] + self.y]), f'y_w_{w}_{t}')
 
         #Constraint 2 -- can only assign up to l_max number of workers to a station for a given scenario and stage
         for w in self.prod_sequences.keys():
@@ -1317,11 +1329,11 @@ class model_dependent_problem_multi_labor_recourse(MMALBP_LP_Problem):
                     model = self.prod_sequences[int(v.name.split('_')[2])]['sequence'][int(v.name.split('_')[4])]
                     labor = {'scenario':v.name.split('_')[2], 'stage':v.name.split('_')[3], 'station': v.name.split('_')[4], 'model':model, 'workers': int(v.value()) }
                     labor_assignments.append(labor)
-                elif 'Y_w' in v.name: #otherwise 'Y" catches the scenario workers
+                elif 'y_w' in v.name: #otherwise 'y" catches the scenario workers
                     pass
-                elif 'Y' in v.name:
+                elif 'y' in v.name:
                     fixed_labor = int(v.value())
-            if 'Y_w' in v.name:
+            if 'y_w' in v.name:
                 labor_hire = {'scenario':v.name.split('_')[2], 'scenario_workers': int(v.value()) }
                 labor_hire_assignments.append(labor_hire)
     #turns task_assignments into a dataframe
