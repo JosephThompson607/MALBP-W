@@ -31,7 +31,6 @@ class MMALBP_LP_Problem:
         '''generate a dictionary resluts from the solved problem'''
         obj_val_dict = {}
         for i, input_instance in enumerate(self.problem_instance.model_mixtures):
-            obj_val_dict['file_'+ str(i)] = self.problem_instance.instance_config_yaml
             model = list(self.problem_instance.data.keys())[i]
             for key, value in self.problem_instance.data[model].items():
                 obj_val_dict[model+'_'+key] = value

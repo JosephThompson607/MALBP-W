@@ -39,7 +39,7 @@ def warmstart_dynamic_problem_linear_labor_recourse( problem_instance, equipment
     return result_df 
 
 
-def warm_start_from_config(config_file, seed = None, scenario_generator= make_scenario_tree, base_file_name = 'test', run_time = 600, **kwargs):
+def warm_start_from_config(config_file, seed = None, base_file_name = 'test', run_time = 600,save_variables=False, **kwargs):
    test_instances = []
    with open(config_file) as f:
       print('Opening config file', config_file)
@@ -118,10 +118,13 @@ def warm_start_from_config(config_file, seed = None, scenario_generator= make_sc
          milp_prob.solve(solver=solver, 
                            file_name=file_name + conf_name+ str(group_counter))
          #writes the lp variables to a file if save_variables is true
-         folder_name = file_name + conf_name + str(group_counter) + '_variables/'
-         if not os.path.exists(folder_name):
-            os.makedirs(folder_name)
-         milp_prob.save_variables(folder_name)
+         if save_variables:
+               print('here are the x_soi variables')
+               print(milp_prob.x_soi)
+               folder_name = file_name + conf_name + str(group_counter) + test_instance.name+ '_variables/'
+               if not os.path.exists(folder_name):
+                  os.makedirs(folder_name)
+               milp_prob.save_variables(folder_name)
          end = timer()
          result = milp_prob.get_obj_val_dict()
          result['run_time'] = end - start
@@ -260,6 +263,7 @@ def run_from_config(config_file, run_time = 600, seed = None, base_file_name = '
             end = timer()
             result = milp_prob.get_obj_val_dict()
             result['run_time'] = end - start
+            result['group_counter'] = group_counter
             result_df = pd.DataFrame([result], index=[0])
             if group_counter == 0:
                results_df = result_df.copy()
@@ -292,6 +296,7 @@ if __name__ == "__main__":
     parser.add_argument('--seed', type=int, help='seed for random number generator')
     parser.add_argument('--xp_name', type=str, help='directory to save results')
     parser.add_argument('--run_time', type=int, help='time limit for solver')
+    parser.add_argument('--save_variables', type=bool, help='whether to save the lp variables')
     args = parser.parse_args()
     today = datetime.today().strftime('%Y_%m_%d')
     if args.xp_name:
@@ -299,10 +304,10 @@ if __name__ == "__main__":
         if not os.path.exists('model_runs/'+str(today)+args.xp_name):
             os.makedirs('model_runs/'+str(today)+args.xp_name)
         file_name = 'model_runs/'+str(today)+args.xp_name
-        run_from_config(args.config_file, seed=args.seed,run_time=args.run_time, base_file_name=file_name)
+        run_from_config(args.config_file, seed=args.seed,run_time=args.run_time, base_file_name=file_name, save_variables=args.save_variables)
     else:
         if not os.path.exists('model_runs/test'):
             os.makedirs('model_runs/test')
         file_name = 'model_runs/'+str(today)+ 'test'
         print("args.run_time", args.run_time)
-        run_from_config(args.config_file, seed=args.seed, run_time=args.run_time, file_name=file_name)
+        run_from_config(args.config_file, seed=args.seed, run_time=args.run_time, file_name=file_name, save_variables=args.save_variables)

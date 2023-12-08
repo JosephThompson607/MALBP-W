@@ -238,7 +238,6 @@ class SALBP_Instance:
 
 
 
-## Scenario Tree Generation
 def sum_prob(sequences):
     '''function for sanity checking that the probabilities sum to 1'''
     total = 0
