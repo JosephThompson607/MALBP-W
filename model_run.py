@@ -18,6 +18,15 @@ from timeit import default_timer as timer
 import argparse
 
 
+def dict_list_to_csv(dict_list, file_name):
+    '''writes a list of dictionaries to a csv file'''
+    keys = dict_list[0].keys()
+    with open(file_name, 'w', newline='') as output_file:
+        dict_writer = csv.DictWriter(output_file, keys)
+        dict_writer.writeheader()
+        dict_writer.writerows(dict_list)
+
+
 def warmstart_dynamic_problem_linear_labor_recourse( problem_instance, equipment_instance, production_sequences, md_results_folder,file_name, group_counter, run_time =600):
     '''warmstarts the dynamic problem with the results from the model dependent problem'''
     sequence_length = len(production_sequences[0]['sequence'])
