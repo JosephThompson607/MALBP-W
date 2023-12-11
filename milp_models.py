@@ -7,6 +7,7 @@ from scenario_trees import check_scenarios
 class MMALBP_LP_Problem:
     '''Base class for the linear programming problem for the multi-model assembly line balancing problem'''
     def __init__(self, problem_instance, equipment_instance, sequence_length, **kwargs) -> None:
+        self.model_name = None
         self.problem_instance = problem_instance
         self.equipment_instance = equipment_instance
         self.sequence_length = sequence_length
@@ -27,14 +28,16 @@ class MMALBP_LP_Problem:
         self.solver_status = None
         
     
-    def get_obj_val_dict(self):
+    def get_obj_val_dict(self, full = False):
         '''generate a dictionary resluts from the solved problem'''
         obj_val_dict = {}
-        for i, input_instance in enumerate(self.problem_instance.model_mixtures):
-            model = list(self.problem_instance.data.keys())[i]
-            for key, value in self.problem_instance.data[model].items():
-                obj_val_dict[model+'_'+key] = value
-        obj_val_dict['name'] = self.problem_instance.name
+        if full:
+            for i, input_instance in enumerate(self.problem_instance.model_mixtures):
+                model = list(self.problem_instance.data.keys())[i]
+                for key, value in self.problem_instance.data[model].items():
+                    obj_val_dict[model+'_'+key] = value
+        obj_val_dict['model_name'] = self.model_name
+        obj_val_dict['instance_name'] = self.problem_instance.name
         obj_val_dict['obj_value'] = self.obj_value
         obj_val_dict['solver_status'] = self.solver_status
         return obj_val_dict
@@ -60,6 +63,18 @@ class MMALBP_LP_Problem:
                         task_assignments.append({'scenario':w, 'station':s, 'task':o, 'stage':j, 'value':task_assigned})
         task_assignments_df = pd.DataFrame(task_assignments)
         task_assignments_df.to_csv(file_name + 'x_wsoj.csv', index=False, sep=' ')
+
+    # def x_lsoj_to_csv(self, file_name):
+    #     '''saves the task assignment to a csv file'''
+    #     task_assignments = []
+    #     for l in self.prod_sequences.keys():
+    #         for s in self.stations:
+    #             for o in range(self.problem_instance.no_tasks):
+    #                 for j, task_var in self.x_lsoj[w][s][o].items():
+    #                     task_assigned = task_var.value()
+    #                     task_assignments.append({'scenario':w, 'station':s, 'task':o, 'stage':j, 'value':task_assigned})
+    #     task_assignments_df = pd.DataFrame(task_assignments)
+    #     task_assignments_df.to_csv(file_name + 'x_lsoj.csv', index=False, sep=' ')
 
     def u_se_to_csv(self, file_name):
         '''saves the equipment variables to a csv file'''
@@ -417,6 +432,7 @@ class MMALBP_LP_Problem:
     
 class dynamic_problem_linear_labor_recourse(MMALBP_LP_Problem):
     def __init__(self, problem_instance, equipment_instance, sequence_length, prod_sequences) -> None:
+        self.model_name = "dynamic linear labour recourse"
         self.problem_instance = problem_instance
         self.equipment_instance = equipment_instance
         self.sequence_length = sequence_length
@@ -649,7 +665,7 @@ class dynamic_problem_linear_labor_recourse(MMALBP_LP_Problem):
 
 class dynamic_problem_multi_labor_recourse(MMALBP_LP_Problem):
     def __init__(self, problem_instance, equipment_instance, sequence_length, prod_sequences) -> None:
-        self.name = 'dynamic_problem_multi_labor_recourse'
+        self.model_name = 'dynamic problem multi-labor recourse'
         self.problem_instance = problem_instance
         self.equipment_instance = equipment_instance
         self.sequence_length = sequence_length
@@ -766,7 +782,12 @@ class dynamic_problem_multi_labor_recourse(MMALBP_LP_Problem):
                                 self.prob += (x_wlsoj[w][l][s][o][j] == x_wlsoj[w_prime][l][s][o][j], 
                                         f'anti_ww*lsoj_{w}_{w_prime}_{l}_{s}_{o}_{j}')
                 return
-            
+    def save_variables(self, file_name):
+        '''calls the x_soi_to_csv, l_wts_to_csv, and y_y_w_to_csv functions'''
+        #TODO self.x_wlsoj_to_csv(file_name)
+        self.l_wts_to_csv(file_name)
+        self.y_y_w_to_csv(file_name)
+        self.u_se_to_csv(file_name)
 
     def generate_report(self, file_name):
         '''Shows task assignments for fixed and model dependent task assignment'''
@@ -995,7 +1016,7 @@ class dynamic_problem_multi_labor_recourse(MMALBP_LP_Problem):
 
 class model_dependent_problem_linear_labor_recourse(MMALBP_LP_Problem):
     def __init__(self, problem_instance, equipment_instance, sequence_length, prod_sequences, fixed_assignment = False) -> None:
-        self.name = 'model_dependent_problem_linear_labor_recourse'
+        self.model_name = 'model dependent problem linear labor recourse'
         self.problem_instance = problem_instance
         self.equipment_instance = equipment_instance
         self.sequence_length = sequence_length
@@ -1163,7 +1184,7 @@ class model_dependent_problem_linear_labor_recourse(MMALBP_LP_Problem):
 
 class model_dependent_problem_multi_labor_recourse(MMALBP_LP_Problem):
     def __init__(self, problem_instance, equipment_instance, sequence_length, prod_sequences, fixed_assignment = False) -> None:
-        self.name = 'model_dependent_problem_multi_labor_recourse'
+        self.model_name = 'model dependent problem multi-labor recourse'
         self.problem_instance = problem_instance
         self.equipment_instance = equipment_instance
         self.sequence_length = sequence_length
@@ -1307,6 +1328,14 @@ class model_dependent_problem_multi_labor_recourse(MMALBP_LP_Problem):
                                     self.prob += (self.x_lsoi[l][s][o][model] == self.x_soi[l][s][o][model_2], f'fixed_task_{s}_{o}_{model}_{model_2}')
         return 
     
+    def save_variables(self, file_name):
+        '''calls the x_soi_to_csv, l_wts_to_csv, and y_y_w_to_csv functions'''
+        #TODO self.x_lsoi_to_csv(file_name)
+        self.l_wts_to_csv(file_name)
+        self.y_y_w_to_csv(file_name)
+        self.u_se_to_csv(file_name)
+
+
     #TODO: fix for non-linear task time reduction
     def generate_report(self, file_name):
         '''Shows task assignments for fixed and model dependent task assignment'''

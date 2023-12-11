@@ -8,6 +8,7 @@ import glob
 import copy
 import yaml
 import warnings
+import csv
 
 
 
@@ -610,3 +611,12 @@ def save_MALBPW_config(config_name, no_workers, no_stations, worker_cost, recour
    with open(file_name, 'w') as file:
       documents = yaml.dump(config_dict, file)
    return documents
+
+def dict_list_from_csv(file_name):
+    '''reads a list of dictionaries from a csv file'''
+    with open(file_name, newline='') as input_file:
+        reader = csv.DictReader(input_file)
+        dict_list = []
+        for row in reader:
+            dict_list.append(row)
+    return dict_list
