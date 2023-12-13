@@ -3,7 +3,6 @@ import pandas as pd
 import pulp as plp
 import networkx as nx
 from ALB_instance_tools import *
-from report_functions import *
 from milp_models import *
 from scenario_trees import *
 import os
@@ -20,26 +19,49 @@ class deconstructor():
         self.depth = depth
         self.original_block_size = block_size
         self.block_size = block_size
+        self.original_deconstructor_method = self.random_model_deconstructor
         self.deconstructor_method = self.random_model_deconstructor
         self.deconstructor_modifier = self.no_change
         self.no_improvement_counter = 0
+        self.deconstructor_name = None
+        self.y_decrement = 0
 
     def reset(self):
         self.no_improvement_counter = 0
         self.block_size = self.original_block_size
         self.depth = self.original_depth
+        self.deconstructor_method = self.original_deconstructor_method
+        self.deconstructor_name = None
 
 
     def no_change(self, result):
         '''does nothing'''
         return None
     
-    def increase_block_size(self, result,  increase_delay=2):
+    def increase_block_size(self, result,  no_improvement_limit=2):
         '''increases the block size if no improvement has been made'''
-        if self.no_improvement_counter >= increase_delay:
+        if self.no_improvement_counter >= no_improvement_limit:
             print('increasing block size')
             self.block_size += 1
             self.no_improvement_counter = 0
+
+    def fix_y(self, result, no_improvement_limit=2):
+        '''fixes the y variables'''
+        if self.no_improvement_counter >= no_improvement_limit :
+            self.y_decrement = 1
+            if self.deconstructor_name != 'fix_y_deconstructor':
+                print('fixing y')
+                def new_deconstructor_method(vars, dynamic_problem):
+                    return self.fix_y_deconstructor(*self.original_deconstructor_method(vars, dynamic_problem))
+                self.deconstructor_method = new_deconstructor_method
+                self.no_improvement_counter = 0
+            else:
+                print('going back to original deconstructor')
+                self.deconstructor_method = self.original_deconstructor_method
+                self.deconstructor_name = None
+                self.no_improvement_counter = 0
+        else:
+            self.y_decrement = 0
 
     def update_deconstructor(self, result):
         '''updates the deconstructor'''
@@ -48,6 +70,7 @@ class deconstructor():
 
     def set_deconstructor(self, deconstructor_method):
         self.deconstructor_method = deconstructor_method
+        self.original_deconstructor_method = deconstructor_method
         
     def deconstruct(self, vars, dynamic_problem):
         return self.deconstructor_method(vars, dynamic_problem)
@@ -76,11 +99,18 @@ class deconstructor():
         not_fixed_vars = {'x_wsoj': not_fixed_x_wsoj, 'u_se': u_se, 'l_wts': l_wts, 'y_w': y_w, 'y': y_def}
         return fixed_vars, not_fixed_vars
 
-
+    def fix_y_deconstructor(self, fixed, not_fixed):
+        '''decreases by 1 and fixes the y variables'''
+        self.deconstructor_name = 'fix_y_deconstructor'
+        #Only fixes the first stage y value if it is not already fixed
+        not_fixed_vars = {'x_wsoj': not_fixed['x_wsoj'], 'u_se': not_fixed['u_se'], 'l_wts': not_fixed['l_wts'], 'y_w': not_fixed['y_w'], 'y': None}
+        fixed_vars = {'x_wsoj': fixed['x_wsoj'], 'u_se': fixed['u_se'], 'l_wts': fixed['l_wts'], 'y_w': fixed['y_w'], 'y': not_fixed['y'] -self.y_decrement}
+        return fixed_vars, not_fixed_vars
+    
     def random_sequence_deconstructor(self, vars, dynamic_problem):
         '''Randomly chooses a set of sequences to not be fixed'''
+        print('using random_sequence_deconstructor')
         x_wsoj, u_se, l_wts, y_w, y_def = vars
-        print('using block size ', self.block_size)
         no_scenarios = len(x_wsoj)
         scenario_list = list(range(no_scenarios))
         block_size = min(self.block_size, no_scenarios)
@@ -100,8 +130,8 @@ class deconstructor():
 
     def random_model_deconstructor(self, vars, dynamic_problem):
         '''Randomly chooses a block of models to be not fixed'''
+        print('using random_model_deconstructor')
         model_dict = dynamic_problem.problem_instance.model_mixtures
-        print('model_dict', model_dict)
         x_wsoj, u_se, l_wts, y_w, y_def = vars
         no_scenarios = len(x_wsoj)
         no_stations = len(x_wsoj[0])
@@ -111,7 +141,6 @@ class deconstructor():
         #Randomly chooses a model block of model_block_size models to be not fixed from model dict keys
         model_keys = list(model_dict.keys())
         models = np.random.choice(model_keys, block_size, replace=False)
-        print('models', models)
         #filters the x_wsoj dict into two dicts, one with the fixed variables and one with the not fixed variables
         not_fixed_x_wsoj = {}
         fixed_x_wsoj = {}
@@ -147,7 +176,7 @@ class deconstructor():
         #TODO: fix l_wts and u_se for stations that are fixed
         block_size = min(self.block_size, no_stations)
         #Randomly chooses a block of station_block_size stations to be not fixed
-        start_station = np.random.randint(0, no_stations - block_size)
+        start_station = np.random.randint(0, no_stations - block_size+1)
         end_station = start_station + block_size
         loose_stations = list(range(start_station, end_station))
         #filters the x_wsoj dict into two dicts, one with the fixed variables and one with the not fixed variables
@@ -318,6 +347,9 @@ def get_deconstructor(deconstructor_method, update_method, block_size = 2, depth
     if update_method == 'increase_block_size':
         print('using increase_block_size')
         decon.deconstructor_modifier = decon.increase_block_size
+    elif update_method == 'fix_y':
+        print('using fix_y')
+        decon.deconstructor_modifier = decon.fix_y
     elif update_method == 'no_change':
         print('using no_change')
         decon.deconstructor_modifier = decon.no_change
@@ -335,14 +367,15 @@ def main_lns():
     if not os.path.exists(base_file_name):
         os.makedirs(base_file_name)
     #base_xp_yaml = args.base_xp_yaml
-    run_time = args.run_time
+    run_time = args.milp_run_time
+    total_run_time = args.run_time
     block_size = args.block_size
     n_iter = args.n_iter
     deconstructor = get_deconstructor(args.deconstructor, args.update_method, block_size)
     #reads the setup file
     setup_dict_list = dict_list_from_csv(setup_file)
     #runs the fix and optimize function
-    results_df = run_fix_and_optimize(setup_dict_list, base_file_name, deconstructor, run_time = run_time, n_iter = n_iter)
+    results_df = run_fix_and_optimize(setup_dict_list, base_file_name, deconstructor, run_time = run_time, total_run_time=total_run_time, n_iter = n_iter)
     return results_df
 
 
