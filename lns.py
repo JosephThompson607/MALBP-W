@@ -14,7 +14,7 @@ import argparse
 
 class deconstructor():
     '''class for deconstructing the variables'''
-    def __init__(self, block_size = 2, depth = 1):
+    def __init__(self, block_size = 2, depth = 1, no_improvement_limit=2):
         self.original_depth = depth
         self.depth = depth
         self.original_block_size = block_size
@@ -22,6 +22,7 @@ class deconstructor():
         self.original_deconstructor_method = self.random_model_deconstructor
         self.deconstructor_method = self.random_model_deconstructor
         self.deconstructor_modifier = self.no_change
+        self.no_improvement_limit = no_improvement_limit
         self.no_improvement_counter = 0
         self.deconstructor_name = None
         self.y_decrement = 0
@@ -38,16 +39,25 @@ class deconstructor():
         '''does nothing'''
         return None
     
-    def increase_block_size(self, result,  no_improvement_limit=2):
+    def increase_block_size(self, result ):
         '''increases the block size if no improvement has been made'''
-        if self.no_improvement_counter >= no_improvement_limit:
+        if self.no_improvement_counter >= self.no_improvement_limit:
             print('increasing block size')
             self.block_size += 1
             self.no_improvement_counter = 0
 
-    def fix_y(self, result, no_improvement_limit=2):
+    def decrease_depth_increase_block(self, result):
+        '''decreases the depth and increases the block size if no improvement has been made'''
+        self.depth = self.depth - 1
+        if self.no_improvement_counter >= self.no_improvement_limit:
+            print(' increasing block size, resetting starting depth')
+            self.block_size += 1
+            self.no_improvement_counter = 0
+            self.depth = self.original_depth
+
+    def fix_y(self, result):
         '''fixes the y variables'''
-        if self.no_improvement_counter >= no_improvement_limit :
+        if self.no_improvement_counter >= self.no_improvement_limit :
             self.y_decrement = 1
             if self.deconstructor_name != 'fix_y_deconstructor':
                 print('fixing y')
@@ -82,17 +92,22 @@ class deconstructor():
         model_dict = dynamic_problem.problem_instance.model_mixtures
         model_keys = list(model_dict.keys())
         test_seq = []
-        block_size = min(self.block_size, len(model_keys))
+        depth = max(self.depth, 1)
+        block_size = min(self.block_size, len(model_keys)**depth)
+        #TODO fix it so that no two subtrees are not the same
         for j in range(block_size):
-            models = np.random.choice(model_keys, self.depth, replace=True)
+            models = list(np.random.choice(model_keys, depth, replace=True))
             test_seq.append(models)
         not_fixed_x_wsoj = {}
         fixed_x_wsoj = {}
         for w in range(no_scenarios):
             for j in range(block_size):
                 #If the first depth number of elements of the sequence match the test sequence, then the sequence is not fixed
-                if dynamic_problem.prod_sequences[w]['sequence'][:self.depth] == test_seq[j]:
+                print('test_seq[j]', test_seq[j])
+                print('dynamic_problem.prod_sequences[w][sequence]', dynamic_problem.prod_sequences[w]['sequence'])
+                if dynamic_problem.prod_sequences[w]['sequence'][:depth] == test_seq[j]:
                     not_fixed_x_wsoj[w] = x_wsoj[w]
+                    print('not fixed', not_fixed_x_wsoj[w])
                 else:
                     fixed_x_wsoj[w] = x_wsoj[w]
         fixed_vars = {'x_wsoj': fixed_x_wsoj, 'u_se': None, 'l_wts': None, 'y_w': None, 'y': None}
@@ -190,13 +205,21 @@ class deconstructor():
                     not_fixed_x_wsoj[w][s] = x_wsoj[w][s]
                 else:
                     fixed_x_wsoj[w][s] = x_wsoj[w][s]
-        fixed_vars = {'x_wsoj': fixed_x_wsoj, 'u_se': None, 'l_wts': None, 'y_w': None, 'y': None}
-        not_fixed_vars = {'x_wsoj': not_fixed_x_wsoj, 'u_se': u_se, 'l_wts': l_wts, 'y_w': y_w, 'y': y_def}
+        #filters the u_se into two dicts, one with the fixed variables and one with the not fixed variables
+        not_fixed_u_se = {}
+        fixed_u_se = {}
+        for s in range(no_stations):
+            if s in loose_stations:
+                not_fixed_u_se[s] = u_se[s]
+            else:
+                fixed_u_se[s] = u_se[s]
+        fixed_vars = {'x_wsoj': fixed_x_wsoj, 'u_se': fixed_u_se, 'l_wts': None, 'y_w': None, 'y': None}
+        not_fixed_vars = {'x_wsoj': not_fixed_x_wsoj, 'u_se': not_fixed_u_se, 'l_wts': l_wts, 'y_w': y_w, 'y': y_def}
         return fixed_vars, not_fixed_vars
 
 
 
-def fix_and_optimize_dl( deconstructor,md_results_folder,start_obj_value, problem_instance, equipment_instance,prod_sequences, fp, group_counter=0, n_iter = 3, run_time = 600, total_run_time=None, **kwargs):
+def fix_and_optimize_dl( deconstructor,md_results_folder,start_obj_value, problem_instance, equipment_instance,prod_sequences, fp, group_counter=0, n_iter = 3, run_time = 600, total_run_time=None, no_improvement=2, **kwargs):
     '''fixes the variables in the problem instance and optimizes'''
     #creates the dynamic problem
     sequence_length = len(prod_sequences[0]['sequence'])
@@ -228,6 +251,8 @@ def fix_and_optimize_dl( deconstructor,md_results_folder,start_obj_value, proble
         #Checks if the total run time has been exceeded
         if total_run_time is not None:
             if end_time - start_time > total_run_time:
+                print('total run time exceeded')
+                print('ending at iteration counter', i)
                 break
         #Checks if the objective value has improved
         if result['obj_value'] < prev_best:
@@ -251,6 +276,8 @@ def run_fix_and_optimize(param_dict_list, base_file_name, deconstructor, run_tim
         base_xp_yaml = param_dict['xp_config_file']
         print('Opening config file', base_xp_yaml)
         print('base_file_name', base_file_name)
+        print('model_file', param_dict['model_file'])
+        print('equipment_instance', param_dict['equipment_instance'])
         #Removes file extension from config file name
         with open(base_xp_yaml) as f:
             xp_yaml = yaml.load(f, Loader=yaml.FullLoader)
@@ -260,7 +287,7 @@ def run_fix_and_optimize(param_dict_list, base_file_name, deconstructor, run_tim
         NO_STATIONS = xp_yaml['no_stations']
         WORKER_COST = xp_yaml['worker_cost']
         RECOURSE_COST = xp_yaml['recourse_cost']
-        out_folder = base_file_name + '/dynamic_problem_linear_labor_recourse_fo/'
+        out_folder = base_file_name + 'dynamic_problem_linear_labor_recourse_fo/'
         if not os.path.exists(out_folder):
             os.makedirs(out_folder)
         test_instance = MultiModelTaskTimesInstance( init_type='model_data_from_yaml',
@@ -289,14 +316,17 @@ def run_fix_and_optimize(param_dict_list, base_file_name, deconstructor, run_tim
                                         total_run_time=total_run_time,
                                         group_counter=group_counter,
                                         **kwargs)
+        result_df['base_xp_config'] = base_xp_yaml
+        result_df['original_obj_value'] = param_dict['obj_value']
+        result_df['original_run_time'] = param_dict['run_time']
+        result_df['model_file'] = param_dict['model_file']
+        result_df['equipment_instance'] = param_dict['equipment_instance']
         if group_counter == 0:
             results_df = result_df.copy()
         else:
             results_df = pd.concat([results_df, result_df], axis=0, ignore_index=True)
         #writes the results to a csv file
-        results_df['base_xp_config'] = base_xp_yaml
-        results_df['model_file'] = param_dict['model_file']
-        results_df['equipment_instance'] = param_dict['equipment_instance']
+        
         #resets the deconstructor
         deconstructor.reset()
         results_df.to_csv(out_folder + 'results.csv')
@@ -319,14 +349,16 @@ def arg_parse_lns():
     parser.add_argument('--run_time', '-r', type=int, nargs='?', const=600, default=600, help='The maximum run time for the fix and optimize lns, default is 600')
     parser.add_argument('--update_method', '-u', type=str, nargs='?', const='increase_block_size', default='increase_block_size', help='The method for updating the deconstructor, default is increase_block_size')
     parser.add_argument('--block_size', '-bs', type=int, nargs='?', const=2, default=2, help='The size of the block to not be fixed, default is 2')
+    parser.add_argument('--depth', '-dt', type=int, nargs='?', const=1, default=1, help='The depth of the subtree to not be fixed, default is 1. Only works for random_subtree_deconstructor')
     parser.add_argument('--n_iter', '-ni', type=int, nargs='?', const=3, default=3, help='The number of iterations to be run, default is 3')
+    parser.add_argument('--n_iter_no_imp', '-nimp', type=int, nargs='?', const=2, default=2, help='The number of iterations to be run before we modify the desconstructor, default is 2')
     parser.add_argument('--deconstructor', '-d', type=str, required=True, help='The deconstructor to be used')
     args = parser.parse_args()
     return args
 
-def get_deconstructor(deconstructor_method, update_method, block_size = 2, depth = 1):
+def get_deconstructor(deconstructor_method, update_method, block_size = 2, depth = 1, n_iter_no_imp=2):
     '''gets the deconstructor function'''
-    decon = deconstructor(block_size, depth)
+    decon = deconstructor(block_size, depth, no_improvement_limit=n_iter_no_imp)
     if deconstructor_method == 'random_model_deconstructor':
         print('using random_model_deconstructor')
         decon.set_deconstructor(decon.random_model_deconstructor)
@@ -347,6 +379,9 @@ def get_deconstructor(deconstructor_method, update_method, block_size = 2, depth
     if update_method == 'increase_block_size':
         print('using increase_block_size')
         decon.deconstructor_modifier = decon.increase_block_size
+    elif update_method == 'decrease_depth_increase_block':
+        print('using decrease_depth_increase_block')
+        decon.deconstructor_modifier = decon.decrease_depth_increase_block
     elif update_method == 'fix_y':
         print('using fix_y')
         decon.deconstructor_modifier = decon.fix_y
@@ -363,7 +398,7 @@ def main_lns():
     args = arg_parse_lns()
     setup_file = args.setup_file
     today = datetime.today().strftime('%y_%m_%d')
-    base_file_name = args.results_folder +'xp_lns_'+  today+ '_' + args.xp_name
+    base_file_name = args.results_folder +'xp_lns_'+  today+ '_' + args.xp_name + '/' + args.deconstructor + '/'
     if not os.path.exists(base_file_name):
         os.makedirs(base_file_name)
     #base_xp_yaml = args.base_xp_yaml
@@ -371,7 +406,7 @@ def main_lns():
     total_run_time = args.run_time
     block_size = args.block_size
     n_iter = args.n_iter
-    deconstructor = get_deconstructor(args.deconstructor, args.update_method, block_size)
+    deconstructor = get_deconstructor(args.deconstructor, args.update_method, block_size, depth=args.depth,  n_iter_no_imp=args.n_iter_no_imp)
     #reads the setup file
     setup_dict_list = dict_list_from_csv(setup_file)
     #runs the fix and optimize function

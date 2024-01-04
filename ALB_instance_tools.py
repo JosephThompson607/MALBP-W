@@ -559,7 +559,7 @@ def generate_equipment_2(no_equipment, no_stations,no_tasks,mean=100, variance=1
     c_se = np.zeros((no_stations,no_equipment))
     for equipment in range(no_equipment):
         for station in range(no_stations):
-            c_se[ station, equipment] =int((mean+np.random.randn()*variance ))* np.sum(r_oe,axis=0)[equipment]    
+            c_se[ station, equipment] =int(abs((mean+np.random.randn())*variance ))* np.sum(r_oe,axis=0)[equipment]    
     return c_se,r_oe
 
 class Equipment():

@@ -119,6 +119,8 @@ def warmstart_dynamic_from_results(results_file, base_file_name = 'test', run_ti
       ws_res_df['xp_config_file'] = config_file
       ws_res_df['model_file'] = start_results['model_file']
       ws_res_df['variables_folder'] = var_folder
+      ws_res_df['original_run_time'] = start_results['run_time']
+      ws_res_df['original_obj_value'] = start_results['obj_value']
       if group_counter == 0:
             results_df = ws_res_df.copy()
       else:
