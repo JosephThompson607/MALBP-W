@@ -148,20 +148,53 @@ def check_scenarios(prod_sequence1,prod_sequence2,t):
         return False
 
 
-def monte_carlo_tree(n_takts, entry_probabilities, enum_depth=0, n_samples = 100):
+def monte_carlo_tree(n_takts, entry_probabilities, enum_depth=0, n_samples = 100, seed=None):
     '''Generates a scenario tree by sampling from the entry probabilities'''
+    #set the seed
+    if seed != None:
+        random.seed(seed)
     #enumerates the fist enum_depth takts
     _, final_sequences = make_scenario_tree(enum_depth, entry_probabilities)
     #randomly sample from the final sequences dictionary of dictionaries, based off of the probabilities
     sampled_sequences = {}
     for i in range(n_samples):
         seq = random.choices(list(final_sequences.values()),[x['probability'] for x in final_sequences.values()])[0]['sequence'].copy()
-        print("seq", seq)
-        print("i", i)
         for j in range(n_takts-enum_depth):
-            print("j", j)
             seq.append(random.choices(list(entry_probabilities.keys()),[x for x in entry_probabilities.values()])[0])
         sampled_sequences[i] = {'sequence':seq, 'probability': 1/n_samples}
   
     return None, sampled_sequences
 
+def monte_carlo_tree_limit(n_takts, entry_probabilities,  enum_depth=0, n_samples = 100, seed=None):
+    '''Checks and see if the number of samples is greater than the number of possible sequences, if so, returns all possible sequences'''
+    if n_samples > len(entry_probabilities)**n_takts:
+        print("Too many samples, returning all possible sequences, solving for exact solution ",  flush=True)
+        return make_scenario_tree(n_takts, entry_probabilities)
+    else:
+        print("Sampling ", n_samples, "with seed ", seed,   flush=True)
+        return monte_carlo_tree(n_takts, entry_probabilities, enum_depth=enum_depth, n_samples=n_samples, seed=seed)
+
+
+def get_scenario_generator(xp_yaml, seed = None):
+    '''Reads the xp_yaml config file and seed and returns a scenario generator'''
+    tree_kwargs = {}
+    if isinstance(xp_yaml['scenario_generator'], dict):
+         if xp_yaml['scenario_generator']['generator']== 'monte_carlo_tree':
+            scenario_generator = monte_carlo_tree
+            tree_kwargs['n_samples'] = xp_yaml['scenario_generator']['n_samples']
+            tree_kwargs['enum_depth'] = xp_yaml['scenario_generator']['enum_depth']
+            tree_kwargs['seed'] = xp_yaml['scenario_generator']['seed']
+            if seed != None:
+                tree_kwargs['seed'] = seed
+         elif xp_yaml['scenario_generator']['generator']== 'monte_carlo_tree_limit':
+            scenario_generator = monte_carlo_tree_limit
+            tree_kwargs['n_samples'] = xp_yaml['scenario_generator']['n_samples']
+            tree_kwargs['enum_depth'] = xp_yaml['scenario_generator']['enum_depth']
+            tree_kwargs['seed'] = xp_yaml['scenario_generator']['seed']
+            if seed != None:
+                tree_kwargs['seed'] = seed
+         else:
+            raise ValueError('scenario generator not recognized')
+    else:
+        scenario_generator = make_scenario_tree
+    return tree_kwargs, scenario_generator

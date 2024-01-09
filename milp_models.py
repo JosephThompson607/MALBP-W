@@ -214,17 +214,18 @@ class MMALBP_LP_Problem:
         if fixed:
             self.y.fixValue()
 
-    def solve(self, solver=None, generate_report =True, file_name = ''):
+    def solve(self, solver=None, generate_report =False, file_name = ''):
         self.make_lp_problem()
         self.prob.solve(solver=solver)
         self.obj_value = self.prob.objective.value()
         self.solver_status = self.prob.status
         #only generate report if the problem is solved
-        if generate_report and self.solver_status == 1:
-            task_assignment_df, labor_assignments_df = self.generate_report(file_name)
-            return self.prob, task_assignment_df, labor_assignments_df
-        
-        warnings.warn('Solver did not find a solution')
+        if self.solver_status == 1:
+            if generate_report:
+                task_assignment_df, labor_assignments_df = self.generate_report(file_name)
+                return self.prob, task_assignment_df, labor_assignments_df
+        else:
+            warnings.warn('Solver did not find a solution')
 
         return self.prob, None, None
     

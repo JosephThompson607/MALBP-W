@@ -234,7 +234,7 @@ def fix_and_optimize_dl( deconstructor,md_results_folder,start_obj_value, proble
     results_batch = []
     solver = plp.GUROBI_CMD(warmStart=True,options=[ ('TimeLimit', run_time)])
     for i in range(n_iter):
-        print('solving dynamic problem')
+        print('solving dynamic problem: ', problem_instance.name, 'iteration: ', n_iter, flush=True)
         fix_vars, not_fix_vars = deconstructor.deconstruct(vars=prev_vars,dynamic_problem=dynamic_problem)
         dynamic_problem.set_variables(**fix_vars, fixed=True)
         dynamic_problem.set_variables(**not_fix_vars, fixed=False)
@@ -300,7 +300,8 @@ def run_fix_and_optimize(param_dict_list, base_file_name, deconstructor, run_tim
         #loads the equipment file
         equipment_instance = Equipment(generation_method='import_yaml', equipment_file=param_dict['equipment_instance'])
         #makes the scenario tree
-        scenario_tree, final_sequences = make_scenario_tree(SEQUENCE_LENGTH, test_instance.model_mixtures)
+        tree_kwargs, scenario_tree_generator = get_scenario_generator(xp_yaml)
+        scenario_tree, final_sequences = scenario_tree_generator(SEQUENCE_LENGTH, test_instance.model_mixtures, **tree_kwargs)
         #makes directory if it does not exist
         if not os.path.exists(base_file_name):
             os.makedirs(base_file_name)

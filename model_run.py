@@ -37,8 +37,9 @@ def warmstart_dynamic_problem_linear_labor_recourse( problem_instance, equipment
     #loads the results from the model dependent problem
     start_time = timer()
     dynamic_problem.set_up_from_model_dependent(md_results_folder)
-    print('solving dynamic problem')
+    print('solving dynamic problem: ', problem_instance.name, flush=True)
     solver = plp.GUROBI_CMD(warmStart=True,options=[ ('TimeLimit', run_time), ('LogFile', f"{file_name}{group_counter}.log")])
+    
     dynamic_problem.solve(solver=solver, file_name=file_name + str(group_counter))
     folder_name = None
     if save_variables:
@@ -92,13 +93,7 @@ def warmstart_dynamic_from_results(results_file, base_file_name = 'test', run_ti
                                           worker_cost=WORKER_COST, 
                                           recourse_cost=RECOURSE_COST)
       #create scenario tree
-      tree_kwargs = {}
-      if xp_yaml['scenario_generator']== 'monte_carlo_tree':
-         scenario_generator = monte_carlo_tree
-         tree_kwargs['n_samples'] = xp_yaml['scenario_generator']['n_samples']
-         tree_kwargs['enum_depth'] = xp_yaml['scenario_generator']['enum_depth']
-      else:
-         scenario_generator = make_scenario_tree
+      tree_kwargs, scenario_generator = get_scenario_generator(xp_yaml, seed)
       print('generating scenario tree')
       model_mixtures = test_instance.model_mixtures
       _, final_sequences = scenario_generator(SEQUENCE_LENGTH, model_mixtures, **tree_kwargs)
@@ -272,14 +267,7 @@ def run_from_config(config_file, save_variables=False, run_time = 600, seed = No
       WORKER_COST = xp_yaml['worker_cost']
       RECOURSE_COST = xp_yaml['recourse_cost']
       #configuring scenario tree generator
-      tree_kwargs = {}
-      if xp_yaml['scenario_generator']== 'monte_carlo_tree':
-         scenario_generator = monte_carlo_tree
-         tree_kwargs['n_samples'] = xp_yaml['scenario_generator']['n_samples']
-         tree_kwargs['enum_depth'] = xp_yaml['scenario_generator']['enum_depth']
-      else:
-         scenario_generator = make_scenario_tree
-      
+      tree_kwargs, scenario_generator = get_scenario_generator(xp_yaml, seed)
       #copying config file to results folder
       print('copying config file to results folder',  config_file, base_file_name +'/'+ config_file)
       shutil.copyfile(config_file, base_file_name +'/'+ conf_name + '_config.yaml')
@@ -401,7 +389,7 @@ def arg_parse():
    parser = argparse.ArgumentParser(description='Runs ALB model from config file')
    parser.add_argument('--xp_type', type=str, help='type of experiment to run')
    parser.add_argument('--config_file', type=str, help='config file to run')
-   parser.add_argument('--seed', type=int, help='seed for random number generator')
+   parser.add_argument('--seed', type=int, required=False, default=None, help='seed for random number generator')
    parser.add_argument('--xp_name', type=str, help='directory to save results')
    parser.add_argument('--run_time', type=int, help='time limit for solver')
    parser.add_argument('--save_variables', action=argparse.BooleanOptionalAction, help='whether to save the lp variables')
