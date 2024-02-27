@@ -74,7 +74,7 @@ class MultiModelInstance:
         for model in self.data:
             total_probability += self.data[model]['probability']
         if total_probability != 1:
-            warnings.warn('Model probabilities do not sum to 1')
+            warnings.warn('Model probabilities do not sum to 1: ', total_probability)
         #Check that the total task time is less than the takt time * number of stations * max workers
         for model in self.data:
             total_task_time = 0
@@ -360,30 +360,41 @@ def rand_pert_precedence(p_graph_orig, seed=None):
 
 # this function actually removes tasks from the precedence graph and task times
 def eliminate_tasks(old_instance, elim_interval=(0.6, 0.8), seed=None):
-    instance = old_instance.copy()
+    instance = copy.deepcopy(old_instance)
     rng = np.random.default_rng(seed=seed)
     interval_choice = rng.uniform(low=elim_interval[0], high=elim_interval[1])
+    print('instance.data', instance.data)
+    first_key = list(instance.data.keys())[0]
+    print('first key', first_key)
+    print('first key  tasks')
+    print(list(instance.data[first_key]["task_times"][1].keys()))
+    print('instance.data[first_key]', instance.data[first_key])
+    print(interval_choice)
     # Instance must have same number of tasks and task numbering
     to_remove = rng.choice(
-        list(instance[0]["task_times"].keys()),
-        size=(int(instance[0]["num_tasks"] * (interval_choice))),
+        list(instance.data[first_key]["task_times"][1].keys()),
+        size=(int(instance.data[first_key]["num_tasks"] * (interval_choice))),
         replace=False,
     )
     # nx.draw_planar(p_graph, with_labels=True)
-    for index, model in enumerate(instance):
-        # Remove node from task times list
-        entries_to_remove(
-            to_remove, instance[index]["task_times"]
-        )  
-        # change precedence graph
-        instance[index]["precedence_relations"] = reconstruct_precedence_constraints(
-            instance[index]["precedence_relations"], to_remove
-        )  
-        #update number of tasks
-        instance[index]["num_tasks"] = len(
-            instance[index]["task_times"]
-        )  
-        
+    for model in instance.data:
+        for worker in instance.data[model]["task_times"]:
+            # Remove node from task times list
+            #print(instance.data[model]["task_times"])
+            entries_to_remove(
+                to_remove, 
+                instance.data[model]["task_times"][worker]
+            )  
+            # change precedence graph
+            instance.data[model]["precedence_relations"] = reconstruct_precedence_constraints(
+                instance.data[model]["precedence_relations"], 
+                to_remove
+            )  
+            #update number of tasks
+            instance.data[model]["num_tasks"] = len(
+                instance.data[model]["task_times"]
+            )  
+            
     return instance
 
 

@@ -300,6 +300,7 @@ def run_fix_and_optimize(param_dict_list, base_file_name, deconstructor, run_tim
         #loads the equipment file
         equipment_instance = Equipment(generation_method='import_yaml', equipment_file=param_dict['equipment_instance'])
         #makes the scenario tree
+        #TODO fix seed for mc tree generator
         tree_kwargs, scenario_tree_generator = get_scenario_generator(xp_yaml)
         scenario_tree, final_sequences = scenario_tree_generator(SEQUENCE_LENGTH, test_instance.model_mixtures, **tree_kwargs)
         #makes directory if it does not exist

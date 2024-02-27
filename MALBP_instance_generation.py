@@ -12,6 +12,19 @@ def random_model_mixture(model_names, seed = None):
         model_mixture[model_name] = model_mixture[model_name]/total
     return model_mixture
 
+def make_reduced_instances(filepath, SALBP_instance_list, model_names, takt_time, sequence_length, max_workers, no_stations, worker_cost, recourse_cost, task_time_adjuster=change_task_times_linear, interval_choice = (0.7,0.8), seed = None):
+    for i in range(len(SALBP_instance_list)-len(model_names)+1):
+        instances = SALBP_instance_list[i:i+len(model_names)]
+        model_mixture = random_model_mixture(model_names, seed)
+        model_dicts = make_instance_pair(instances, model_mixture)
+        print("These are the model_dicts")
+        print(model_dicts)
+        mm_instance = MultiModelTaskTimesInstance(model_dicts=model_dicts, takt_time=takt_time, sequence_length=sequence_length, max_workers=max_workers, no_stations=no_stations, worker_cost=worker_cost, recourse_cost=recourse_cost)
+        mm_instance.genererate_task_times(change_func=task_time_adjuster)
+        print("This is the data")
+        new_instance = eliminate_tasks(mm_instance, interval_choice, seed=seed)
+        new_instance.model_data_to_yaml(filepath)
+
 def make_instances(filepath,SALBP_instance_list,model_names,takt_time, sequence_length, max_workers, no_stations, worker_cost, recourse_cost,task_time_adjuster=change_task_times_linear, seed = None):
     for i in range(len(SALBP_instance_list)-len(model_names)+1):
         instances = SALBP_instance_list[i:i+len(model_names)]
