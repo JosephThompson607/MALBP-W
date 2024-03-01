@@ -363,13 +363,7 @@ def eliminate_tasks(old_instance, elim_interval=(0.6, 0.8), seed=None):
     instance = copy.deepcopy(old_instance)
     rng = np.random.default_rng(seed=seed)
     interval_choice = rng.uniform(low=elim_interval[0], high=elim_interval[1])
-    print('instance.data', instance.data)
     first_key = list(instance.data.keys())[0]
-    print('first key', first_key)
-    print('first key  tasks')
-    print(list(instance.data[first_key]["task_times"][1].keys()))
-    print('instance.data[first_key]', instance.data[first_key])
-    print(interval_choice)
     # Instance must have same number of tasks and task numbering
     to_remove = rng.choice(
         list(instance.data[first_key]["task_times"][1].keys()),

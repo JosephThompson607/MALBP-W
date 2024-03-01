@@ -1043,6 +1043,8 @@ class model_dependent_problem_linear_labor_recourse(MMALBP_LP_Problem):
     def make_lp_variables(self):
         self.u_se = plp.LpVariable.dicts('u_se', (self.stations, self.equipment), lowBound=0, cat='Binary')
         self.l_wts = plp.LpVariable.dicts('l_wts', (self.prod_sequences.keys(), self.takts, self.stations), lowBound=0, cat='Integer')
+        #prints the number of l_wts variables
+        print(len(self.l_wts))
         self.x_soi = plp.LpVariable.dicts('x_soi', ( self.stations, range(self.problem_instance.no_tasks), self.problem_instance.data.keys() ), lowBound=0, cat='Binary')
         self.y_w = plp.LpVariable.dicts('y_w', (self.prod_sequences.keys()), lowBound=0, cat='Integer')
         self.y = plp.LpVariable('y', lowBound=0, cat='Integer')

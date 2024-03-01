@@ -1,5 +1,6 @@
 import networkx as nx
 import random
+import pandas as pd
 
 
 def make_scenario_tree(n_takts, entry_probabilities):
@@ -198,3 +199,27 @@ def get_scenario_generator(xp_yaml, seed = None):
     else:
         scenario_generator = make_scenario_tree
     return tree_kwargs, scenario_generator
+
+def generate_tree_csv(tree_generator, n_takts, entry_probabilities, enum_depth=0, n_samples = 100, seed=None, filename='scenario_tree.csv'):
+    '''Generates a scenario tree and writes it to a csv file'''
+    tree, final_sequences = tree_generator(n_takts, entry_probabilities, enum_depth=enum_depth, n_samples=n_samples, seed=seed)
+    #convert the final sequences to a dataframe
+    print("final sequences", final_sequences)
+    frames = []
+    for key in final_sequences.keys():
+        row_frame = pd.Series(final_sequences[key]).to_frame().T
+        frames.append(row_frame)
+
+    print("writing to file ", filename)
+    df = pd.concat(frames, axis=0, ignore_index=True)
+    df.to_csv(filename, index=False)
+
+def read_tree_csv(filename):
+    '''Reads a scenario tree from a csv file'''
+    with open(filename) as f:
+        lines = f.readlines()
+    final_sequences = {}
+    for line in lines:
+        key, value = line.split(',')
+        final_sequences[key] = value
+    return final_sequences

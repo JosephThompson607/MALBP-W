@@ -23,6 +23,7 @@ def make_reduced_instances(filepath, SALBP_instance_list, model_names, takt_time
         mm_instance.genererate_task_times(change_func=task_time_adjuster)
         print("This is the data")
         new_instance = eliminate_tasks(mm_instance, interval_choice, seed=seed)
+        new_instance.generate_name()
         new_instance.model_data_to_yaml(filepath)
 
 def make_instances(filepath,SALBP_instance_list,model_names,takt_time, sequence_length, max_workers, no_stations, worker_cost, recourse_cost,task_time_adjuster=change_task_times_linear, seed = None):
