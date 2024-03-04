@@ -152,8 +152,15 @@ def check_scenarios(prod_sequence1,prod_sequence2,t):
 def monte_carlo_tree(n_takts, entry_probabilities, enum_depth=0, n_samples = 100, seed=None):
     '''Generates a scenario tree by sampling from the entry probabilities'''
     #set the seed
-    if seed != None:
+    print("seed at monte_carlo_tree", seed)
+    #IF a seed is given, set it
+    if seed is not None:
+        print('setting seed')
         random.seed(seed)
+    #else, set the seed to a number determined by the system
+    else:
+        random.seed()
+    
     #enumerates the fist enum_depth takts
     _, final_sequences = make_scenario_tree(enum_depth, entry_probabilities)
     #randomly sample from the final sequences dictionary of dictionaries, based off of the probabilities
@@ -192,8 +199,11 @@ def get_scenario_generator(xp_yaml, seed = None):
             tree_kwargs['n_samples'] = xp_yaml['scenario_generator']['n_samples']
             tree_kwargs['enum_depth'] = xp_yaml['scenario_generator']['enum_depth']
             tree_kwargs['seed'] = xp_yaml['scenario_generator']['seed']
-            if seed != None:
+            if seed != "None":
                 tree_kwargs['seed'] = seed
+            else:
+                tree_kwargs['seed'] = None
+                
          else:
             raise ValueError('scenario generator not recognized')
     else:

@@ -97,7 +97,6 @@ def warmstart_dynamic_from_results(results_file, base_file_name = 'test', run_ti
       print('generating scenario tree')
       model_mixtures = test_instance.model_mixtures
       _, final_sequences = scenario_generator(SEQUENCE_LENGTH, model_mixtures, **tree_kwargs)
-      
       #Warm starts the dynamic problem with the results from the model dependent problem
       warm_start_fp = base_file_name + '/dynamic_problem_linear_labor_recourse/warmstart/'
       if not os.path.exists(warm_start_fp):
@@ -338,6 +337,7 @@ def run_from_config(config_file, save_variables=False, run_time = 600, seed = No
             print('generating scenario tree')
             model_mixtures = test_instance.model_mixtures
             scenario_tree_graph, final_sequences = scenario_generator(SEQUENCE_LENGTH, model_mixtures, **tree_kwargs)
+            print('Here are the sequences', final_sequences)
             print('defining problem')
             milp_prob = milp_model(problem_instance = test_instance, 
                                    equipment_instance = equipment, 
