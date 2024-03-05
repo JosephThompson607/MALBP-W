@@ -337,7 +337,6 @@ def run_from_config(config_file, save_variables=False, run_time = 600, seed = No
             print('generating scenario tree')
             model_mixtures = test_instance.model_mixtures
             scenario_tree_graph, final_sequences = scenario_generator(SEQUENCE_LENGTH, model_mixtures, **tree_kwargs)
-            print('Here are the sequences', final_sequences)
             print('defining problem')
             milp_prob = milp_model(problem_instance = test_instance, 
                                    equipment_instance = equipment, 

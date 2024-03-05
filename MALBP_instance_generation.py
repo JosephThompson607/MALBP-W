@@ -35,3 +35,24 @@ def make_instances(filepath,SALBP_instance_list,model_names,takt_time, sequence_
         mm_instance.genererate_task_times(change_func=task_time_adjuster)
 
         mm_instance.model_data_to_yaml(filepath)
+
+
+if __name__ == "__main__":
+    instance_list = read_instance_folder("SALBP_benchmark/small data set_n=20/")[:100]
+    #NO_EQUIPMENT = 4
+    seed = 42
+    NO_WORKERS =1
+    NO_STATIONS = 2
+    WORKER_COST = 500
+    RECOURSE_COST = WORKER_COST * 2
+    TAKT_TIME = 500
+    SEQUENCE_LENGTH = 20
+    model_names = ['A', 'B','C','D','E']
+
+
+
+    fp = 'SALBP_benchmark/MM_instances/model_data/small_instances/5_models/'
+    #if filepath does not exist, create it
+    if not os.path.exists(fp):
+        os.makedirs(fp)
+    make_instances(fp,instance_list, model_names, takt_time=TAKT_TIME, sequence_length=SEQUENCE_LENGTH, max_workers=NO_WORKERS, no_stations=NO_STATIONS, worker_cost=WORKER_COST, recourse_cost=RECOURSE_COST, seed=seed)
