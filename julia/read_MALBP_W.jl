@@ -7,7 +7,7 @@ function read_scenario_tree(scenario_info::Dict)
     if scenario_info["generator"] == "read_csv"
         return CSV.read(scenario_info["filepath"], DataFrame)
     else
-        error("unrecognized generator")
+        error("unrecognized generator, currently we only support read_csv for scenario tree generation.")
     end
 end
 
@@ -45,7 +45,6 @@ struct MALBP_W_instance
     equipment::EquipmentInstance
     no_stations:: Int
     max_workers:: Int
-    cycle_time :: Int
     worker_cost:: Int
     recourse_cost:: Int
     sequence_length:: Int
@@ -87,7 +86,7 @@ function read_models_instance(file_name :: String)
     instance_name = models_yaml["name"]
     cycle_time = models_yaml["takt_time"]
     #reads the model instances
-    for (key, value)in models_yaml["model_data"]
+    for (key, value) in models_yaml["model_data"]
         name = key
         probability = value["probability"]
         no_tasks  = value["num_tasks"]
@@ -98,7 +97,8 @@ function read_models_instance(file_name :: String)
         model_instance = ModelInstance(name, probability, no_tasks, order_strength, precedence_relations, task_times)
         push!(models, model_instance)
     end
-    models_instance = ModelsInstance( instance_name, models)
+    models_instance = ModelsInstance(instance_name, cycle_time, models)
+    return models_instance
 end
 
 
@@ -121,7 +121,7 @@ function read_MALBP_W_instances(file_name::String)
                         config_file["worker_cost"], 
                         config_file["recourse_cost"], 
                         config_file["sequence_length"], 
-                        config_file["MILP_models"])
+                        config_file["milp_models"])
             push!(instances, current_instance)
         end
     end
@@ -138,5 +138,5 @@ end
 
 # tree = read_scenario_tree("SALBP_benchmark/MM_instances/scenario_trees/5_takts_5_samples_3_models.csv")
 # print_scenario_tree(tree)
-instances = read_MALBP_W_instances("SALBP_benchmark/MM_instances/small_instance_debug.yaml")
+instances = read_MALBP_W_instances("SALBP_benchmark/MM_instances/julia_debug.yaml")
 
