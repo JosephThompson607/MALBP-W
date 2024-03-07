@@ -197,7 +197,8 @@ def run_from_csv_slurm(csv_file, array_index, save_variables=False, run_time = 6
       start_time = time.time()
       group_counter = 0
       #if scenario_tree is None, then the scenario tree is generated from the model mixtures
-      if config['scenario_tree_yaml'] == 'None':
+      print('THis is the SCENARIO', config['scenario_tree_yaml'])
+      if config['scenario_tree_yaml'] == "No Tree":
          if seed is None:
             seed = array_index
          tree_kwargs, scenario_generator = get_scenario_generator(xp_yaml, seed)

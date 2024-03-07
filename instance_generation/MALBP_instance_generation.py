@@ -1,3 +1,5 @@
+import sys  
+sys.path.insert(1, '..')
 from ALB_instance_tools import *
 import random
 
@@ -58,11 +60,11 @@ if __name__ == "__main__":
     # if not os.path.exists(fp):
     #     os.makedirs(fp)
     # make_instances(fp,instance_list, model_names, takt_time=TAKT_TIME, sequence_length=SEQUENCE_LENGTH, max_workers=NO_WORKERS, no_stations=NO_STATIONS, worker_cost=WORKER_COST, recourse_cost=RECOURSE_COST, seed=seed)
-
+    
     model_files = get_model_files_list('../SALBP_benchmark/MM_instances/small_instance_longSeq.yaml')
     print('model_files list', model_files)
     equipment_files = ["SALBP_benchmark/MM_instances/equipment_data/random_O20_E8_S4_seed42.yaml"]
-    scenario_trees = ['None']
+    scenario_trees = ['No Tree']
     config_files = ['SALBP_benchmark/MM_instances/small_instance_longSeq.yaml']
     output_folder = '../SALBP_benchmark/MM_instances/csv_config'
     make_slurm_csv(model_files, equipment_files, scenario_trees, config_files, output_folder, name= 'no_tree', model_repeats=10)

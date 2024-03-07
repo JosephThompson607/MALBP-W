@@ -632,7 +632,9 @@ def make_slurm_csv(model_files, equipment_files, scenario_trees, config_files, o
     #if output folder does not exist, make it
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
+    
     with open(f'{output_folder}/{name}.csv', 'w') as f:
+        print('fp is ', f'{output_folder}/{name}.csv')
         f.write('model_yaml,equipment_yaml,scenario_tree_yaml,config_yaml\n')
         for model in model_files:
             for _ in range(model_repeats):
