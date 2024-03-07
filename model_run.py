@@ -125,6 +125,10 @@ def warmstart_dynamic_from_results(results_file, base_file_name = 'test', run_ti
    end_time = time.time()
    print('time for', 'dynamic_problem_linear_labor_recourse', end_time - start_time)
 
+
+def get_xp_name(string):
+    return re.search(r'[^/]+', string).group(0)
+
 def handle_model_folder(milp_model, base_file_name):
    '''creates the folder to put the results for the given formulation of the MALBP problem'''
    if milp_model == 'model_dependent_problem_multi_labor_recourse':
@@ -190,6 +194,7 @@ def run_from_csv_slurm(csv_file, array_index, save_variables=False, run_time = 6
       print('instance no tasks', test_instance.no_tasks)
       #raises an error if the equipment and instance have different number of tasks
       raise ValueError('Equipment and instance have different number of tasks')
+   original_xp_name = get_xp_name(base_file_name )
    row_file_name = base_file_name + '/' + csv_name + '_row_' + str(array_index) +  '/'
    for milp_model in xp_yaml['milp_models']:
       milp_model, file_name = handle_model_folder(milp_model, row_file_name)
@@ -244,12 +249,12 @@ def run_from_csv_slurm(csv_file, array_index, save_variables=False, run_time = 6
       result_df = pd.DataFrame([result], index=[0])
       #if the results_df already exists, then append the new results to it
       
-      if os.path.exists(base_file_name + "/results.csv"):
-         results_df = pd.read_csv(base_file_name + "/results.csv")
+      if os.path.exists(original_xp_name + "/results.csv"):
+         results_df = pd.read_csv(original_xp_name + "/results.csv")
          results_df = pd.concat([results_df, result_df], axis=0, ignore_index=True)
       else:
          results_df = result_df.copy()
-      output_path = base_file_name +  '/results.csv'
+      output_path = original_xp_name +  '/results.csv'
       print('output_path', output_path)
       results_df.to_csv(output_path)
       group_counter += 1
@@ -408,6 +413,7 @@ def main_run():
    today = datetime.today().strftime('%Y_%m_%d')
    if args.xp_name:
       print("Writing output to model_runs/"+str(today)+args.xp_name)
+      print(os.path.exists('model_runs/'+str(today)+args.xp_name))
       if not os.path.exists('model_runs/'+str(today)+args.xp_name):
          os.makedirs('model_runs/'+str(today)+args.xp_name)
       file_name = 'model_runs/'+str(today)+args.xp_name
