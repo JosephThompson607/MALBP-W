@@ -190,15 +190,14 @@ def run_from_csv_slurm(csv_file, array_index, save_variables=False, run_time = 6
       print('instance no tasks', test_instance.no_tasks)
       #raises an error if the equipment and instance have different number of tasks
       raise ValueError('Equipment and instance have different number of tasks')
-   base_file_name = base_file_name + '/' + csv_name + '_row_' + str(array_index) +  '/'
+   row_file_name = base_file_name + '/' + csv_name + '_row_' + str(array_index) +  '/'
    for milp_model in xp_yaml['milp_models']:
-      milp_model, file_name = handle_model_folder(milp_model, base_file_name)
+      milp_model, file_name = handle_model_folder(milp_model, row_file_name)
       #Keeps track of time
       start_time = time.time()
       group_counter = 0
       #if scenario_tree is None, then the scenario tree is generated from the model mixtures
-      print('THis is the SCENARIO', config['scenario_tree_yaml'])
-      if config['scenario_tree_yaml'] == "No Tree":
+      if config['scenario_tree_yaml'] == "No Tree" or config['scenario_tree_yaml'] == "None":
          if seed is None:
             seed = array_index
          tree_kwargs, scenario_generator = get_scenario_generator(xp_yaml, seed)
@@ -241,13 +240,17 @@ def run_from_csv_slurm(csv_file, array_index, save_variables=False, run_time = 6
       result['seed'] = seed
       result['variables_folder'] = folder_name
       result['run_time'] = end - start
-      result['group_counter'] = group_counter
+      result['array_index'] = array_index
       result_df = pd.DataFrame([result], index=[0])
-      if group_counter == 0:
-         results_df = result_df.copy()
-      else:
+      #if the results_df already exists, then append the new results to it
+      
+      if os.path.exists(base_file_name + "/results.csv"):
+         results_df = pd.read_csv(base_file_name + "/results.csv")
          results_df = pd.concat([results_df, result_df], axis=0, ignore_index=True)
-      output_path=file_name + conf_name +  '_results.csv'
+      else:
+         results_df = result_df.copy()
+      output_path = base_file_name +  '/results.csv'
+      print('output_path', output_path)
       results_df.to_csv(output_path)
       group_counter += 1
       #deletes results df
