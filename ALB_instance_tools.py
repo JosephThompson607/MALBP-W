@@ -625,3 +625,27 @@ def dict_list_from_csv(file_name):
         for row in reader:
             dict_list.append(row)
     return dict_list
+
+def make_slurm_csv(model_files, equipment_files, scenario_trees, config_files, output_folder, name= 'slurm_config', model_repeats=1):
+    '''Writes a csv file with all the combinations of model, equipment, scenario tree, and config files for a slurm job.
+      Model repeats will repeat the same config. This is for testing random configurations.'''
+    #if output folder does not exist, make it
+    if not os.path.exists(output_folder):
+        os.makedirs(output_folder)
+    with open(f'{output_folder}/{name}.csv', 'w') as f:
+        f.write('model_yaml,equipment_yaml,scenario_tree_yaml,config_yaml\n')
+        for model in model_files:
+            for _ in range(model_repeats):
+                for equipment in equipment_files:
+                    for scenario_tree in scenario_trees:
+                        for config in config_files:
+                            f.write(f'{model},{equipment},{scenario_tree},{config}\n')
+
+def get_model_files_list(config_file):
+    '''returns the list of product variants of a given config file'''
+    model_files = []
+    with open(config_file) as f:
+        xp_yaml = yaml.load(f, Loader=yaml.FullLoader)
+        for model_file in xp_yaml['model_files']:
+            model_files.append(model_file)
+    return model_files

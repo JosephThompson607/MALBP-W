@@ -23,6 +23,7 @@ end
 
 struct ModelsInstance
     name::String
+    no_models::Int
     cycle_time:: Int
     models::Vector{ModelInstance}
 end
@@ -48,6 +49,7 @@ struct MALBP_W_instance
     worker_cost:: Int
     recourse_cost:: Int
     sequence_length:: Int
+    no_cycles:: Int
     MILP_models::Array{String}
 end
 
@@ -97,7 +99,8 @@ function read_models_instance(file_name :: String)
         model_instance = ModelInstance(name, probability, no_tasks, order_strength, precedence_relations, task_times)
         push!(models, model_instance)
     end
-    models_instance = ModelsInstance(instance_name, cycle_time, models)
+    no_models = length(models)
+    models_instance = ModelsInstance(instance_name, no_models, cycle_time, models)
     return models_instance
 end
 
@@ -112,6 +115,7 @@ function read_MALBP_W_instances(file_name::String)
             models_instance = read_models_instance(model)
             equipment_instance = read_equipment_instance(equip)
             scenarios = read_scenario_tree(config_file["scenario_generator"])
+            no_cycles = config_file["sequence_length"] + config_file["no_stations"] - 1
             current_instance =MALBP_W_instance(config_file["config_name"], 
                         models_instance, 
                         scenarios, 
@@ -120,7 +124,8 @@ function read_MALBP_W_instances(file_name::String)
                         config_file["max_workers"], 
                         config_file["worker_cost"], 
                         config_file["recourse_cost"], 
-                        config_file["sequence_length"], 
+                        config_file["sequence_length"],
+                        no_cycles, 
                         config_file["milp_models"])
             push!(instances, current_instance)
         end
@@ -129,7 +134,7 @@ function read_MALBP_W_instances(file_name::String)
 end
 
 
-#Gets scenario tree, prints each line of scenario tree
+#prints each line of scenario tree
 function print_scenario_tree(scenario_tree)
     for row in eachrow(scenario_tree)
         println(row)
@@ -139,4 +144,3 @@ end
 # tree = read_scenario_tree("SALBP_benchmark/MM_instances/scenario_trees/5_takts_5_samples_3_models.csv")
 # print_scenario_tree(tree)
 instances = read_MALBP_W_instances("SALBP_benchmark/MM_instances/julia_debug.yaml")
-

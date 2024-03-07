@@ -1,6 +1,11 @@
+import sys
+sys.path.insert(1, 'instance_generation/')
+import os
 import networkx as nx
 import random
 import pandas as pd
+import yaml
+from MALBP_instance_generation import random_model_mixture
 
 
 def make_scenario_tree(n_takts, entry_probabilities):
@@ -210,9 +215,9 @@ def get_scenario_generator(xp_yaml, seed = None):
         scenario_generator = make_scenario_tree
     return tree_kwargs, scenario_generator
 
-def generate_tree_csv(tree_generator, n_takts, entry_probabilities, enum_depth=0, n_samples = 100, seed=None, filename='scenario_tree.csv'):
+def generate_tree_csv(tree_generator, sequence_length, entry_probabilities, enum_depth=0, n_samples = 100, seed=None, filename='scenario_tree.csv'):
     '''Generates a scenario tree and writes it to a csv file'''
-    tree, final_sequences = tree_generator(n_takts, entry_probabilities, enum_depth=enum_depth, n_samples=n_samples, seed=seed)
+    tree, final_sequences = tree_generator(sequence_length, entry_probabilities, enum_depth=enum_depth, n_samples=n_samples, seed=seed)
     #convert the final sequences to a dataframe
     print("final sequences", final_sequences)
     frames = []
@@ -220,9 +225,41 @@ def generate_tree_csv(tree_generator, n_takts, entry_probabilities, enum_depth=0
         row_frame = pd.Series(final_sequences[key]).to_frame().T
         frames.append(row_frame)
 
-    print("writing to file ", filename)
+    
     df = pd.concat(frames, axis=0, ignore_index=True)
+    df['entry_probabilities'] = entry_probabilities
+    df['sequence_length'] = sequence_length
+    df['num_samples'] = n_samples
+    print("writing to file ", filename)
     df.to_csv(filename, index=False)
+
+def save_tree_yaml( final_sequences, entry_probabilities, sequence_length, n_samples, seed, enum_depth, filename, tree_name):
+    '''Saves a scenario tree to a yaml file'''
+    scenario_dict = {'filename':filename, 'tree_name':tree_name, 'entry_probabilities':entry_probabilities, 'sequence_length':sequence_length, 'n_samples' : n_samples, 'seed':seed, 'enum_depth':enum_depth, 'final_sequences':final_sequences}
+    my_yaml = open(filename + '.yaml', 'w')
+    yaml.dump(scenario_dict, my_yaml)
+
+def generate_tree_yaml(tree_generator, sequence_length, entry_probabilities, fp, enum_depth=0, n_samples = 100, seed=None,  tree_name='tree', filename='st'):
+    '''Generates a scenario tree and writes it to a yaml file'''
+    tree, final_sequences = tree_generator(sequence_length, entry_probabilities, enum_depth=enum_depth, n_samples=n_samples, seed=seed)
+    #convert the final sequences to a dataframe
+    print("final sequences", final_sequences)
+    scenario_dict = {'filename':filename, 'tree_name':tree_name, 'entry_probabilities':entry_probabilities, 'sequence_length':sequence_length, 'n_samples' : n_samples, 'seed':seed, 'enum_depth':enum_depth, 'final_sequences':final_sequences}
+
+    my_yaml = open(fp + f'{filename}.yaml', 'w')
+    yaml.dump(scenario_dict, my_yaml)
+
+def make_scenarios(n_s_trees, sequence_length, model_names, n_samples, fp, enum_depth=0, filename='s_tree_', no_model_mixture_repeats=1):
+    #if the fp does not exist yet, make it
+    if not os.path.exists(fp):
+        os.makedirs(fp)
+    for i in range(n_s_trees):
+        model_mixtures = random_model_mixture(model_names=model_names)
+        #if the fp does not exist yet, make it
+        if not os.path.exists(fp + filename + str(i+1) + '/'):
+            os.makedirs(fp + filename + str(i+1) + '/')
+        for j in range(no_model_mixture_repeats):
+            generate_tree_yaml(monte_carlo_tree_limit, sequence_length, model_mixtures, enum_depth=enum_depth , n_samples=n_samples, fp = fp, tree_name=i+1, filename=filename + str(i+1) + '/'+ 'mc_sample_' + str(j+1))
 
 def read_tree_csv(filename):
     '''Reads a scenario tree from a csv file'''
