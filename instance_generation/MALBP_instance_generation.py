@@ -67,4 +67,4 @@ if __name__ == "__main__":
     scenario_trees = ['No Tree']
     config_files = ['SALBP_benchmark/MM_instances/small_instance_longSeq.yaml']
     output_folder = '../SALBP_benchmark/MM_instances/csv_config'
-    make_slurm_csv(model_files, equipment_files, scenario_trees, config_files, output_folder, name= 'no_tree', model_repeats=10)
+    make_slurm_csv(model_files, equipment_files, scenario_trees, config_files, output_folder, name= 'small_no_tree', model_repeats=2)
