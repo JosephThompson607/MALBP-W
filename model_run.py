@@ -127,7 +127,7 @@ def warmstart_dynamic_from_results(results_file, base_file_name = 'test', run_ti
 
 
 def get_xp_name(string):
-    return re.search(r'[^/]+', string).group(0)
+    return string.split("/")[0] + "/" + string.split("/")[1] + "/"
 
 def handle_model_folder(milp_model, base_file_name):
    '''creates the folder to put the results for the given formulation of the MALBP problem'''
@@ -249,12 +249,12 @@ def run_from_csv_slurm(csv_file, array_index, save_variables=False, run_time = 6
       result_df = pd.DataFrame([result], index=[0])
       #if the results_df already exists, then append the new results to it
       
-      if os.path.exists(original_xp_name + "/results.csv"):
-         results_df = pd.read_csv(original_xp_name + "/results.csv")
+      if os.path.exists(original_xp_name + "results.csv"):
+         results_df = pd.read_csv(original_xp_name + "results.csv")
          results_df = pd.concat([results_df, result_df], axis=0, ignore_index=True)
       else:
          results_df = result_df.copy()
-      output_path = original_xp_name +  '/results.csv'
+      output_path = original_xp_name +  "results.csv"
       print('output_path', output_path)
       results_df.to_csv(output_path)
       group_counter += 1
