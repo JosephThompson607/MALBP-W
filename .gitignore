@@ -1,6 +1,7 @@
 .DS_Store
 /SALBP_benchmark/
 *.lp
+*.toml
 precedence_graph.png
 version1.mps
 /__pycache__/
