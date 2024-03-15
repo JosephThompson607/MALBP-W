@@ -42,20 +42,21 @@ def make_instances(filepath,SALBP_instance_list,model_names,takt_time, sequence_
 
 
 if __name__ == "__main__":
-    # instance_list = read_instance_folder("SALBP_benchmark/small data set_n=20/")[:100]
-    # #NO_EQUIPMENT = 4
-    # seed = 42
-    # NO_WORKERS =1
-    # NO_STATIONS = 2
-    # WORKER_COST = 500
-    # RECOURSE_COST = WORKER_COST * 2
-    # TAKT_TIME = 500
-    # SEQUENCE_LENGTH = 20
+    instance_list = read_instance_folder("../SALBP_benchmark/small data set_n=20/")[:100]
+    #NO_EQUIPMENT = 4
+    print("instance list", instance_list)
+    seed = 42
+    NO_WORKERS =1
+    NO_STATIONS = 2
+    WORKER_COST = 500
+    RECOURSE_COST = WORKER_COST * 2
+    TAKT_TIME = 1000
+    SEQUENCE_LENGTH = 20
     # model_names = ['A', 'B','C','D','E']
 
 
 
-    # fp = 'SALBP_benchmark/MM_instances/model_data/small_instances/5_models/'
+    # fp = '../SALBP_benchmark/MM_instances/model_data/small_instances/5_models/'
     # #if filepath does not exist, create it
     # if not os.path.exists(fp):
     #     os.makedirs(fp)
@@ -65,6 +66,6 @@ if __name__ == "__main__":
     print('model_files list', model_files)
     equipment_files = ["SALBP_benchmark/MM_instances/equipment_data/random_O20_E8_S4_seed42.yaml"]
     scenario_trees = ['No Tree']
-    config_files = ['SALBP_benchmark/MM_instances/small_instance_longSeq.yaml']
+    config_files = ['SALBP_benchmark/MM_instances/small_instance_longSeq_5samp.yaml']
     output_folder = '../SALBP_benchmark/MM_instances/csv_config'
-    make_slurm_csv(model_files, equipment_files, scenario_trees, config_files, output_folder, name= 'small_no_tree', model_repeats=2)
+    make_slurm_csv(model_files, equipment_files, scenario_trees, config_files, output_folder, name= '5_samp_no_tree', model_repeats=10)

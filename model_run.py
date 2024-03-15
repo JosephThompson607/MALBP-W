@@ -236,6 +236,7 @@ def run_from_csv_slurm(csv_file, array_index, save_variables=False, run_time = 6
             os.makedirs(folder_name)
          milp_prob.save_variables(folder_name)
       result = milp_prob.get_obj_val_dict()
+      print("here are the results", result)
       result['equipment_instance'] = config['equipment_yaml']
       result['xp_config_file'] = config['config_yaml']
       result['model_file'] = config['model_yaml']
@@ -246,12 +247,14 @@ def run_from_csv_slurm(csv_file, array_index, save_variables=False, run_time = 6
       result['variables_folder'] = folder_name
       result['run_time'] = end - start
       result['array_index'] = array_index
-      result_df = pd.DataFrame([result], index=[0])
+      result_df = pd.DataFrame([result])
       #if the results_df already exists, then append the new results to it
       
       if os.path.exists(original_xp_name + "results.csv"):
          results_df = pd.read_csv(original_xp_name + "results.csv")
-         results_df = pd.concat([results_df, result_df], axis=0, ignore_index=True)
+         #filters results df so it has the same columns as result df
+         results_df = results_df[result_df.columns.intersection(results_df.columns)]
+         results_df = pd.concat([results_df, result_df], axis=0)
       else:
          results_df = result_df.copy()
       output_path = original_xp_name +  "results.csv"
