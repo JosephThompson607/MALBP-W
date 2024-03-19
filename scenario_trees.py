@@ -5,7 +5,18 @@ import networkx as nx
 import random
 import pandas as pd
 import yaml
-from MALBP_instance_generation import random_model_mixture
+
+
+def random_model_mixture(model_names, seed = None):
+    '''Creates a dictionary where the model name are the keys and the probability is the values. The probabilities sum to 1'''
+    model_mixture = {}
+    random.seed(seed)
+    for model_name in model_names:
+        model_mixture[model_name] = random.random()
+    total = sum(model_mixture.values())
+    for model_name in model_mixture.keys():
+        model_mixture[model_name] = model_mixture[model_name]/total
+    return model_mixture
 
 
 def make_scenario_tree(n_takts, entry_probabilities):
@@ -191,25 +202,31 @@ def monte_carlo_tree_limit(n_takts, entry_probabilities,  enum_depth=0, n_sample
 def get_scenario_generator(xp_yaml, seed = None):
     '''Reads the xp_yaml config file and seed and returns a scenario generator'''
     tree_kwargs = {}
-    if isinstance(xp_yaml['scenario_generator'], dict):
-         if xp_yaml['scenario_generator']['generator']== 'monte_carlo_tree':
+    #old name for the scenario generator
+    scenario_key = 'scenario_generator'
+    if scenario_key not in xp_yaml:
+        #new name for the scenario generator
+        scenario_key = 'scenario'
+    if isinstance(xp_yaml[scenario_key], dict):
+        if xp_yaml[scenario_key]['generator']== 'monte_carlo_tree':
             scenario_generator = monte_carlo_tree
-            tree_kwargs['n_samples'] = xp_yaml['scenario_generator']['n_samples']
-            tree_kwargs['enum_depth'] = xp_yaml['scenario_generator']['enum_depth']
-            tree_kwargs['seed'] = xp_yaml['scenario_generator']['seed']
+            tree_kwargs['n_samples'] = xp_yaml[scenario_key]['n_samples']
+            tree_kwargs['enum_depth'] = xp_yaml[scenario_key]['enum_depth']
+            tree_kwargs['seed'] = xp_yaml[scenario_key]['seed']
             if seed != None:
                 tree_kwargs['seed'] = seed
-         elif xp_yaml['scenario_generator']['generator']== 'monte_carlo_tree_limit':
+        elif xp_yaml[scenario_key]['generator']== 'monte_carlo_tree_limit':
             scenario_generator = monte_carlo_tree_limit
-            tree_kwargs['n_samples'] = xp_yaml['scenario_generator']['n_samples']
-            tree_kwargs['enum_depth'] = xp_yaml['scenario_generator']['enum_depth']
-            tree_kwargs['seed'] = xp_yaml['scenario_generator']['seed']
+            tree_kwargs['n_samples'] = xp_yaml[scenario_key]['n_samples']
+            tree_kwargs['enum_depth'] = xp_yaml[scenario_key]['enum_depth']
+            tree_kwargs['seed'] = xp_yaml[scenario_key]['seed']
             if seed != "None":
                 tree_kwargs['seed'] = seed
             else:
                 tree_kwargs['seed'] = None
-                
-         else:
+        elif xp_yaml[scenario_key]['generator']== 'full':
+            scenario_generator = make_scenario_tree     
+        else:
             raise ValueError('scenario generator not recognized')
     else:
         scenario_generator = make_scenario_tree

@@ -28,7 +28,7 @@ struct ModelsInstance
     name::String
     no_models::Int
     cycle_time:: Int
-    models::Vector{ModelInstance}
+    models::Dict{String, ModelInstance}
 end
 
 struct EquipmentInstance
@@ -97,7 +97,7 @@ end
 #Reads models instance
 function read_models_instance(file_name :: String)
     models_yaml = YAML.load(open(file_name))
-    models = []
+    models = Dict{String, ModelInstance}()
     instance_name = models_yaml["name"]
     #if the cycle time is defined as "takt_time" in the yaml file, read instance
     if haskey(models_yaml, "takt_time")
@@ -115,7 +115,7 @@ function read_models_instance(file_name :: String)
         task_times  = value["task_times"]
         #println(task_times)
         model_instance = ModelInstance(name, probability, no_tasks, order_strength, precedence_relations, task_times)
-        push!(models, model_instance)
+        models[name] = model_instance
     end
     no_models = length(models)
     models_instance = ModelsInstance(instance_name, no_models, cycle_time, models)
@@ -126,8 +126,8 @@ end
 # key and probability as value
 function get_model_mixture(models_instance::ModelsInstance)
     model_mixture = Dict{String, Float64}()
-    for model in models_instance.models
-        model_mixture[model.name] = model.probability
+    for (model, model_dict) in models_instance.models
+        model_mixture[model] = model_dict.probability
     end
     return model_mixture
 end
@@ -138,10 +138,10 @@ function check_instance(config_file, models_instance, equipment_instance)
         error("number of stations in the config file does not match the number of stations in the equipment instance")
     end
     #If the tasks in the models instance are not in the equipment instance, throw an error
-    for model in models_instance.models
-        for task in model.task_times
+    for (model, model_dict) in models_instance.models
+        for task in model_dict.task_times
             if task[1] > equipment_instance.no_tasks
-                error("task $(task[1]) in model $(model.name) is not in the equipment instance")
+                error("task $(task[1]) in model $(model) is not in the equipment instance")
             end
         end
     end

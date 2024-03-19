@@ -16,6 +16,7 @@ import shutil
 from datetime import datetime
 from timeit import default_timer as timer
 import argparse
+import warnings
 
 
 def dict_list_to_csv(dict_list, file_name):
@@ -163,6 +164,11 @@ def handle_model_folder(milp_model, base_file_name):
       raise ValueError('milp_model not recognized')
    return milp_model, file_name
 
+def check_equipment_instance(test_instance, equipment):
+   '''checks if the equipment and instance have the same number of tasks'''
+   if equipment.no_tasks != test_instance.no_tasks:
+      #gives a warning if the equipment and instance have different number of tasks
+      warnings.warn(f'Equipment and instance have different number of tasks: {equipment.no_tasks} and {test_instance.no_tasks}')
 
 def run_from_csv_slurm(csv_file, array_index, save_variables=False, run_time = 600, seed = None, base_file_name = 'test'):
    '''runs the model from a csv file. Meant to be used with slurm arrays. Notice that if you load scenario trees from a file, the model mixtures will be from the scenario tree file, not the model file'''
@@ -189,11 +195,7 @@ def run_from_csv_slurm(csv_file, array_index, save_variables=False, run_time = 6
                                        recourse_cost=RECOURSE_COST)
    
    equipment = Equipment(generation_method='import_yaml', equipment_file=config['equipment_yaml'])
-   if equipment.no_tasks != test_instance.no_tasks:
-      print('equipmen no tasks', equipment.no_tasks)
-      print('instance no tasks', test_instance.no_tasks)
-      #raises an error if the equipment and instance have different number of tasks
-      raise ValueError('Equipment and instance have different number of tasks')
+   check_equipment_instance(test_instance, equipment)
    original_xp_name = get_xp_name(base_file_name )
    row_file_name = base_file_name + '/' + csv_name + '_row_' + str(array_index) +  '/'
    for milp_model in xp_yaml['milp_models']:
@@ -281,7 +283,11 @@ def run_from_config(config_file, save_variables=False, run_time = 600, seed = No
       print('conf_name', conf_name)
       xp_yaml = yaml.load(f, Loader=yaml.FullLoader)
       #configuring problem
-      SEQUENCE_LENGTH = xp_yaml['sequence_length']
+      #If xp_yaml has key 'sequence_length', then use that value, otherwise use 10
+      if 'sequence_length' in xp_yaml:
+         SEQUENCE_LENGTH = xp_yaml['sequence_length']
+      else:
+         SEQUENCE_LENGTH = xp_yaml['scenario']['sequence_length']
       NO_WORKERS = xp_yaml['max_workers']
       NO_STATIONS = xp_yaml['no_stations']
       WORKER_COST = xp_yaml['worker_cost']
@@ -341,11 +347,7 @@ def run_from_config(config_file, save_variables=False, run_time = 600, seed = No
             if xp_yaml['equipment_files']:
                print('loading equipment from', xp_yaml['equipment_files'][0])
                equipment = Equipment(generation_method='import_yaml', equipment_file=xp_yaml['equipment_files'][0])
-               if equipment.no_tasks != test_instance.no_tasks:
-                  print('equipmen no tasks', equipment.no_tasks)
-                  print('instance no tasks', test_instance.no_tasks)
-                  #raises an error if the equipment and instance have different number of tasks
-                  raise ValueError('Equipment and instance have different number of tasks')
+               check_equipment_instance(test_instance, equipment)
             else:
                print('creating equipment')
                NO_EQUIPMENT = xp_yaml['no_equipment']
