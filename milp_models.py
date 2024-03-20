@@ -217,6 +217,7 @@ class MMALBP_LP_Problem:
 
     def solve(self, solver=None, generate_report =False, file_name = ''):
         self.make_lp_problem()
+        #self.prob.writeLP(f"{file_name}stochastic_problem.lp")
         self.prob.solve(solver=solver)
         self.obj_value = self.prob.objective.value()
         self.solver_status = self.prob.status
@@ -359,7 +360,8 @@ class dynamic_problem_linear_labor_recourse(MMALBP_LP_Problem):
             #Constraint 3 all tasks must be assigned to a station
         for w in self.prod_sequences.keys():
             for j, model in enumerate(self.prod_sequences[w]['sequence']):
-                for o in range(self.problem_instance.no_tasks): 
+                for task in self.problem_instance.data[model]['task_times'][1]: 
+                    o = int(task)-1
                     self.prob += (plp.lpSum([self.x_wsoj[w][s][o][j] for s in self.stations]) == 1, f'x_wsoj_{w}_s_{o}_{j}')
             #Constraint 4 -- sum of task times for assigned tasks must be less than takt time times the number of workers for a given station
         for w in self.prod_sequences.keys():
@@ -379,7 +381,8 @@ class dynamic_problem_linear_labor_recourse(MMALBP_LP_Problem):
         for w in self.prod_sequences.keys():
             for j, model in enumerate(self.prod_sequences[w]['sequence']):
                 for s in self.stations:
-                    for o in range(self.problem_instance.no_tasks):
+                    for task in self.problem_instance.data[model]['task_times'][1]: 
+                        o = int(task)-1
                         self.prob += self.x_wsoj[w][s][o][j] <= plp.lpSum([self.R_oe[o][e]*self.u_se[s][e] for  e in self.equipment]), f'equipment_wsoj_{w}_{s}_{o}_{j}'
         
         #Constraint 6 -- precedence constraints

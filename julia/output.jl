@@ -30,7 +30,8 @@ function write_x_wsoj_solution(output_filepath::String, instance::MALBP_W_instan
                     if only_nonzero && value(x[w, s, o, j]) == 0
                         continue
                     end
-                    x_wsoj_dict = Dict("scenario"=>w, "station"=>s, "task"=>o, "item"=>j, "value"=>value(x[w, s, o, j]))
+                    
+                    x_wsoj_dict = Dict("scenario"=>w, "station"=>s, "task"=>o, "item_idx"=>j, "item"=>instance.scenarios[w,"sequence"][j], "value"=>value(x[w, s, o, j]))
                     push!(x_wsoj_solution, x_wsoj_dict)
                 end
             end

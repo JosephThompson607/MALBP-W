@@ -7,7 +7,7 @@ include("../output.jl")
 #defines the decision variables for the dynamic MALBP-W model
 function define_dynamic_linear_vars!(m::Model, instance::MALBP_W_instance)
     #defines the variables
-    @variable(m, x_wsoj[1:instance.no_scenarios, 1:instance.equipment.no_stations, 1:instance.equipment.no_tasks, 1:instance.sequence_length], Bin, base_name="x_soj")
+    @variable(m, x_wsoj[1:instance.no_scenarios, 1:instance.equipment.no_stations, 1:instance.equipment.no_tasks, 1:instance.sequence_length], Bin, base_name="x_wsoj")
     @variable(m, u_se[1:instance.equipment.no_stations, 1:instance.equipment.no_equipment], Bin, base_name="u_se")
     @variable(m, y_wts[1:instance.no_scenarios, 1:instance.no_cycles, 1:instance.no_stations] >=0, Int, base_name="y_wts")
     @variable(m, y_w[1:instance.no_scenarios]>=0, Int, base_name="y_w")
@@ -64,17 +64,15 @@ function define_dynamic_linear_constraints!(m::Model, instance::MALBP_W_instance
     end
     #constraint 2: each task is assigned to exactly one station
     for w in 1:instance.no_scenarios
-        for s in 1:instance.equipment.no_stations
             for o in 1:instance.equipment.no_tasks
                 for j in 1:instance.sequence_length
                     #Do not need constraint if the task is not a task of the model
                     if string(o) ∉ keys(instance.models.models[instance.scenarios[w,"sequence"][j]].task_times[1])
                         continue
                     end
-                    @constraint(m, sum(x_wsoj[w, s, o, j] for j in 1:instance.sequence_length) == 1)
+                    @constraint(m, sum(x_wsoj[w, s, o, j] for s in 1:instance.no_stations) == 1)
                 end
             end
-        end
     end
     #constraint 3: sum of task times of each assigned task for each model must be less than the cycle time times the number of workers y_wts
     for w in eachrow(instance.scenarios)
@@ -138,7 +136,7 @@ function MMALBP_W_dynamic(config_filepath::String, output_filepath::String="")
     define_dynamic_linear!(m, instance)
     #writes the model to a file
     optimize!(m)
-    write_MALBP_W_solution_dynamic(output_filepath, instance, m, true)
+    write_MALBP_W_solution_dynamic(output_filepath, instance, m, false)
     write_to_file(m, output_filepath * "model.lp")
     return m
 end
