@@ -3,18 +3,6 @@ using DataFrames
 import YAML
 include("scenario_generators.jl")
 
-#reads scenario tree file from csv accepts a dictionary of scenario tree info and model mixtures(optional)
-function read_scenario_tree(scenario_info::Dict, model_mixtures::Dict{String, Float64} )
-    if scenario_info["generator"] == "read_csv"
-        return CSV.read(scenario_info["filepath"], DataFrame)
-    elseif scenario_info["generator"] == "full"
-        return generate_scenario_tree(scenario_info["sequence_length"], model_mixtures)
-    else
-        error("unrecognized generator, currently we only support read_csv for scenario tree generation.")
-    end
-end
-
-
 struct ModelInstance
     name::String
     probability::Real
@@ -57,12 +45,15 @@ struct MALBP_W_instance
     MILP_models::Array{String}
 end
 
-function calculate_scenarions(scenarios::DataFrame)
+
+
+
+function calculate_scenarios(scenarios::DataFrame)
     return nrow(scenarios)
 end
 
 function MALBP_W_instance(config_name::String, models::ModelsInstance, scenarios::DataFrame, equipment::EquipmentInstance, no_stations:: Int, max_workers:: Int, worker_cost:: Int, recourse_cost:: Int, sequence_length:: Int, no_cycles:: Int, MILP_models::Array{String})
-    no_scenarios = calculate_scenarions(scenarios)
+    no_scenarios = calculate_scenarios(scenarios)
     return MALBP_W_instance(config_name, models, scenarios,no_scenarios, equipment, no_stations, max_workers, worker_cost, recourse_cost, sequence_length, no_cycles, MILP_models)
 end
 
