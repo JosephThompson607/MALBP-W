@@ -1,6 +1,4 @@
-using CSV
-using DataFrames
-import YAML
+
 include("scenario_generators.jl")
 
 struct ModelInstance
@@ -13,6 +11,7 @@ struct ModelInstance
 end
 
 struct ModelsInstance
+    filepath::String
     name::String
     no_models::Int
     cycle_time:: Int
@@ -20,6 +19,7 @@ struct ModelsInstance
 end
 
 struct EquipmentInstance
+    filepath::String
     name::String
     no_stations::Int
     no_equipment::Int
@@ -31,6 +31,8 @@ end
 
 
 struct MALBP_W_instance
+    filepath::String
+    name::String
     config_name::String
     models::ModelsInstance
     scenarios::DataFrame
@@ -52,9 +54,10 @@ function calculate_scenarios(scenarios::DataFrame)
     return nrow(scenarios)
 end
 
-function MALBP_W_instance(config_name::String, models::ModelsInstance, scenarios::DataFrame, equipment::EquipmentInstance, no_stations:: Int, max_workers:: Int, worker_cost:: Int, recourse_cost:: Int, sequence_length:: Int, no_cycles:: Int, MILP_models::Array{String})
+function MALBP_W_instance(filepath::String,config_name::String, models::ModelsInstance, scenarios::DataFrame, equipment::EquipmentInstance, no_stations:: Int, max_workers:: Int, worker_cost:: Int, recourse_cost:: Int, sequence_length:: Int, no_cycles:: Int, MILP_models::Array{String})
     no_scenarios = calculate_scenarios(scenarios)
-    return MALBP_W_instance(config_name, models, scenarios,no_scenarios, equipment, no_stations, max_workers, worker_cost, recourse_cost, sequence_length, no_cycles, MILP_models)
+    name =  models.name  * "_" *equipment.name
+    return MALBP_W_instance(filepath,name,config_name, models, scenarios,no_scenarios, equipment, no_stations, max_workers, worker_cost, recourse_cost, sequence_length, no_cycles, MILP_models)
 end
 
 
@@ -67,6 +70,7 @@ end
 #Reads equipment instance YAML and returns an equipment object
 function read_equipment_instance(file_name::String)
     equip_yaml  = YAML.load(open(file_name))
+
     name = equip_yaml["name"]
     no_stations= equip_yaml["no_stations"]
     no_equipment = equip_yaml["no_equipment"]
@@ -74,6 +78,7 @@ function read_equipment_instance(file_name::String)
     c_se = equip_yaml["c_se"]
     r_oe = equip_yaml["r_oe"]
     equip_instance = EquipmentInstance(
+        file_name,
         name,
         no_stations,
         no_equipment,
@@ -81,6 +86,7 @@ function read_equipment_instance(file_name::String)
         c_se,
         r_oe
     )
+    return equip_instance
 end
 
 
@@ -109,7 +115,7 @@ function read_models_instance(file_name :: String)
         models[name] = model_instance
     end
     no_models = length(models)
-    models_instance = ModelsInstance(instance_name, no_models, cycle_time, models)
+    models_instance = ModelsInstance(file_name,instance_name, no_models, cycle_time, models)
     return models_instance
 end
 
@@ -148,7 +154,8 @@ function read_MALBP_W_instances(file_name::String)
             check_instance(config_file,models_instance, equipment_instance)
             scenarios = read_scenario_tree(config_file["scenario"], get_model_mixture(models_instance))
             no_cycles = config_file["scenario"]["sequence_length"] + config_file["no_stations"] - 1
-            current_instance =MALBP_W_instance(config_file["config_name"], 
+            current_instance =MALBP_W_instance(file_name,
+                        config_file["config_name"], 
                         models_instance, 
                         scenarios, 
                         equipment_instance, 

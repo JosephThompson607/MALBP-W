@@ -1,7 +1,3 @@
-using JuMP
-using Gurobi
-include("../read_MALBP_W.jl") 
-include("../output.jl")
 
 
 #defines the decision variables for the model dependent MALBP-W model
@@ -9,7 +5,7 @@ function define_md_linear_vars!(m::Model, instance::MALBP_W_instance)
     #defines the variables
     @variable(m, x_soi[1:instance.equipment.no_stations, 1:instance.equipment.no_tasks, 1:instance.models.no_models], Bin, base_name="x_soi")
     @variable(m, u_se[1:instance.equipment.no_stations, 1:instance.equipment.no_equipment], Bin, base_name="u_se")
-    @variable(m, y_wts[1:instance.no_scenarios, 1:instance.no_cycles, 1:instance.no_stations] >=0, Int, base_name="y_wts")
+    @variable(m, instance.max_workers>=y_wts[1:instance.no_scenarios, 1:instance.no_cycles, 1:instance.no_stations] >=0, Int, base_name="y_wts")
     @variable(m, y_w[1:instance.no_scenarios]>=0, Int, base_name="y_w")
     @variable(m, y>=0, Int, base_name="y")
 
@@ -99,18 +95,3 @@ function define_md_linear!(m::Model, instance::MALBP_W_instance)
 end
 
 
-function MMALBP_W_model_dependent(config_filepath::String, output_filepath::String="")
-    #reads the instance file
-    instances = read_MALBP_W_instances(config_filepath)
-    #creates the model
-    m = Model(Gurobi.Optimizer)
-    instance = instances[1]
-    #defines the model dependent parameters
-    define_md_linear!(m, instance)
-    #writes the model to a file
-    optimize!(m)
-    write_MALBP_W_solution_md(output_filepath, instance, m, true)
-    write_to_file(m, output_filepath * "model.lp")
-    return m
-end
-malbp_w_model = MMALBP_W_model_dependent("SALBP_benchmark/MM_instances/julia_debug.yaml", "model_runs/juliaaa/")

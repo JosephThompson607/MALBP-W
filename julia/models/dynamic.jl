@@ -1,7 +1,3 @@
-using JuMP
-using Gurobi
-include("../read_MALBP_W.jl") 
-include("../output.jl")
 
 
 #defines the decision variables for the dynamic MALBP-W model
@@ -9,7 +5,7 @@ function define_dynamic_linear_vars!(m::Model, instance::MALBP_W_instance)
     #defines the variables
     @variable(m, x_wsoj[1:instance.no_scenarios, 1:instance.equipment.no_stations, 1:instance.equipment.no_tasks, 1:instance.sequence_length], Bin, base_name="x_wsoj")
     @variable(m, u_se[1:instance.equipment.no_stations, 1:instance.equipment.no_equipment], Bin, base_name="u_se")
-    @variable(m, y_wts[1:instance.no_scenarios, 1:instance.no_cycles, 1:instance.no_stations] >=0, Int, base_name="y_wts")
+    @variable(m, instance.max_workers>=y_wts[1:instance.no_scenarios, 1:instance.no_cycles, 1:instance.no_stations] >=0, Int, base_name="y_wts")
     @variable(m, y_w[1:instance.no_scenarios]>=0, Int, base_name="y_w")
     @variable(m, y>=0, Int, base_name="y")
 
@@ -34,13 +30,18 @@ function add_non_anticipativity_constraints!(m::Model, instance::MALBP_W_instanc
     #usesful variables
     x_wsoj = m[:x_wsoj]
     #constraint 1:  x_wsoj must be equal for shared sequence segments
-    for t in instance.sequence_length:1
-        #if the sequence is the same up to time t, then x_wsoj must be equal
+    for t in instance.sequence_length:-1:1
+        #if the sequence is the same up to time t, then x_wsoj must be equal up to time t
         if instance.scenarios[w, "sequence"][1:t] == instance.scenarios[w_prime, "sequence"][1:t]
-            for j in 1:instance.sequence_length
-                @constraint(m, x_wsoj[w, s, o, j] == x_wsoj[w_prime, s, o, j])
+            for j in 1:t
+                max_station = min(t-j+1, instance.equipment.no_stations)
+                for s in 1:max_station
+                    for o in 1:instance.equipment.no_tasks
+                        @constraint(m, x_wsoj[w, s, o, j] == x_wsoj[w_prime, s, o, j])
+                    end
+                end
             end
-        return
+            return
         end
     end
 
@@ -112,7 +113,7 @@ function define_dynamic_linear_constraints!(m::Model, instance::MALBP_W_instance
     end
     #Constraint 6: non-anticipativity
     for w in 1:instance.no_scenarios
-        for w_prime in w:instance.no_scenarios
+        for w_prime in (w+1):instance.no_scenarios
             add_non_anticipativity_constraints!(m, instance, w, w_prime)
         end
     end
@@ -125,20 +126,3 @@ function define_dynamic_linear!(m::Model, instance::MALBP_W_instance)
     define_dynamic_linear_constraints!(m, instance)   
 end
 
-
-function MMALBP_W_dynamic(config_filepath::String, output_filepath::String="")
-    #reads the instance file
-    instances = read_MALBP_W_instances(config_filepath)
-    #creates the model
-    m = Model(Gurobi.Optimizer)
-    instance = instances[1]
-    #defines the model dependent parameters
-    define_dynamic_linear!(m, instance)
-    #writes the model to a file
-    optimize!(m)
-    write_MALBP_W_solution_dynamic(output_filepath, instance, m, false)
-    write_to_file(m, output_filepath * "model.lp")
-    return m
-end
-
-malbp_w_model = MMALBP_W_dynamic("SALBP_benchmark/MM_instances/julia_debug.yaml", "model_runs/juliaaa/dynamic/")

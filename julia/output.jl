@@ -1,5 +1,6 @@
 using CSV
 using DataFrames
+using Dates
 
 function write_x_soi_solution(output_filepath::String, instance::MALBP_W_instance, x::Array, only_nonzero::Bool=false)
     #writes the solution to a file
@@ -64,7 +65,6 @@ function write_y_w_solution(output_filepath::String, instance::MALBP_W_instance,
     y_solution = []
     scenario_df = instance.scenarios
     for w in 1:instance.no_scenarios
-        println("scenario_df" ,scenario_df)
         if only_nonzero && value(y_w[w]) == 0
             continue
         end
@@ -87,9 +87,13 @@ function write_MALBP_W_solution_md(output_filepath::String, instance::MALBP_W_in
     u = m[:u_se]
     y_w = m[:y_w]
     y = m[:y]
-    write_x_soi_solution(output_filepath, instance, x, only_nonzero)
-    write_u_se_solution(output_filepath, instance, u, only_nonzero)
-    write_y_w_solution(output_filepath, instance, y_w, y; only_nonzero = only_nonzero)
+    if is_solved_and_feasible(m)
+        write_x_soi_solution(output_filepath, instance, x, only_nonzero)
+        write_u_se_solution(output_filepath, instance, u, only_nonzero)
+        write_y_w_solution(output_filepath, instance, y_w, y; only_nonzero = only_nonzero)
+    else
+        @info("Model is not solved or feasible, no solution written")
+    end
     #writes the sequences to a file
     CSV.write(output_filepath * "sequences.csv", instance.scenarios)
 end
@@ -103,9 +107,40 @@ function write_MALBP_W_solution_dynamic(output_filepath::String, instance::MALBP
     u = m[:u_se]
     y_w = m[:y_w]
     y = m[:y]
-    write_x_wsoj_solution(output_filepath, instance, x, only_nonzero)
-    write_u_se_solution(output_filepath, instance, u, only_nonzero)
-    write_y_w_solution(output_filepath, instance, y_w, y; only_nonzero = only_nonzero)
+    if is_solved_and_feasible(m)
+        write_x_wsoj_solution(output_filepath, instance, x, only_nonzero)
+        write_u_se_solution(output_filepath, instance, u, only_nonzero)
+        write_y_w_solution(output_filepath, instance, y_w, y; only_nonzero = only_nonzero)
+    else
+        @info("Model is not solved or feasible, no solution written")
+    end
+
     #writes the sequences to a file
     CSV.write(output_filepath * "sequences.csv", instance.scenarios)
+end
+
+
+function save_results(output_filepath::String, m::Model, run_time::Real, instance::MALBP_W_instance, output_csv::String)
+    #saves the objective function, relative gap, run time, and instance_name to a file
+    if is_solved_and_feasible(m)
+        obj_val = objective_value(m)
+        rel_gap = relative_gap(m)
+    else
+        obj_val = "NA"
+        rel_gap = "NA"
+    end
+    results = DataFrame(instance_name=instance.name, 
+                        objective_value=obj_val, 
+                        relative_gap=rel_gap, 
+                        run_time=run_time, 
+                        date=Dates.now(),
+                        equip_fp= instance.equipment.filepath,
+                        model_fp= instance.models.filepath,
+                        instance_fp= instance.filepath)
+    #If the file does not exist, create it
+    if !isfile(output_filepath * output_csv)
+        CSV.write(output_filepath * output_csv, results)
+    else
+        CSV.write(output_filepath * output_csv, results, append=true)
+    end
 end
