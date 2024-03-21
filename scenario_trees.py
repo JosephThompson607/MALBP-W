@@ -192,14 +192,17 @@ def get_scenario_generator(xp_yaml, seed = None):
     '''Reads the xp_yaml config file and seed and returns a scenario generator'''
     tree_kwargs = {}
     if isinstance(xp_yaml['scenario_generator'], dict):
-         if xp_yaml['scenario_generator']['generator']== 'monte_carlo_tree':
+        if xp_yaml['scenario_generator']['generator']== 'monte_carlo_tree':
             scenario_generator = monte_carlo_tree
             tree_kwargs['n_samples'] = xp_yaml['scenario_generator']['n_samples']
             tree_kwargs['enum_depth'] = xp_yaml['scenario_generator']['enum_depth']
             tree_kwargs['seed'] = xp_yaml['scenario_generator']['seed']
             if seed != None:
                 tree_kwargs['seed'] = seed
-         elif xp_yaml['scenario_generator']['generator']== 'monte_carlo_tree_limit':
+        elif xp_yaml['scenario_generator']['generator']=='full':
+            scenario_generator = make_scenario_tree
+            
+        elif xp_yaml['scenario_generator']['generator']== 'monte_carlo_tree_limit':
             scenario_generator = monte_carlo_tree_limit
             tree_kwargs['n_samples'] = xp_yaml['scenario_generator']['n_samples']
             tree_kwargs['enum_depth'] = xp_yaml['scenario_generator']['enum_depth']
@@ -209,7 +212,7 @@ def get_scenario_generator(xp_yaml, seed = None):
             else:
                 tree_kwargs['seed'] = None
                 
-         else:
+        else:
             raise ValueError('scenario generator not recognized')
     else:
         scenario_generator = make_scenario_tree
