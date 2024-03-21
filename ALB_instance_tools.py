@@ -91,7 +91,11 @@ class MultiModelInstance:
         with open(model_yaml_file) as file:
 
             mm_yaml = yaml.load(file, Loader=yaml.FullLoader)
-            self.takt_time = mm_yaml['takt_time']
+            #if takt_time is in the mm_yaml dict
+            if 'takt_time' in mm_yaml:
+                self.takt_time = mm_yaml['takt_time']
+            else:
+                self.takt_time = mm_yaml['cycle_time']
             self.data = mm_yaml['model_data']
             self.no_models = len(mm_yaml['model_data'])
 

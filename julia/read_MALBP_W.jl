@@ -1,16 +1,5 @@
-using CSV
-using DataFrames
-import YAML
 
-#reads scenario tree file from csv
-function read_scenario_tree(scenario_info::Dict)
-    if scenario_info["generator"] == "read_csv"
-        return CSV.read(scenario_info["filepath"], DataFrame)
-    else
-        error("unrecognized generator, currently we only support read_csv for scenario tree generation.")
-    end
-end
-
+include("scenario_generators.jl")
 
 struct ModelInstance
     name::String
@@ -22,13 +11,15 @@ struct ModelInstance
 end
 
 struct ModelsInstance
+    filepath::String
     name::String
     no_models::Int
     cycle_time:: Int
-    models::Vector{ModelInstance}
+    models::Dict{String, ModelInstance}
 end
 
 struct EquipmentInstance
+    filepath::String
     name::String
     no_stations::Int
     no_equipment::Int
@@ -40,9 +31,12 @@ end
 
 
 struct MALBP_W_instance
+    filepath::String
+    name::String
     config_name::String
     models::ModelsInstance
     scenarios::DataFrame
+    no_scenarios::Int
     equipment::EquipmentInstance
     no_stations:: Int
     max_workers:: Int
@@ -55,6 +49,19 @@ end
 
 
 
+
+function calculate_scenarios(scenarios::DataFrame)
+    return nrow(scenarios)
+end
+
+function MALBP_W_instance(filepath::String,config_name::String, models::ModelsInstance, scenarios::DataFrame, equipment::EquipmentInstance, no_stations:: Int, max_workers:: Int, worker_cost:: Int, recourse_cost:: Int, sequence_length:: Int, no_cycles:: Int, MILP_models::Array{String})
+    no_scenarios = calculate_scenarios(scenarios)
+    name =  models.name  * "_" *equipment.name
+    return MALBP_W_instance(filepath,name,config_name, models, scenarios,no_scenarios, equipment, no_stations, max_workers, worker_cost, recourse_cost, sequence_length, no_cycles, MILP_models)
+end
+
+
+
 #reads MALBP-W instance file from yaml
 function get_instance_YAML(file_name::String)
     return YAML.load(open(file_name))
@@ -63,6 +70,7 @@ end
 #Reads equipment instance YAML and returns an equipment object
 function read_equipment_instance(file_name::String)
     equip_yaml  = YAML.load(open(file_name))
+
     name = equip_yaml["name"]
     no_stations= equip_yaml["no_stations"]
     no_equipment = equip_yaml["no_equipment"]
@@ -70,6 +78,7 @@ function read_equipment_instance(file_name::String)
     c_se = equip_yaml["c_se"]
     r_oe = equip_yaml["r_oe"]
     equip_instance = EquipmentInstance(
+        file_name,
         name,
         no_stations,
         no_equipment,
@@ -77,6 +86,7 @@ function read_equipment_instance(file_name::String)
         c_se,
         r_oe
     )
+    return equip_instance
 end
 
 
@@ -84,9 +94,14 @@ end
 #Reads models instance
 function read_models_instance(file_name :: String)
     models_yaml = YAML.load(open(file_name))
-    models = []
+    models = Dict{String, ModelInstance}()
     instance_name = models_yaml["name"]
-    cycle_time = models_yaml["takt_time"]
+    #if the cycle time is defined as "takt_time" in the yaml file, read instance
+    if haskey(models_yaml, "takt_time")
+        cycle_time = models_yaml["takt_time"]
+    else
+        cycle_time = models_yaml["cycle_time"]
+    end
     #reads the model instances
     for (key, value) in models_yaml["model_data"]
         name = key
@@ -97,26 +112,50 @@ function read_models_instance(file_name :: String)
         task_times  = value["task_times"]
         #println(task_times)
         model_instance = ModelInstance(name, probability, no_tasks, order_strength, precedence_relations, task_times)
-        push!(models, model_instance)
+        models[name] = model_instance
     end
     no_models = length(models)
-    models_instance = ModelsInstance(instance_name, no_models, cycle_time, models)
+    models_instance = ModelsInstance(file_name,instance_name, no_models, cycle_time, models)
     return models_instance
 end
 
+#Gets the model mixture from the models instance. The model mixture is a dictionary with model name as
+# key and probability as value
+function get_model_mixture(models_instance::ModelsInstance)
+    model_mixture = Dict{String, Float64}()
+    for (model, model_dict) in models_instance.models
+        model_mixture[model] = model_dict.probability
+    end
+    return model_mixture
+end
 
+#checks the instance for consistency
+function check_instance(config_file, models_instance, equipment_instance)
+    if config_file["no_stations"] != equipment_instance.no_stations
+        error("number of stations in the config file does not match the number of stations in the equipment instance")
+    end
+    #If the tasks in the models instance are not in the equipment instance, throw an error
+    for (model, model_dict) in models_instance.models
+        for task in model_dict.task_times
+            if task[1] > equipment_instance.no_tasks
+                error("task $(task[1]) in model $(model) is not in the equipment instance")
+            end
+        end
+    end
+end
 #takes an instance filepath as an input, and returns an array of MALBP_W_instance struct
 function read_MALBP_W_instances(file_name::String)
     config_file = get_instance_YAML(file_name)
     instances = []
-    println(config_file)
     for model in config_file["model_files"]
         for equip in config_file["equipment_files"]
             models_instance = read_models_instance(model)
             equipment_instance = read_equipment_instance(equip)
-            scenarios = read_scenario_tree(config_file["scenario_generator"])
-            no_cycles = config_file["sequence_length"] + config_file["no_stations"] - 1
-            current_instance =MALBP_W_instance(config_file["config_name"], 
+            check_instance(config_file,models_instance, equipment_instance)
+            scenarios = read_scenario_tree(config_file["scenario"], get_model_mixture(models_instance))
+            no_cycles = config_file["scenario"]["sequence_length"] + config_file["no_stations"] - 1
+            current_instance =MALBP_W_instance(file_name,
+                        config_file["config_name"], 
                         models_instance, 
                         scenarios, 
                         equipment_instance, 
@@ -124,7 +163,7 @@ function read_MALBP_W_instances(file_name::String)
                         config_file["max_workers"], 
                         config_file["worker_cost"], 
                         config_file["recourse_cost"], 
-                        config_file["sequence_length"],
+                        config_file["scenario"]["sequence_length"],
                         no_cycles, 
                         config_file["milp_models"])
             push!(instances, current_instance)
@@ -143,4 +182,4 @@ end
 
 # tree = read_scenario_tree("SALBP_benchmark/MM_instances/scenario_trees/5_takts_5_samples_3_models.csv")
 # print_scenario_tree(tree)
-instances = read_MALBP_W_instances("SALBP_benchmark/MM_instances/julia_debug.yaml")
+#instances = read_MALBP_W_instances("SALBP_benchmark/MM_instances/julia_debug.yaml")

@@ -555,3 +555,4 @@ model_runs/dynamic_model_small_instances_C1000_L4_T4_S4_W500/~$dynamic_model_dep
 *.xlsx
 model_runs/
 Manifest.toml
+.vscode/
