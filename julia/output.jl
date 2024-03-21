@@ -125,13 +125,16 @@ function save_results(output_filepath::String, m::Model, run_time::Real, instanc
     if is_solved_and_feasible(m)
         obj_val = objective_value(m)
         rel_gap = relative_gap(m)
+        solution_time = solve_time(m)
     else
         obj_val = "NA"
         rel_gap = "NA"
+        solution_time = "NA"
     end
     results = DataFrame(instance_name=instance.name, 
                         objective_value=obj_val, 
                         relative_gap=rel_gap, 
+                        solve_time=solution_time,
                         run_time=run_time, 
                         date=Dates.now(),
                         equip_fp= instance.equipment.filepath,

@@ -102,12 +102,14 @@ function define_dynamic_linear_constraints!(m::Model, instance::MALBP_W_instance
             end
         end
     end
-    #constraint 5: precedence precedence_relations
+    #constraint 5: precedence relations
     for w in 1:instance.no_scenarios
         for j in 1:instance.sequence_length
-            model = instance.scenarios[w,"sequence"][j]
-            for (prec, suc) in instance.models.models[model].precendence_relations
-                @constraint(m, sum( s * x_wsoj[w,s, parse(Int,prec), j] for s in 1:instance.equipment.no_stations) <= sum( s * x_wsoj[w,s, parse(Int,suc), j] for s in 1:instance.equipment.no_stations))
+            for k in 1:instance.equipment.no_stations
+                model = instance.scenarios[w,"sequence"][j]
+                for (prec, suc) in instance.models.models[model].precendence_relations
+                    @constraint(m, sum(x_wsoj[w,s, parse(Int,prec), j] for s in 1:k) >= sum( x_wsoj[w,s, parse(Int,suc), j] for s in 1:k))
+                end
             end
         end
     end

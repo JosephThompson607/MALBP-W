@@ -81,8 +81,10 @@ function define_md_linear_constraints!(m::Model, instance::MALBP_W_instance)
     #constraint 5: precedence precedence_relations
     for i in 1:instance.models.no_models
         model = model_indexes[i]
-        for (prec, suc) in instance.models.models[model].precendence_relations
-                @constraint(m, sum( s * x_soi[s, parse(Int,prec), i] for s in 1:instance.equipment.no_stations) <= sum( s * x_soi[s, parse(Int,suc), i] for s in 1:instance.equipment.no_stations))
+        for k in 1:instance.equipment.no_stations
+            for (prec, suc) in instance.models.models[model].precendence_relations
+                    @constraint(m, sum( x_soi[s, parse(Int,prec), i] for s in 1:k) >= sum( x_soi[s, parse(Int,suc), i] for s in 1:k))
+            end
         end
     end
 end
