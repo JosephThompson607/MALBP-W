@@ -215,7 +215,7 @@ def get_scenario_generator(xp_yaml, seed = None):
             tree_kwargs['seed'] = xp_yaml[scenario_key]['seed']
             if seed != None:
                 tree_kwargs['seed'] = seed
-        elif xp_yaml['scenario_generator']['generator']== 'monte_carlo_tree_limit':
+        elif xp_yaml[scenario_key]['generator']== 'monte_carlo_tree_limit':
             scenario_generator = monte_carlo_tree_limit
             tree_kwargs['n_samples'] = xp_yaml[scenario_key]['n_samples']
             tree_kwargs['enum_depth'] = xp_yaml[scenario_key]['enum_depth']

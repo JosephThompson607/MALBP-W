@@ -60,10 +60,28 @@ function write_u_se_solution(output_filepath::String, instance::MALBP_W_instance
     CSV.write(output_filepath * "u_se_solution.csv", u_se_solution_df)
 end
 
+function write_y_wts_solution(output_filepath::String, instance::MALBP_W_instance, y_wts, only_nonzero::Bool=false)
+    #writes the solution to a file
+    y_wts_solution = []
+    for w in 1:instance.no_scenarios
+        for t in 1:instance.no_cycles
+            for s in 1:instance.equipment.no_stations
+                if only_nonzero && value(y_wts[w, t, s]) == 0
+                    continue
+                end
+                y_wts_dict = Dict("scenario"=>w, "cycle"=>t, "station"=>s, "value"=>value(y_wts[w, t, s]))
+                push!(y_wts_solution, y_wts_dict)
+            end
+        end
+    end
+    #writes the y_wts_solution as a csv
+    y_wts_solution_df = DataFrame(y_wts_solution)
+    CSV.write(output_filepath * "y_wts_solution.csv", y_wts_solution_df)
+end
+
 function write_y_w_solution(output_filepath::String, instance::MALBP_W_instance, y_w, y; only_nonzero::Bool=false)
     #writes the solution to a file
     y_solution = []
-    scenario_df = instance.scenarios
     for w in 1:instance.no_scenarios
         if only_nonzero && value(y_w[w]) == 0
             continue
@@ -91,6 +109,7 @@ function write_MALBP_W_solution_md(output_filepath::String, instance::MALBP_W_in
         write_x_soi_solution(output_filepath, instance, x, only_nonzero)
         write_u_se_solution(output_filepath, instance, u, only_nonzero)
         write_y_w_solution(output_filepath, instance, y_w, y; only_nonzero = only_nonzero)
+        write_y_wts_solution(output_filepath, instance, m[:y_wts], only_nonzero)
     else
         @info("Model is not solved or feasible, no solution written")
     end
@@ -111,16 +130,18 @@ function write_MALBP_W_solution_dynamic(output_filepath::String, instance::MALBP
         write_x_wsoj_solution(output_filepath, instance, x, only_nonzero)
         write_u_se_solution(output_filepath, instance, u, only_nonzero)
         write_y_w_solution(output_filepath, instance, y_w, y; only_nonzero = only_nonzero)
+        write_y_wts_solution(output_filepath, instance, m[:y_wts], only_nonzero)
     else
         @info("Model is not solved or feasible, no solution written")
     end
 
-    #writes the sequences to a file
-    CSV.write(output_filepath * "sequences.csv", instance.scenarios)
+    #writes the sequences to a yaml file
+    
+    
 end
 
 
-function save_results(output_filepath::String, m::Model, run_time::Real, instance::MALBP_W_instance, output_csv::String)
+function save_results(output_filepath::String, m::Model, run_time::Real, instance::MALBP_W_instance, var_fp::String, output_csv::String)
     #saves the objective function, relative gap, run time, and instance_name to a file
     if is_solved_and_feasible(m)
         obj_val = objective_value(m)
@@ -139,7 +160,8 @@ function save_results(output_filepath::String, m::Model, run_time::Real, instanc
                         date=Dates.now(),
                         equip_fp= instance.equipment.filepath,
                         model_fp= instance.models.filepath,
-                        instance_fp= instance.filepath)
+                        instance_fp= instance.filepath, 
+                        output_folder=var_fp)
     #If the file does not exist, create it
     if !isfile(output_filepath * output_csv)
         CSV.write(output_filepath * output_csv, results)

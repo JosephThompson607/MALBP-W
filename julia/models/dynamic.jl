@@ -49,8 +49,7 @@ end
 
 #defines the constraints of the model dependent MALBP-W model
 function define_dynamic_linear_constraints!(m::Model, instance::MALBP_W_instance)
-    # usesful variables
-    model_indexes = [i for (i, model_dict) in instance.models.models]
+    
     #model variables
     x_wsoj = m[:x_wsoj]
     u_se = m[:u_se]
@@ -68,7 +67,7 @@ function define_dynamic_linear_constraints!(m::Model, instance::MALBP_W_instance
             for o in 1:instance.equipment.no_tasks
                 for j in 1:instance.sequence_length
                     #Do not need constraint if the task is not a task of the model
-                    if string(o) ∉ keys(instance.models.models[instance.scenarios[w,"sequence"][j]].task_times[1])
+                    if string(o) ∉ keys(instance.models.models[string(instance.scenarios[w,"sequence"][j])].task_times[1])
                         continue
                     end
                     @constraint(m, sum(x_wsoj[w, s, o, j] for s in 1:instance.no_stations) == 1)
@@ -121,6 +120,84 @@ function define_dynamic_linear_constraints!(m::Model, instance::MALBP_W_instance
     end
 end
 
+function read_MALBP_W_solution(results_folder::String)
+    #Opens the x_soi file
+    x_soi_fp = results_folder * "x_soi_solution.csv"
+    x_soi_df = CSV.read(x_soi_fp, DataFrame)
+    #Opens the u_se file
+    u_se_fp = results_folder * "u_se_solution.csv"
+    u_se_df = CSV.read(u_se_fp, DataFrame)
+    #Opens the y_wts file
+    y_wts_fp = results_folder * "y_wts_solution.csv"
+    y_wts_df = CSV.read(y_wts_fp, DataFrame)
+    #Opens the y_w file
+    y_w_fp = results_folder * "y_solution.csv"
+    y_w_df = CSV.read(y_w_fp, DataFrame)
+    return x_soi_df, u_se_df, y_wts_df, y_w_df
+end
+
+function warmstart_dynamic_from_md_setup!(m::Model, vars_fp::String, instance::MALBP_W_instance)
+    #usesful variables
+    x_wsoj = m[:x_wsoj]
+    u_se = m[:u_se]
+    y_wts = m[:y_wts]
+    y_w = m[:y_w]
+    y = m[:y]
+    #Gets the model depedent variables from the given folder
+    x_soi_df, u_se_md_df, y_wts_md_df, y_w_md_df = read_MALBP_W_solution(vars_fp)
+
+    #Sets the start value of the equipment variables if they are in the model dependent solution
+    if !isempty(u_se_md_df)
+        for row in eachrow(u_se_md_df)
+            s = row.station
+            e = row.equipment
+            set_start_value(u_se[s, e], row.value)
+        end
+    end
+
+    #Sets the start value of the worker y_w variables, if the scenario == fixed, then it is the y variable
+    if !isempty(y_w_md_df)
+        for row in eachrow(y_w_md_df)
+            w = row.scenario
+            if w == "fixed"
+                set_start_value(y, row.value)
+            else
+                w = parse(Int, w)
+                set_start_value(y_w[w], row.value)
+            end
+        end
+    end
+
+    #sets the start value of the y_wts variables
+    if !isempty(y_wts_md_df)
+        for row in eachrow(y_wts_md_df)
+            w = row.scenario
+            t = row.cycle
+            s = row.station
+            value = row.value
+            set_start_value(y_wts[w, t, s], value)
+        end
+    end
+
+    #Sets the start value of the task variables
+    if !isempty(x_soi_df)
+        model_indexes = [i for (i, model_dict) in instance.models.models]
+        for row in eachrow(x_soi_df)
+            s = row.station
+            o = row.task
+            i = row.model
+            value = row.value
+            for w in 1:instance.no_scenarios
+                for j in 1:instance.sequence_length
+                    if instance.scenarios[w, "sequence"][j] == model_indexes[i]
+                        set_start_value(x_wsoj[w, s, o, j], value)
+                    end
+                end
+            end
+        end
+    end
+end
+
 
 function define_dynamic_linear!(m::Model, instance::MALBP_W_instance)
     define_dynamic_linear_vars!(m, instance)
@@ -128,3 +205,9 @@ function define_dynamic_linear!(m::Model, instance::MALBP_W_instance)
     define_dynamic_linear_constraints!(m, instance)   
 end
 
+function define_dynamic_linear!(m::Model, instance::MALBP_W_instance, warmstart_vars_fp::String)
+    define_dynamic_linear_vars!(m, instance)
+    warmstart_dynamic_from_md_setup!(m, warmstart_vars_fp, instance)
+    define_dynamic_linear_obj!(m, instance)
+    define_dynamic_linear_constraints!(m, instance)   
+end

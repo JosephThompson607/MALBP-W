@@ -1,5 +1,8 @@
 
 include("scenario_generators.jl")
+using YAML
+using CSV
+using DataFrames
 
 struct ModelInstance
     name::String
@@ -172,6 +175,55 @@ function read_MALBP_W_instances(file_name::String)
     return instances
 end
 
+#reads the scenario tree from a csv file
+function read_scenario_csv(file_name::String)
+    scenarios = CSV.read(file_name, DataFrame)
+    #For each row in the scenario tree, the sequence is a vector of the sequence of models
+    #Makes a dataframe to add rows to
+    new_scenarios = []
+    for row in eachrow(scenarios)
+        #Removes everything outside of brackets in the sequence column
+        new_seq = split(row.sequence, "]")[1]
+        new_seq = split(new_seq, "[")[2]
+        new_seq = split(string(new_seq), ",")
+        new_seq = [replace(strip(x), "\"" => "") for x in new_seq]
+        push!(new_scenarios, (sequence=new_seq, probability=row.probability))
+
+    end
+    new_scenarios = DataFrame(new_scenarios)
+    println(new_scenarios)
+    return new_scenarios
+end
+
+#reads the instances from the results file of a model dependent run
+function read_md_results(file_name::String)
+    results = CSV.read(file_name, DataFrame)
+    instances = []
+    for row in eachrow(results)
+        models_instance = read_models_instance(row.model_fp)
+        equip_instance = read_equipment_instance(row.equip_fp)
+        config_file = get_instance_YAML(row.instance_fp)
+        scenarios_fp = row.output_folder * "sequences.csv"
+        scenarios = read_scenario_csv(scenarios_fp)
+        no_cycles = config_file["scenario"]["sequence_length"] + config_file["no_stations"] - 1
+        current_instance = MALBP_W_instance(row.instance_fp,
+                        config_file["config_name"], 
+                        models_instance, 
+                        scenarios, 
+                        equip_instance, 
+                        config_file["no_stations"], 
+                        config_file["max_workers"], 
+                        config_file["worker_cost"], 
+                        config_file["recourse_cost"], 
+                        config_file["scenario"]["sequence_length"],
+                        no_cycles, 
+                        config_file["milp_models"])
+        push!(instances, (instance=current_instance, vars= row.output_folder))
+
+    end
+    return instances
+end
+
 
 #prints each line of scenario tree
 function print_scenario_tree(scenario_tree)
@@ -182,4 +234,3 @@ end
 
 # tree = read_scenario_tree("SALBP_benchmark/MM_instances/scenario_trees/5_takts_5_samples_3_models.csv")
 # print_scenario_tree(tree)
-#instances = read_MALBP_W_instances("SALBP_benchmark/MM_instances/julia_debug.yaml")
