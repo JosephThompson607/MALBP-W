@@ -275,8 +275,9 @@ class dynamic_problem_linear_labor_recourse(MMALBP_LP_Problem):
                             if 0<= t-s < self.sequence_length:
                                 j = t-s
                                 model = self.prod_sequences[w]['sequence'][j]
-                                for o in range(self.problem_instance.no_tasks):
-                                    df_result = x_soi_df.loc[(x_soi_df['station'] == s) & (x_soi_df['model'] == model) & (x_soi_df['task'] == o)]['value'].values[0]
+                                for task in self.problem_instance.data[model]['task_times'][1]:
+                                    o = int(task) - 1
+                                    df_result = x_soi_df.loc[(x_soi_df['station'] == s) & (x_soi_df['model'] == model) & (x_soi_df['task'] == int(task))]['value'].values[0]
                                     #Gets value of datafram at the current scenario, stage, station, and task
                                     self.x_wsoj[w][s][o][j].setInitialValue(round(df_result))
                                     if fixed:
