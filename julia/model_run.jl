@@ -12,7 +12,7 @@ include("read_MALBP_W.jl")
 include("output.jl")
 include("models/model_dependent.jl")
 include("models/dynamic.jl")
-
+include("models/lns.jl")
 
 
 
@@ -90,7 +90,30 @@ function MMALBP_W_dynamic( instance::MALBP_W_instance, optimizer::Gurobi.MathOpt
     return m
 end
 
-
+function MMALBP_W_dynamic_lns( instance::MALBP_W_instance, optimizer::Gurobi.MathOptInterface.OptimizerWithAttributes, original_filepath::String, run_time::Real, search_strategy::Dict; save_variables::Bool=true, save_lp::Bool=false, warmstart_vars::String="")
+    #if directory is not made yet, make it
+    output_filepath = original_filepath * "dynamic/"* instance.name * "/"
+    if !isdir(output_filepath )
+        mkpath(output_filepath)
+    end
+    #creates the model
+    m = Model(optimizer)
+    set_optimizer_attribute(m, "LogFile", output_filepath * "gurobi.log")
+    #defines the model dependent parameters
+    define_dynamic_linear!(m, instance, warmstart_vars)
+    #solves the model in a lns loop
+    lns!(m, instance, search_strategy; lns_res_fp= output_filepath  * "lns_results.csv")
+    if save_variables
+        write_MALBP_W_solution_dynamic(output_filepath, instance, m, false)
+    end
+    #writes the model to a file
+    if save_lp
+        write_to_file(m, output_filepath * "model.lp")
+    end
+    #saves the objective function, relative gap, run time, and instance_name to a file
+    save_results(original_filepath * "dynamic/", m, run_time, instance, output_filepath, "dynamic_problem_linear_labor_recourse.csv")
+    return m
+end
 
 function MMALBP_from_yaml(config_filepath::String, output_filepath::String, run_time::Float64, save_variables::Bool, save_lp::Bool; xp_folder::String="model_runs")
     config_file = get_instance_YAML(config_filepath)
@@ -125,6 +148,20 @@ function warmstart_dynamic(config_filepath::String, output_filepath::String, run
     end
 end
 
+function MMALBP_W_LNS(config_filepath::String, output_filepath::String, run_time::Float64, save_variables::Bool, save_lp::Bool, search_strategy_fp::String; xp_folder::String="model_runs")
+    search_strategy = read_search_strategy_YAML(search_strategy_fp, run_time)
+    instances = read_md_results(config_filepath)
+    optimizer = optimizer_with_attributes(() -> Gurobi.Optimizer(GRB_ENV), "TimeLimit" => run_time)
+    #adds the date and time to the output file path
+    now = Dates.now()
+    now = Dates.format(now, "yyyy-mm-ddTHH:MM")
+    output_filepath = xp_folder * "/" * now * "_" * output_filepath 
+    for (instance, var_folder) in instances
+        @info "Running instance $(instance.name), from $(config_filepath). \n Output will be saved to $(output_filepath)"
+        MMALBP_W_dynamic_lns(instance, optimizer, output_filepath, run_time, search_strategy; save_variables= save_variables, save_lp=save_lp, warmstart_vars= var_folder)
+    end
+end
+
 function parse_commandline()
     s = ArgParseSettings()
 
@@ -136,6 +173,10 @@ function parse_commandline()
             help = "Filepath of main config file"
             arg_type = String
             required = true
+        "--LNS_config", "-l"
+            help = "filepath of LNS configuration file"
+            arg_type = String
+            required = false
         "--save_variables"
             help = "Save the solution variables"
             action = :store_true
@@ -166,6 +207,11 @@ function main()
         MMALBP_from_yaml(parsed_args["config_file"], output_file,parsed_args["run_time"], parsed_args["save_variables"], parsed_args["save_lp"] )
     elseif parsed_args["xp_type"] == "warmstart"
         warmstart_dynamic(parsed_args["config_file"], output_file,parsed_args["run_time"], parsed_args["save_variables"], parsed_args["save_lp"] )
+    elseif parsed_args["xp_type"] == "lns"
+        if isnothing(parsed_args["LNS_config"]) && parsed_args["xp_type"] == "lns"
+            error("LNS config file is required for LNS experiments")
+        end
+        MMALBP_W_LNS(parsed_args["config_file"], output_file,parsed_args["run_time"], parsed_args["save_variables"], parsed_args["save_lp"], parsed_args["LNS_config"] )
     end
 end
 main()

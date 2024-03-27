@@ -191,7 +191,6 @@ function read_scenario_csv(file_name::String)
 
     end
     new_scenarios = DataFrame(new_scenarios)
-    println(new_scenarios)
     return new_scenarios
 end
 

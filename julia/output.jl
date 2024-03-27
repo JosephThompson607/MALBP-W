@@ -105,7 +105,7 @@ function write_MALBP_W_solution_md(output_filepath::String, instance::MALBP_W_in
     u = m[:u_se]
     y_w = m[:y_w]
     y = m[:y]
-    if is_solved_and_feasible(m)
+    if is_solved_and_feasible(m) || termination_status(m) == MOI.TIME_LIMIT
         write_x_soi_solution(output_filepath, instance, x, only_nonzero)
         write_u_se_solution(output_filepath, instance, u, only_nonzero)
         write_y_w_solution(output_filepath, instance, y_w, y; only_nonzero = only_nonzero)
@@ -126,7 +126,8 @@ function write_MALBP_W_solution_dynamic(output_filepath::String, instance::MALBP
     u = m[:u_se]
     y_w = m[:y_w]
     y = m[:y]
-    if is_solved_and_feasible(m)
+
+    if is_solved_and_feasible(m) || termination_status(m) == MOI.TIME_LIMIT
         write_x_wsoj_solution(output_filepath, instance, x, only_nonzero)
         write_u_se_solution(output_filepath, instance, u, only_nonzero)
         write_y_w_solution(output_filepath, instance, y_w, y; only_nonzero = only_nonzero)
