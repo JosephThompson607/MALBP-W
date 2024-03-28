@@ -217,7 +217,7 @@ function read_md_results(file_name::String)
                         config_file["scenario"]["sequence_length"],
                         no_cycles, 
                         config_file["milp_models"])
-        push!(instances, (instance=current_instance, vars= row.output_folder))
+        push!(instances, (instance=current_instance, vars= row.output_folder, objective_value = row.objective_value))
 
     end
     return instances

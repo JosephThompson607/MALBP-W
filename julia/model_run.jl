@@ -66,7 +66,7 @@ function MMALBP_W_dynamic( instance::MALBP_W_instance, optimizer::Gurobi.MathOpt
     return m
 end
 
-function MMALBP_W_dynamic( instance::MALBP_W_instance, optimizer::Gurobi.MathOptInterface.OptimizerWithAttributes, original_filepath::String, run_time::Real; save_variables::Bool=true, save_lp::Bool=false, warmstart_vars::String="")
+function MMALBP_W_dynamic( instance::MALBP_W_instance, optimizer::Gurobi.MathOptInterface.OptimizerWithAttributes, original_filepath::String, run_time::Real; save_variables::Bool=true, save_lp::Bool=false, warmstart_vars::String="", md_obj_val::Real=0.0)
     #if directory is not made yet, make it
     output_filepath = original_filepath * "dynamic/"* instance.name * "/"
     if !isdir(output_filepath )
@@ -86,11 +86,11 @@ function MMALBP_W_dynamic( instance::MALBP_W_instance, optimizer::Gurobi.MathOpt
         write_to_file(m, output_filepath * "model.lp")
     end
     #saves the objective function, relative gap, run time, and instance_name to a file
-    save_results(original_filepath * "dynamic/", m, run_time, instance, output_filepath, "dynamic_problem_linear_labor_recourse.csv")
+    save_results(original_filepath * "dynamic/", m, run_time, instance, output_filepath, "dynamic_problem_linear_labor_recourse.csv"; prev_obj_val=md_obj_val)
     return m
 end
 
-function MMALBP_W_dynamic_lns( instance::MALBP_W_instance, optimizer::Gurobi.MathOptInterface.OptimizerWithAttributes, original_filepath::String, run_time::Real, search_strategy::Dict; save_variables::Bool=true, save_lp::Bool=false, warmstart_vars::String="")
+function MMALBP_W_dynamic_lns( instance::MALBP_W_instance, optimizer::Gurobi.MathOptInterface.OptimizerWithAttributes, original_filepath::String, run_time::Real, search_strategy::String; save_variables::Bool=true, save_lp::Bool=false, warmstart_vars::String="", md_obj_val::Real=0.0)
     #if directory is not made yet, make it
     output_filepath = original_filepath * "dynamic/"* instance.name * "/"
     if !isdir(output_filepath )
@@ -102,7 +102,7 @@ function MMALBP_W_dynamic_lns( instance::MALBP_W_instance, optimizer::Gurobi.Mat
     #defines the model dependent parameters
     define_dynamic_linear!(m, instance, warmstart_vars)
     #solves the model in a lns loop
-    lns!(m, instance, search_strategy; lns_res_fp= output_filepath  * "lns_results.csv")
+    lns!(m, instance, search_strategy; lns_res_fp= output_filepath  * "lns_results.csv", md_obj_val=md_obj_val, run_time=run_time)
     if save_variables
         write_MALBP_W_solution_dynamic(output_filepath, instance, m, false)
     end
@@ -111,7 +111,7 @@ function MMALBP_W_dynamic_lns( instance::MALBP_W_instance, optimizer::Gurobi.Mat
         write_to_file(m, output_filepath * "model.lp")
     end
     #saves the objective function, relative gap, run time, and instance_name to a file
-    save_results(original_filepath * "dynamic/", m, run_time, instance, output_filepath, "dynamic_problem_linear_labor_recourse.csv")
+    save_results(original_filepath * "dynamic/", m, run_time, instance, output_filepath, "dynamic_problem_linear_labor_recourse.csv"; prev_obj_val=md_obj_val)
     return m
 end
 
@@ -142,23 +142,22 @@ function warmstart_dynamic(config_filepath::String, output_filepath::String, run
     now = Dates.now()
     now = Dates.format(now, "yyyy-mm-ddTHH:MM")
     output_filepath = xp_folder * "/" * now * "_" * output_filepath 
-    for (instance, var_folder) in instances
+    for (instance, var_folder, md_obj_val) in instances
         @info "Running instance $(instance.name), from $(config_filepath). \n Output will be saved to $(output_filepath)"
-        MMALBP_W_dynamic(instance, optimizer, output_filepath, run_time; save_variables= save_variables, save_lp=save_lp, warmstart_vars= var_folder)
+        MMALBP_W_dynamic(instance, optimizer, output_filepath, run_time; save_variables= save_variables, save_lp=save_lp, warmstart_vars= var_folder, md_obj_val= md_obj_val)
     end
 end
 
 function MMALBP_W_LNS(config_filepath::String, output_filepath::String, run_time::Float64, save_variables::Bool, save_lp::Bool, search_strategy_fp::String; xp_folder::String="model_runs")
-    search_strategy = read_search_strategy_YAML(search_strategy_fp, run_time)
     instances = read_md_results(config_filepath)
     optimizer = optimizer_with_attributes(() -> Gurobi.Optimizer(GRB_ENV), "TimeLimit" => run_time)
     #adds the date and time to the output file path
     now = Dates.now()
     now = Dates.format(now, "yyyy-mm-ddTHH:MM")
     output_filepath = xp_folder * "/" * now * "_" * output_filepath 
-    for (instance, var_folder) in instances
+    for (instance, var_folder, md_obj_val) in instances
         @info "Running instance $(instance.name), from $(config_filepath). \n Output will be saved to $(output_filepath)"
-        MMALBP_W_dynamic_lns(instance, optimizer, output_filepath, run_time, search_strategy; save_variables= save_variables, save_lp=save_lp, warmstart_vars= var_folder)
+        MMALBP_W_dynamic_lns(instance, optimizer, output_filepath, run_time,  search_strategy_fp; save_variables= save_variables, save_lp=save_lp, warmstart_vars= var_folder, md_obj_val= md_obj_val)
     end
 end
 
