@@ -426,7 +426,7 @@ def main_run():
       if not os.path.exists('model_runs/test'):
          os.makedirs('model_runs/test')
       file_name = 'model_runs/'+str(today)+ 'test'
-   if args.xp_type == 'warm_start':
+   if args.xp_type == 'warm_start' or args.xp_type == 'warmstart':
       print('running warm start')
       warmstart_dynamic_from_results(args.config_file, seed=args.seed, base_file_name=file_name, run_time=args.run_time, save_variables=args.save_variables)
    elif args.xp_type == 'config_csv':

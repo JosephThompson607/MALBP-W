@@ -195,14 +195,14 @@ function read_scenario_csv(file_name::String)
 end
 
 #reads the instances from the results file of a model dependent run
-function read_md_results(file_name::String)
+function read_md_results(file_name::String; sequence_csv_name::String="sequences.csv")
     results = CSV.read(file_name, DataFrame)
     instances = []
     for row in eachrow(results)
         models_instance = read_models_instance(row.model_fp)
         equip_instance = read_equipment_instance(row.equip_fp)
         config_file = get_instance_YAML(row.instance_fp)
-        scenarios_fp = row.output_folder * "sequences.csv"
+        scenarios_fp = row.output_folder * sequence_csv_name
         scenarios = read_scenario_csv(scenarios_fp)
         no_cycles = config_file["scenario"]["sequence_length"] + config_file["no_stations"] - 1
         current_instance = MALBP_W_instance(row.instance_fp,

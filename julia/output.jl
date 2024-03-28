@@ -153,6 +153,7 @@ function save_results(output_filepath::String, m::Model, run_time::Real, instanc
         rel_gap = "NA"
         solution_time = "NA"
     end
+    if !isnothing(prev_obj_val)
     results = DataFrame(instance_name=instance.name, 
                         prev_obj_val=prev_obj_val,
                         objective_value=obj_val, 
@@ -164,6 +165,18 @@ function save_results(output_filepath::String, m::Model, run_time::Real, instanc
                         model_fp= instance.models.filepath,
                         instance_fp= instance.filepath, 
                         output_folder=var_fp)
+    else
+        results = DataFrame(instance_name=instance.name, 
+                        objective_value=obj_val, 
+                        relative_gap=rel_gap, 
+                        solve_time=solution_time,
+                        run_time=run_time, 
+                        date=Dates.now(),
+                        equip_fp= instance.equipment.filepath,
+                        model_fp= instance.models.filepath,
+                        instance_fp= instance.filepath, 
+                        output_folder=var_fp)
+    end
     #If the file does not exist, create it
     if !isfile(output_filepath * output_csv)
         CSV.write(output_filepath * output_csv, results)

@@ -5,6 +5,8 @@ using CSV
 using DataFrames
 using Gurobi
 using Dates
+using Random
+using StatsBase
 const GRB_ENV = Gurobi.Env()
 #user defined modules
 include("scenario_generators.jl")
@@ -90,9 +92,14 @@ function MMALBP_W_dynamic( instance::MALBP_W_instance, optimizer::Gurobi.MathOpt
     return m
 end
 
-function MMALBP_W_dynamic_lns( instance::MALBP_W_instance, optimizer::Gurobi.MathOptInterface.OptimizerWithAttributes, original_filepath::String, run_time::Real, search_strategy::String; save_variables::Bool=true, save_lp::Bool=false, warmstart_vars::String="", md_obj_val::Real=0.0)
+function MMALBP_W_dynamic_lns( instance::MALBP_W_instance, optimizer::Gurobi.MathOptInterface.OptimizerWithAttributes, original_filepath::String, run_time::Real, search_strategy::String; 
+                                save_variables::Bool=true, save_lp::Bool=false, warmstart_vars::String="", md_obj_val::Real=0.0, slurm_array_ind::Union{Int, Nothing}=nothing)
     #if directory is not made yet, make it
-    output_filepath = original_filepath * "dynamic/"* instance.name * "/"
+    if !isnothing(slurm_array_ind)
+        output_filepath = original_filepath * "dynamic/"* instance.name * "/slurm_" * string(slurm_array_ind) * "/"
+    else
+        output_filepath = original_filepath * "dynamic/"* instance.name * "/"
+    end
     if !isdir(output_filepath )
         mkpath(output_filepath)
     end
@@ -161,6 +168,18 @@ function MMALBP_W_LNS(config_filepath::String, output_filepath::String, run_time
     end
 end
 
+function MMALBP_W_LNS(config_filepath::String, output_filepath::String, run_time::Float64, save_variables::Bool, save_lp::Bool, search_strategy_fp::String, slurm_array_ind::Int; xp_folder::String="model_runs")
+    instances = read_md_results(config_filepath)
+    optimizer = optimizer_with_attributes(() -> Gurobi.Optimizer(GRB_ENV), "TimeLimit" => run_time)
+    #adds the date and time to the output file path
+    now = Dates.now()
+    now = Dates.format(now, "yyyy-mm-dd")
+    output_filepath = xp_folder * "/" * now * "_" * output_filepath 
+    instance, var_folder, md_obj_val = instances[slurm_array_ind]
+    @info "Running instance $(instance.name), from $(config_filepath). \n Output will be saved to $(output_filepath)"
+    MMALBP_W_dynamic_lns(instance, optimizer, output_filepath, run_time,  search_strategy_fp; save_variables= save_variables, save_lp=save_lp, warmstart_vars= var_folder, md_obj_val= md_obj_val, slurm_array_ind=slurm_array_ind)
+end
+
 function parse_commandline()
     s = ArgParseSettings()
 
@@ -190,6 +209,9 @@ function parse_commandline()
             help = "Name of the experiment"
             arg_type = String
             default = "xp"
+        "--slurm_array_ind"
+            help = "Index of the slurm array job"
+            arg_type = Int
     end
 
     return parse_args(s)
@@ -211,6 +233,13 @@ function main()
             error("LNS config file is required for LNS experiments")
         end
         MMALBP_W_LNS(parsed_args["config_file"], output_file,parsed_args["run_time"], parsed_args["save_variables"], parsed_args["save_lp"], parsed_args["LNS_config"] )
+    elseif parsed_args["xp_type"] == "slurm_array_lns"
+        if isnothing(parsed_args["LNS_config"]) && parsed_args["xp_type"] == "lns"
+            error("LNS config file is required for LNS experiments")
+        elseif isnothing(parsed_args["slurm_array_ind"])
+            error("Slurm array index is required for slurm LNS experiments")
+        end
+        MMALBP_W_LNS(parsed_args["config_file"], output_file,parsed_args["run_time"], parsed_args["save_variables"], parsed_args["save_lp"], parsed_args["LNS_config"], parsed_args["slurm_array_ind"] )
     end
 end
 main()
