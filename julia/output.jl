@@ -144,7 +144,7 @@ end
 
 function save_results(output_filepath::String, m::Model, run_time::Real, instance::MALBP_W_instance, var_fp::String, output_csv::String; prev_obj_val::Union{Real, Nothing}=nothing)
     #saves the objective function, relative gap, run time, and instance_name to a file
-    if is_solved_and_feasible(m)
+    if is_solved_and_feasible(m)  || termination_status(m) == MOI.TIME_LIMIT
         obj_val = objective_value(m)
         rel_gap = relative_gap(m)
         solution_time = solve_time(m)

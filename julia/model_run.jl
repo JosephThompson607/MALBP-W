@@ -109,7 +109,7 @@ function MMALBP_W_dynamic_lns( instance::MALBP_W_instance, optimizer::Gurobi.Mat
     #defines the model dependent parameters
     define_dynamic_linear!(m, instance, warmstart_vars)
     #solves the model in a lns loop
-    lns!(m, instance, search_strategy; lns_res_fp= output_filepath  * "lns_results.csv", md_obj_val=md_obj_val, run_time=run_time)
+    large_neighborhood_search!(m, instance, search_strategy; lns_res_fp= output_filepath  * "lns_results.csv", md_obj_val=md_obj_val, run_time=run_time)
     if save_variables
         write_MALBP_W_solution_dynamic(output_filepath, instance, m, false)
     end

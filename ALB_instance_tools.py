@@ -571,6 +571,22 @@ def generate_equipment_2(no_equipment, no_stations,no_tasks,mean=100, variance=1
             c_se[ station, equipment] =int(abs((mean+np.random.randn())*variance ))* np.sum(r_oe,axis=0)[equipment]    
     return c_se,r_oe
 
+def generate_equipment_3(no_equipment, no_stations,no_tasks,mean=100, variance=15, seed = None):
+    '''Generates equipment costs and r_oe matrix for a given number of equipment, stations, and tasks. Differerence
+    is that equipment cost is the same for all stations'''
+    rng = np.random.default_rng(seed=seed)
+    r_oe =rng.integers(low=0, high=2, size=( no_tasks, no_equipment))
+    while np.sum(r_oe,axis=1).min() == 0:
+        warnings.warn('infeasible equipment, trying random seed again')
+        rng = np.random.default_rng()
+        #makes sure we have feasible equipment
+        r_oe =rng.integers(low=0, high=2, size=( no_tasks, no_equipment))
+        print(np.sum(r_oe,axis=1))
+    c_se = np.zeros((no_stations,no_equipment))
+    for equipment in range(no_equipment):
+            c_se[ :, equipment] =int(abs((mean+np.random.randn())*variance ))* np.sum(r_oe,axis=0)[equipment]    
+    return c_se,r_oe
+
 class Equipment():
     def __init__(self,no_tasks = None,  no_equipment = None,no_stations = None, generation_method = None, equipment_file = None, seed= 42, **kwargs):
         self.no_tasks = no_tasks
@@ -582,6 +598,10 @@ class Equipment():
             print('doing cost based')
             self.name = f'cost_based_O{no_tasks}_E{no_equipment}_S{no_stations}_seed{seed}'
             self.c_se, self.r_oe = generate_equipment(no_equipment, no_stations, no_tasks, seed=seed, **kwargs)
+        elif generation_method == 'same_cost':
+            print('doing same cost')
+            self.name = f'same_cost_O{no_tasks}_E{no_equipment}_S{no_stations}_seed{seed}'
+            self.c_se, self.r_oe = generate_equipment_3(no_equipment, no_stations, no_tasks, seed=seed, **kwargs)
         else:
             print('doing new method')
             self.name = f'random_O{no_tasks}_E{no_equipment}_S{no_stations}_seed{seed}'
