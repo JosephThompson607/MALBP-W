@@ -5,6 +5,7 @@ mutable struct RepairOp
 end
 
 mutable struct DestroyOp
+    name::String
     destroy!::Function
     destroy_change!::Function
     destroy_kwargs::Dict
@@ -13,7 +14,12 @@ end
 
 function DestroyOp(destroy!::Function, destroy_change!::Function, destroy_kwargs::Dict)
     old_destroy_kwargs = deepcopy(destroy_kwargs)
-    return DestroyOp(destroy!, destroy_change!, destroy_kwargs, old_destroy_kwargs)
+    return DestroyOp(string(destroy!), destroy!, destroy_change!, destroy_kwargs, old_destroy_kwargs)
+end
+
+function update_destroy_operator!(des::DestroyOp, new_destroy!::Function)
+    des.destroy! = new_destroy!
+    des.name = string(new_destroy!)
 end
 
 struct LNSConf
@@ -157,14 +163,14 @@ function change_destroy!(iter_no_improve::Int, lns_obj::LNSConf, m::Model)
         #filters out the current operator
         operator_list = filter(x -> x != lns_obj.des.destroy!, operator_list)
         destroy = sample(operator_list, 1)[1]
-        lns_obj.des.destroy! = destroy
+        update_destroy_operator!(lns_obj.des, destroy)
     end
     return iter_no_improve, lns_obj, m
 end
 
 function change_destroy_increase_size!(iter_no_improve::Int, lns_obj::LNSConf, m::Model)
     if iter_no_improve % lns_obj.des.destroy_kwargs[:change_freq] == 0
-        if lns_obj.des.destroy_kwargs[:n_destroy] <= lns_obj.des.destroy_kwargs[:destroy_limit] 
+        if lns_obj.des.destroy_kwargs[:n_destroy] < lns_obj.des.destroy_kwargs[:destroy_limit] 
             lns_obj.des.destroy_kwargs[:n_destroy] += 1
         else
             #resets the size of block to destroy
@@ -174,7 +180,7 @@ function change_destroy_increase_size!(iter_no_improve::Int, lns_obj::LNSConf, m
             #filters out the current operator
             operator_list = filter(x -> x != lns_obj.des.destroy!, operator_list)
             destroy = sample(operator_list, 1)[1]
-            lns_obj.des.destroy! = destroy
+            update_destroy_operator!(lns_obj.des, destroy)
         end
             
     end
@@ -353,10 +359,11 @@ function large_neighborhood_search!(m::Model, instance::MALBP_W_instance, search
     start_time = time()
     obj_vals = []
     incumbent = Inf
+    incumbent_dict = Dict()
     #best_m = copy(m)
     #saves the initial objective value
     if !isnothing(md_obj_val)
-        res_dict = Dict("instance"=> instance.config_name,"iteration"=>0, "obj_val"=>md_obj_val, "time"=>0.0)
+        res_dict = Dict("instance"=> instance.config_name,"iteration"=>0, "obj_val"=>md_obj_val, "time"=>0.0, "operator"=>"initial")
         push!(obj_vals, res_dict)
         incumbent = md_obj_val
     end
@@ -369,10 +376,11 @@ function large_neighborhood_search!(m::Model, instance::MALBP_W_instance, search
         #repairs using MILP TODO: add other repair operators
         optimize!(m)
         #saves the results
-        res_dict = Dict("instance"=> instance.config_name,"iteration"=>i, "obj_val"=>objective_value(m), "time"=>time()-start_time)
+        res_dict = Dict("instance"=> instance.config_name,"iteration"=>i, "obj_val"=>objective_value(m), "time"=>time()-start_time, "operator"=>lns_conf.des.name)
         push!(obj_vals, res_dict)
         if objective_value(m) < incumbent
             incumbent = objective_value(m)
+            incumbent_dict = res_dict
             #best_m = copy(m)
             iter_no_improve = 0
         else
@@ -396,5 +404,6 @@ function large_neighborhood_search!(m::Model, instance::MALBP_W_instance, search
     CSV.write(lns_res_fp, obj_df)
     #writes the lns_config to a yaml file
     YAML.write_file(lns_res_fp * "lns_config.yaml",lns_conf )
-    println("best obj val: ", incumbent)
+    println("best obj val: ", incumbent_dict)
+    return incumbent_dict
 end
