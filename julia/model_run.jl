@@ -142,6 +142,25 @@ function MMALBP_from_yaml(config_filepath::String, output_filepath::String, run_
     end
 end
 
+function MMALBP_from_csv_slurm(config_filepath::String, output_filepath::String, run_time::Float64, save_variables::Bool, save_lp::Bool, slurm_array_ind::Int ; xp_folder::String="model_runs")
+    
+    instances = read_slurm_csv(config_filepath)
+    optimizer = optimizer_with_attributes(() -> Gurobi.Optimizer(GRB_ENV), "TimeLimit" => run_time)
+    #adds the date and time to the output file path
+    now = Dates.now()
+    now = Dates.format(now, "yyyy-mm-ddTHH:MM")
+    output_filepath = xp_folder * "/" * now * "_" * output_filepath 
+    (instance, config_file) = instances[slurm_array_ind]
+    for milp in config_file["milp_models"]
+            @info "Running instance $(instance.name), of model $(milp). \n Output will be saved to $(output_filepath)"
+            if milp== "model_dependent_problem_linear_labor_recourse"
+                m = MMALBP_W_model_dependent(instance, optimizer, output_filepath, run_time; save_variables= save_variables, save_lp=save_lp)
+            elseif milp == "dynamic_problem_linear_labor_recourse"
+                m = MMALBP_W_dynamic(instance, optimizer, output_filepath, run_time; save_variables= save_variables, save_lp=save_lp)
+            end
+    end
+end
+
 function warmstart_dynamic(config_filepath::String, output_filepath::String, run_time::Float64, save_variables::Bool, save_lp::Bool; xp_folder::String="model_runs")
     instances = read_md_results(config_filepath)
     optimizer = optimizer_with_attributes(() -> Gurobi.Optimizer(GRB_ENV), "TimeLimit" => run_time)
@@ -168,6 +187,7 @@ function MMALBP_W_LNS(config_filepath::String, output_filepath::String, run_time
     end
 end
 
+#Runs the LNS model on a list of instances using a slurm array index
 function MMALBP_W_LNS(config_filepath::String, output_filepath::String, run_time::Float64, save_variables::Bool, save_lp::Bool, search_strategy_fp::String, slurm_array_ind::Int; xp_folder::String="model_runs")
     instances = read_md_results(config_filepath)
     optimizer = optimizer_with_attributes(() -> Gurobi.Optimizer(GRB_ENV), "TimeLimit" => run_time)
@@ -228,6 +248,11 @@ function main()
         MMALBP_from_yaml(parsed_args["config_file"], output_file,parsed_args["run_time"], parsed_args["save_variables"], parsed_args["save_lp"] )
     elseif parsed_args["xp_type"] == "warmstart"
         warmstart_dynamic(parsed_args["config_file"], output_file,parsed_args["run_time"], parsed_args["save_variables"], parsed_args["save_lp"] )
+    elseif parsed_args["xp_type"] == "csv_slurm"
+        MMALBP_from_csv_slurm(parsed_args["config_file"], output_file,parsed_args["run_time"], parsed_args["save_variables"], parsed_args["save_lp"], parsed_args["slurm_array_ind"] )
+        if isnothing(parsed_args["slurm_array_ind"])
+            error("Slurm array index is required for slurm experiments")
+        end
     elseif parsed_args["xp_type"] == "lns"
         if isnothing(parsed_args["LNS_config"]) && parsed_args["xp_type"] == "lns"
             error("LNS config file is required for LNS experiments")
@@ -236,7 +261,7 @@ function main()
     elseif parsed_args["xp_type"] == "slurm_array_lns"
         if isnothing(parsed_args["LNS_config"]) && parsed_args["xp_type"] == "lns"
             error("LNS config file is required for LNS experiments")
-        elseif isnothing(parsed_args["slurm_array_ind"])
+        elseif isnothing(parsed_args["lns_slurm_array_ind"])
             error("Slurm array index is required for slurm LNS experiments")
         end
         MMALBP_W_LNS(parsed_args["config_file"], output_file,parsed_args["run_time"], parsed_args["save_variables"], parsed_args["save_lp"], parsed_args["LNS_config"], parsed_args["slurm_array_ind"] )

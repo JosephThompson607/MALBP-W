@@ -223,6 +223,39 @@ function read_md_results(file_name::String; sequence_csv_name::String="sequences
     return instances
 end
 
+#reads the instances from a csv file
+function read_slurm_csv(file_name::String)
+    results = CSV.read(file_name, DataFrame)
+    instances = []
+    for row in eachrow(results)
+        models_instance = read_models_instance(row.model_yaml)
+        equip_instance = read_equipment_instance(row.equipment_yaml)
+        config_file = get_instance_YAML(row.config_yaml)
+        if row.scenario_tree_yaml != "" && row.scenario_tree_yaml != "No Tree"
+            scenarios = read_scenario_csv(row.scenario_tree_yaml)
+        else
+            scenarios = read_scenario_tree(config_file["scenario"], get_model_mixture(models_instance))
+        end
+        no_cycles = config_file["scenario"]["sequence_length"] + config_file["no_stations"] - 1
+        current_instance = MALBP_W_instance(file_name,
+                        config_file["config_name"], 
+                        models_instance, 
+                        scenarios, 
+                        equip_instance, 
+                        config_file["no_stations"], 
+                        config_file["max_workers"], 
+                        config_file["worker_cost"], 
+                        config_file["recourse_cost"], 
+                        config_file["scenario"]["sequence_length"],
+                        no_cycles, 
+                        config_file["milp_models"])
+        push!(instances, (current_instance, config_file))
+
+    end
+    return instances
+end
+
+
 
 #prints each line of scenario tree
 function print_scenario_tree(scenario_tree)

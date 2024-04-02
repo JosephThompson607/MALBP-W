@@ -67,7 +67,7 @@ function read_scenario_tree(scenario_info::Dict, model_mixtures::Dict{String, Fl
         return CSV.read(scenario_info["filepath"], DataFrame)
     elseif scenario_info["generator"] == "full"
         return generate_scenario_tree(scenario_info["sequence_length"], model_mixtures)
-    elseif scenario_info["generator"] == "monte_carlo_tree_limit"
+    elseif scenario_info["generator"] == "monte_carlo_tree_limit" || scenario_info["generator"] == "monte_carlo_limit"
         if !haskey(scenario_info, "n_samples")
             error("n_samples is required for monte_carlo_tree_limit, please provide it in the config file")
         end
