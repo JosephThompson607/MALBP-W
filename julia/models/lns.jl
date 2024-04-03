@@ -32,7 +32,6 @@ function random_model_destroy!(m::Model, instance::MALBP_W_instance; seed:: Unio
 end
 
 function random_station_destroy!(m::Model, instance::MALBP_W_instance; seed::Union{Nothing, Int}=nothing, n_destroy::Int=1, _...)
-    println("n_destroy: ", n_destroy)
     #if the seed is not none, set the seed
     if !isnothing(seed)
         Random.seed!(seed)
@@ -85,19 +84,17 @@ function random_subtree_destroy!(m::Model, instance::MALBP_W_instance; seed::Uni
     end
 end
 
-function no_change(iter_no_improve::Int, lns_obj::LNSConf, m::Model; _...)
+function no_change!(iter_no_improve::Int, lns_obj::LNSConf, m::Model; _...)
     return iter_no_improve, lns_obj, m
 end
 
 function decrement_y!(iter_no_improve::Int, lns_obj::LNSConf, m::Model; _...)
     if iter_no_improve % lns_obj.change.kwargs[:change_freq] == 0
         y = m[:y]
-        println("Fixing y at ", start_value(y)-1)
         fix.(y, start_value(y)-1, force=true)
 
     elseif iter_no_improve % lns_obj.change.kwargs[:change_freq] in [1:lns_obj.change.kwargs[:fix_steps];];
         y = m[:y]
-        println("Fixing y at ", start_value(y))
         fix.(y, start_value(y), force=true)
     end
     return iter_no_improve, lns_obj, m
@@ -128,12 +125,9 @@ function select_destroy!(lns_obj::LNSConf; filter_out_current=true)
         operator_list = filter(x -> x != lns_obj.des.destroy!, operator_list)
         delete!(destroy_weights, lns_obj.des.name)
     end
-    println("destroy weights: ", destroy_weights)
     weights = collect(values(destroy_weights))
     destroy_names = collect(keys(destroy_weights))
     destroy_choice = sample(destroy_names, Weights(weights))
-    println("destroy choice: ", destroy_choice)
-    println("findfirst", findfirst(x -> string(x) == destroy_choice, operator_list))
     destroy = operator_list[findfirst(x -> string(x) == destroy_choice, operator_list)]
     update_destroy_operator!(lns_obj.des, destroy)
 end
@@ -162,44 +156,37 @@ function adapt_lns_des!(iter_no_improve::Int, lns_obj::LNSConf, m::Model; iterat
     #retrieves the decay and change decay parameters
     decay = lns_obj.des.kwargs[:des_decay]
     #decays the rewards of the destroy and change operator
-    println("iter_no_improve: ", iter_no_improve)
-    println("iteration: ", iteration)
-    println("iteration_time: ", iteration_time)
-    
-    println("old weights: ", lns_obj.des.destroy_weights)
     lns_obj.des.destroy_weights[lns_obj.des.name] *= decay 
     #rewards the destroy and change operator if there has been an improvement
     if iter_no_improve == 0
-        println("weight update", (1-decay) * 1 * iteration / (1 + iteration_time))
         lns_obj.des.destroy_weights[lns_obj.des.name] += (1-decay) * 1 * iteration / (1 + (iteration_time/10))
     end
-    println("new weights: ", lns_obj.des.destroy_weights)
     return iter_no_improve, lns_obj, m
 end
 
 #adaptive lns for destroy and change operator selection
 function adapt_lns!(iter_no_improve::Int, lns_obj::LNSConf, m::Model; iteration::Int, iteration_time::Float64)
     #retrieves the decay and change decay parameters
-    decay = lns.des.kwargs[:des_decay]
-    change_decay = lns.change.kwargs[:change_decay]
+    decay = lns_obj.des.kwargs[:des_decay]
+    change_decay = lns_obj.change.kwargs[:change_decay]
     #decays the rewards of the destroy and change operator
     lns_obj.des.destroy_weights[lns_obj.des.name] *= decay 
-    lns_obj.change.change_weights[str(lns_obj.change.change!)] *= change_decay
+    lns_obj.change.change_weights[string(lns_obj.change.change!)] *= change_decay
     #rewards the destroy and change operator if there has been an improvement
     if iter_no_improve == 0
-        lns_obj.des.destroy_weights[lns_obj.des.name] += (1-decay) * 1 * iteration / (1 + iteration_time)
-        lns_obj.change.change_weights[str(lns_obj.change.change!)] += (1-change_decay) * 1 * iteration / (1 + iteration_time)
+        lns_obj.des.destroy_weights[lns_obj.des.name] += (1-decay) * 1 * iteration / (1 + (iteration_time/10))
+        lns_obj.change.change_weights[string(lns_obj.change.change!)] += (1-change_decay) * 1 * iteration / (1 + (iteration_time/10))
     end
     #selects new change operator
     if iter_no_improve % lns_obj.change.kwargs[:change_freq] == 0
         #randomly choses the destroy operator based on the rewards
         change_dict = lns_obj.change.change_weights
         change_names = collect(keys(change_dict))
-        change_rewards = collect(values(operator_dict))
-        change_list = [no_change, increase_destroy!, decrement_y!, change_destroy!]
+        change_rewards = collect(values(change_dict))
+        change_list = [no_change!, increase_destroy!, decrement_y!, change_destroy!]
         change_name = sample(change_names, Weights(change_rewards))
-        change! = change_list[findfirst(x -> str(x) == change_name, change_list)]
-        change!(iter_no_improve, lns_obj, m;  filter_out_current=false)
+        change! = change_list[findfirst(x -> string(x) == change_name, change_list)]
+        lns_obj.change.change! = change!
     end
     return iter_no_improve, lns_obj, m
 end
@@ -210,6 +197,11 @@ function unfix_vars!(m::Model , instance::MALBP_W_instance)
     u_se = m[:u_se]
     y_wts = m[:y_wts]
     y_w = m[:y_w]
+    y = m[:y]
+    if is_fixed(y)
+        unfix(y)
+        set_lower_bound(y, 0)
+    end
     #unfixes task assignment variables
     for x in x_wsoj
         if is_fixed(x)
@@ -223,10 +215,10 @@ function unfix_vars!(m::Model , instance::MALBP_W_instance)
         end
     end
     #unfixes total recourse worker assignment
-    for y in y_w
-        if is_fixed(y)
-            unfix(y)
-            set_lower_bound(y, 0)
+    for y_recorse in y_w
+        if is_fixed(y_recorse)
+            unfix(y_recorse)
+            set_lower_bound(y_recorse, 0)
         end
     end
     #unfixes worker_assignment, reassigns max workers bounds
@@ -245,8 +237,6 @@ end
 
 function large_neighborhood_search!(m::Model, instance::MALBP_W_instance, search_strategy_fp::String; lns_res_fp::String="", md_obj_val::Union{Nothing, Float64}=nothing, run_time::Real=600.0 )
     lns_conf = read_search_strategy_YAML(search_strategy_fp, run_time)
-    println(lns_conf)
-    println("lns_conf", lns_conf.rep.repair_kwargs)
     seed = lns_conf.seed
     #sets the time limit for the model
     set_optimizer_attribute(m, "TimeLimit", lns_conf.rep.repair_kwargs["time_limit"])
@@ -292,6 +282,7 @@ function large_neighborhood_search!(m::Model, instance::MALBP_W_instance, search
             unfix_vars!(m, instance)
             set_start_value.(x, solution)
             lns_conf.adaptation!(iter_no_improve, lns_conf, m; iteration=i, iteration_time=iteration_time)
+            @info "iter_no_improve: $iter_no_improve , iteration: $i, operator: $(lns_conf.des.name), change_operator: $(lns_conf.change.change!)"
             lns_conf.change.change!(iter_no_improve, lns_conf, m; iteration=i, iteration_time=iteration_time, lns_conf.change.kwargs... )
         end
 
