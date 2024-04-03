@@ -1,50 +1,4 @@
-
-mutable struct RepairOp
-    repair!::Function
-    repair_kwargs::Dict
-end
-
-mutable struct DestroyOp
-    name::String
-    destroy!::Function
-    destroy_change!::Function
-    destroy_kwargs::Dict
-    old_destroy_kwargs::Dict
-end
-
-function DestroyOp(destroy!::Function, destroy_change!::Function, destroy_kwargs::Dict)
-    old_destroy_kwargs = deepcopy(destroy_kwargs)
-    return DestroyOp(string(destroy!), destroy!, destroy_change!, destroy_kwargs, old_destroy_kwargs)
-end
-
-function update_destroy_operator!(des::DestroyOp, new_destroy!::Function)
-    des.destroy! = new_destroy!
-    des.name = string(new_destroy!)
-end
-
-struct LNSConf
-    n_iterations::Union{Int, Nothing}
-    n_iter_no_improve::Int
-    time_limit::Float64
-    rep::RepairOp
-    des::DestroyOp
-    seed::Union{Nothing, Int}
-end
-
-function read_search_strategy_YAML(config_filepath::String, run_time::Float64)
-    config_file = YAML.load(open(config_filepath))
-    #if the LNS section is not in the config file, return an empty dictionary
-
-    if !haskey(config_file, "lns")
-        return Dict()
-    elseif !haskey(config_file["lns"], "time_limit")
-        @info "no time limit specified in config file, defaulting to command line defined $run_time seconds"
-        config_file["lns"]["time_limit"] = run_time
-    end
-    search_strategy = config_file["lns"]
-    search_strategy = get_search_strategy_config(search_strategy)
-    return search_strategy
-end
+include("lns_config.jl")
 
 function random_model_destroy!(m::Model, instance::MALBP_W_instance; seed:: Union{Nothing, Int}=nothing, n_destroy::Int=1,_...)
     if !isnothing(seed)
@@ -131,17 +85,17 @@ function random_subtree_destroy!(m::Model, instance::MALBP_W_instance; seed::Uni
     end
 end
 
-function no_change(iter_no_improve::Int, lns_obj::LNSConf, m::Model)
+function no_change(iter_no_improve::Int, lns_obj::LNSConf, m::Model; _...)
     return iter_no_improve, lns_obj, m
 end
 
-function decrement_y!(iter_no_improve::Int, lns_obj::LNSConf, m::Model)
-    if iter_no_improve % lns_obj.des.destroy_kwargs[:change_freq] == 0
+function decrement_y!(iter_no_improve::Int, lns_obj::LNSConf, m::Model; _...)
+    if iter_no_improve % lns_obj.change.kwargs[:change_freq] == 0
         y = m[:y]
         println("Fixing y at ", start_value(y)-1)
         fix.(y, start_value(y)-1, force=true)
 
-    elseif iter_no_improve % lns_obj.des.destroy_kwargs[:change_freq] in [1:lns_obj.des.destroy_kwargs[:fix_steps];];
+    elseif iter_no_improve % lns_obj.change.kwargs[:change_freq] in [1:lns_obj.change.kwargs[:fix_steps];];
         y = m[:y]
         println("Fixing y at ", start_value(y))
         fix.(y, start_value(y), force=true)
@@ -149,166 +103,106 @@ function decrement_y!(iter_no_improve::Int, lns_obj::LNSConf, m::Model)
     return iter_no_improve, lns_obj, m
 end
 
-function increase_destroy!(iter_no_improve::Int, lns_obj::LNSConf, m::Model)
-    if iter_no_improve % lns_obj.des.destroy_kwargs[:change_freq] == 0
-        lns_obj.des.destroy_kwargs[:n_destroy] += 1
+function increase_destroy!(iter_no_improve::Int, lns_obj::LNSConf, m::Model; _...)
+    if iter_no_improve % lns_obj.change.kwargs[:change_freq] == 0
+        lns_obj.des.kwargs[:n_destroy] += 1
     end
     return iter_no_improve, lns_obj, m
 end
 
-function change_destroy!(iter_no_improve::Int, lns_obj::LNSConf, m::Model)
-    if iter_no_improve % lns_obj.des.destroy_kwargs[:change_freq] == 0
+function change_destroy!(iter_no_improve::Int, lns_obj::LNSConf, m::Model;  
+                            filter_out_current = true, _...)
+    if iter_no_improve % lns_obj.change.kwargs[:change_freq] == 0
         #randomly chooses from the destroy operators
-        operator_list = [random_station_destroy!, random_subtree_destroy!,random_model_destroy!]
-        #filters out the current operator
-        operator_list = filter(x -> x != lns_obj.des.destroy!, operator_list)
-        destroy = sample(operator_list, 1)[1]
-        update_destroy_operator!(lns_obj.des, destroy)
+        select_destroy!(lns_obj; filter_out_current=filter_out_current)
     end
     return iter_no_improve, lns_obj, m
 end
 
-function change_destroy_increase_size!(iter_no_improve::Int, lns_obj::LNSConf, m::Model)
-    if iter_no_improve % lns_obj.des.destroy_kwargs[:change_freq] == 0
-        if lns_obj.des.destroy_kwargs[:n_destroy] < lns_obj.des.destroy_kwargs[:destroy_limit] 
-            lns_obj.des.destroy_kwargs[:n_destroy] += 1
+#selects new destroy randomly from destroy operators using their weight
+function select_destroy!(lns_obj::LNSConf; filter_out_current=true)
+    operator_list = [random_station_destroy!, random_subtree_destroy!,random_model_destroy!]
+    destroy_weights = copy(lns_obj.des.destroy_weights)
+    #filters out the current operator
+    if filter_out_current
+        operator_list = filter(x -> x != lns_obj.des.destroy!, operator_list)
+        delete!(destroy_weights, lns_obj.des.name)
+    end
+    println("destroy weights: ", destroy_weights)
+    weights = collect(values(destroy_weights))
+    destroy_names = collect(keys(destroy_weights))
+    destroy_choice = sample(destroy_names, Weights(weights))
+    println("destroy choice: ", destroy_choice)
+    println("findfirst", findfirst(x -> string(x) == destroy_choice, operator_list))
+    destroy = operator_list[findfirst(x -> string(x) == destroy_choice, operator_list)]
+    update_destroy_operator!(lns_obj.des, destroy)
+end
+
+#increases the size of destroy block if no improvement until it reaches a limit, then changes the destroy operator
+function change_destroy_increase_size!(iter_no_improve::Int, lns_obj::LNSConf, m::Model; filter_out_current=true,  _...)
+    if iter_no_improve % lns_obj.change.kwargs[:change_freq] == 0
+        if lns_obj.des.kwargs[:n_destroy] < lns_obj.des.kwargs[:destroy_limit] 
+            lns_obj.des.kwargs[:n_destroy] += 1
         else
             #resets the size of block to destroy
-            lns_obj.des.destroy_kwargs[:n_destroy]= lns_obj.des.old_destroy_kwargs[:n_destroy]
+            lns_obj.des.kwargs[:n_destroy]= lns_obj.des.old_kwargs[:n_destroy]
             #randomly chooses from the destroy operators
-            operator_list = [random_station_destroy!, random_subtree_destroy!,random_model_destroy!]
-            #filters out the current operator
-            operator_list = filter(x -> x != lns_obj.des.destroy!, operator_list)
-            destroy = sample(operator_list, 1)[1]
-            update_destroy_operator!(lns_obj.des, destroy)
+            select_destroy!(lns_obj; filter_out_current=filter_out_current)
         end
-            
     end
     return iter_no_improve, lns_obj, m
 end
 
-function configure_destroy(search_strategy::Dict)
-    if !haskey(search_strategy, "destroy") || !haskey(search_strategy["destroy"], "operator")
-        @info "No destroy specified, defaulting to random_station_destroy"
-        search_strategy["destroy"] = Dict()
-        destroy_op = random_station_destroy!
-        search_strategy["destroy"]["kwargs"] = Dict(Symbol("n_destroy")=>2)
-        search_strategy["destroy"]["change"] = no_change
-    else
-        @info "Deconstructor specified: $(search_strategy["destroy"]["operator"])"
-        destroy = search_strategy["destroy"]["operator"]
-        if destroy == "random_station" || destroy == "random_station_destroy!"
-            destroy_op = random_station_destroy!
-        elseif destroy == "random_subtree" || destroy == "random_subtree_destroy!"
-            destroy_op = random_subtree_destroy!
-        elseif destroy == "random_model" || destroy == "random_model_destroy!"
-            destroy_op = random_model_destroy!
-        else
-            @error "Deconstructor operator $(destroy) not recognized"
-        end
-        if !haskey(search_strategy["destroy"], "kwargs")
-            @info "No destroy arguments specified, defaulting to n_destroy=2"
-            destroy_kwargs = Dict("n_destroy"=>2)
-        else
-            @info "Deconstructor arguments specified: $(search_strategy["destroy"]["kwargs"])"
-            destroy_kwargs = search_strategy["destroy"]["kwargs"]
-            #converts the keys to symbols
-            destroy_kwargs = Dict(Symbol(k) => v for (k, v) in destroy_kwargs)
-        end
-        #destroy operator change configuration
-        if !haskey(search_strategy["destroy"], "change")
-            @info "No destroy change specified, defaulting to no_change"
-            destroy_change = no_change
-        else
-            if search_strategy["destroy"]["change"] == "increase_destroy!" || search_strategy["destroy"]["change"] == "increase_destroy"
-                @info "Deconstructor change operator $(search_strategy["destroy"]["change"]) recognized"
-                destroy_change = increase_destroy!
-            elseif search_strategy["destroy"]["change"] == "no_change"
-                @info "Deconstructor change operator $(search_strategy["destroy"]["change"]) recognized"
-                destroy_change = no_change
-            elseif search_strategy["destroy"]["change"] == "decrement_y!"
-                @info "Deconstructor change operator $(search_strategy["destroy"]["change"]) recognized"
-                destroy_change = decrement_y!
-            elseif search_strategy["destroy"]["change"] == "change_destroy!"
-                @info "Deconstructor change operator $(search_strategy["destroy"]["change"]) recognized"
-                destroy_change = change_destroy!
-            elseif search_strategy["destroy"]["change"] == "change_destroy_increase_size!"
-                @info "Deconstructor change operator $(search_strategy["destroy"]["change"]) recognized"
-                destroy_change = change_destroy_increase_size!
-            else
-                @error "Deconstructor change operator $(search_strategy["destroy"]["change"]) not recognized"
-            end
-        end 
-        
-    end
-    destroy_operator = DestroyOp(destroy_op,  destroy_change, destroy_kwargs)
-    return destroy_operator
+function no_adapt_lns!(iter_no_improve::Int, lns_obj::LNSConf, m::Model; iteration::Int, iteration_time::Float64)
+    return iter_no_improve, lns_obj, m
 end
 
-function configure_repair(search_strategy::Dict)
-    if !haskey(search_strategy, "repair") || !haskey(search_strategy["repair"], "operator")
-        @info "No repair specified, defaulting to MILP"
-        search_strategy["repair"] = Dict()
-        repair_op = optimize!
-        search_strategy["repair"]["kwargs"] = Dict("time_limit"=>100)
-    else
-        @info "Repair operator specified: $(search_strategy["repair"]["operator"])"
-        repair = search_strategy["repair"]["operator"]
-        if repair == "optimize!" || repair == "MILP" || repair == "milp!"
-            repair_op = optimize!
-        else
-            @error "Repair operator $(repair) not recognized"
-        end
-        if !haskey(search_strategy["repair"], "kwargs")
-            @info "No repair arguments specified, defaulting to time_limit=100"
-            repair_kwargs = Dict("time_limit"=>100)
-        else
-            @info "Repair arguments specified: $(search_strategy["repair"]["kwargs"])"
-            repair_kwargs = search_strategy["repair"]["kwargs"]
-            #converts the keys to symbols
-            search_strategy["repair"]["kwargs"] = Dict(Symbol(k) => v for (k, v) in repair_kwargs)
-        end
+#adaptive lns for destroy operator selection
+function adapt_lns_des!(iter_no_improve::Int, lns_obj::LNSConf, m::Model; iteration::Int, iteration_time::Float64)
+    #retrieves the decay and change decay parameters
+    decay = lns_obj.des.kwargs[:des_decay]
+    #decays the rewards of the destroy and change operator
+    println("iter_no_improve: ", iter_no_improve)
+    println("iteration: ", iteration)
+    println("iteration_time: ", iteration_time)
+    
+    println("old weights: ", lns_obj.des.destroy_weights)
+    lns_obj.des.destroy_weights[lns_obj.des.name] *= decay 
+    #rewards the destroy and change operator if there has been an improvement
+    if iter_no_improve == 0
+        println("weight update", (1-decay) * 1 * iteration / (1 + iteration_time))
+        lns_obj.des.destroy_weights[lns_obj.des.name] += (1-decay) * 1 * iteration / (1 + (iteration_time/10))
     end
-    repair_operator = RepairOp(repair_op, repair_kwargs)
-    return repair_operator
+    println("new weights: ", lns_obj.des.destroy_weights)
+    return iter_no_improve, lns_obj, m
 end
 
-function get_search_strategy_config(search_strategy::Dict)
-    if !haskey(search_strategy, "n_iterations")
-        @info "No number of iterations specified, defaulting to 10000"
-        search_strategy["n_iterations"] = 10000
-    else
-        @info "Number of iterations specified: $(search_strategy["n_iterations"])"
+#adaptive lns for destroy and change operator selection
+function adapt_lns!(iter_no_improve::Int, lns_obj::LNSConf, m::Model; iteration::Int, iteration_time::Float64)
+    #retrieves the decay and change decay parameters
+    decay = lns.des.kwargs[:des_decay]
+    change_decay = lns.change.kwargs[:change_decay]
+    #decays the rewards of the destroy and change operator
+    lns_obj.des.destroy_weights[lns_obj.des.name] *= decay 
+    lns_obj.change.change_weights[str(lns_obj.change.change!)] *= change_decay
+    #rewards the destroy and change operator if there has been an improvement
+    if iter_no_improve == 0
+        lns_obj.des.destroy_weights[lns_obj.des.name] += (1-decay) * 1 * iteration / (1 + iteration_time)
+        lns_obj.change.change_weights[str(lns_obj.change.change!)] += (1-change_decay) * 1 * iteration / (1 + iteration_time)
     end
-    if !haskey(search_strategy, "n_iter_no_improve")
-        @info "No number of iterations with no improvement specified, defaulting to 2"
-        search_strategy["n_iter_no_improve"] = 2
-    else
-        @info "Number of iterations with no improvement specified: $(search_strategy["n_iter_no_improve"])"
+    #selects new change operator
+    if iter_no_improve % lns_obj.change.kwargs[:change_freq] == 0
+        #randomly choses the destroy operator based on the rewards
+        change_dict = lns_obj.change.change_weights
+        change_names = collect(keys(change_dict))
+        change_rewards = collect(values(operator_dict))
+        change_list = [no_change, increase_destroy!, decrement_y!, change_destroy!]
+        change_name = sample(change_names, Weights(change_rewards))
+        change! = change_list[findfirst(x -> str(x) == change_name, change_list)]
+        change!(iter_no_improve, lns_obj, m;  filter_out_current=false)
     end
-    if !haskey(search_strategy, "time_limit")
-        @info "No time limit specified, defaulting to 600 seconds"
-        search_strategy["time_limit"] = 600
-    else
-        @info "Time limit specified: $(search_strategy["time_limit"]) seconds"
-    end
-    #repair configuration
-    repair_op = configure_repair(search_strategy)
-    #destroy configuration
-    destroy_op = configure_destroy(search_strategy)
-    #setting the seed (if not none)
-    if !haskey(search_strategy, "seed")
-        search_strategy["seed"] = nothing
-    end
-    lns_obj = LNSConf(search_strategy["n_iterations"], 
-    search_strategy["n_iter_no_improve"], 
-    search_strategy["time_limit"], 
-    repair_op, 
-    destroy_op, 
-    search_strategy["seed"])
-    return lns_obj
+    return iter_no_improve, lns_obj, m
 end
-
 
 #function to unfix all fixed variables in the model and load their 
 function unfix_vars!(m::Model , instance::MALBP_W_instance)
@@ -372,11 +266,13 @@ function large_neighborhood_search!(m::Model, instance::MALBP_W_instance, search
     iter_no_improve = 0
     for i in 1: lns_conf.n_iterations
         #calls the destroy operator
-        lns_conf.des.destroy!(m, instance, seed=seed ; lns_conf.des.destroy_kwargs...)
+        step_start = time()
+        lns_conf.des.destroy!(m, instance, seed=seed ; lns_conf.des.kwargs...)
         #repairs using MILP TODO: add other repair operators
         optimize!(m)
+        iteration_time = time() - step_start
         #saves the results
-        res_dict = Dict("instance"=> instance.config_name,"iteration"=>i, "obj_val"=>objective_value(m), "time"=>time()-start_time, "operator"=>lns_conf.des.name)
+        res_dict = Dict("instance"=> instance.config_name,"iteration"=>i, "obj_val"=>objective_value(m), "time"=>iteration_time, "operator"=>lns_conf.des.name)
         push!(obj_vals, res_dict)
         if objective_value(m) < incumbent
             incumbent = objective_value(m)
@@ -391,11 +287,12 @@ function large_neighborhood_search!(m::Model, instance::MALBP_W_instance, search
             break
         end
         if i < lns_conf.n_iterations
-            #x = all_variables(m)
-            #solution = value.(x)
+            x = all_variables(m)
+            solution = value.(x)
             unfix_vars!(m, instance)
-            #set_start_value.(x, solution)
-            lns_conf.des.destroy_change!(iter_no_improve, lns_conf, m)
+            set_start_value.(x, solution)
+            lns_conf.adaptation!(iter_no_improve, lns_conf, m; iteration=i, iteration_time=iteration_time)
+            lns_conf.change.change!(iter_no_improve, lns_conf, m; iteration=i, iteration_time=iteration_time, lns_conf.change.kwargs... )
         end
 
     end
