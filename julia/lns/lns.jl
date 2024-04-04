@@ -262,7 +262,12 @@ function large_neighborhood_search!(m::Model, instance::MALBP_W_instance, search
         optimize!(m)
         iteration_time = time() - step_start
         #saves the results
-        res_dict = Dict("instance"=> instance.config_name,"iteration"=>i, "obj_val"=>objective_value(m), "time"=>iteration_time, "operator"=>lns_conf.des.name)
+        res_dict = Dict("instance"=> instance.config_name,
+                        "iteration"=>i, 
+                        "obj_val"=>objective_value(m), 
+                        "time"=>iteration_time, 
+                        "operator"=>lns_conf.des.name,
+                        "change_operator"=>string(lns_conf.change.change!))
         push!(obj_vals, res_dict)
         if objective_value(m) < incumbent
             incumbent = objective_value(m)

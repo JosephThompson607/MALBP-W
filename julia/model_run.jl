@@ -14,7 +14,7 @@ include("read_MALBP_W.jl")
 include("output.jl")
 include("models/model_dependent.jl")
 include("models/dynamic.jl")
-include("models/lns.jl")
+include("lns/lns.jl")
 
 
 
