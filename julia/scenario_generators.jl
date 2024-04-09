@@ -1,3 +1,5 @@
+using Random
+using StatsBase
 
 function generate_scenario_tree(sequence_length::Int, model_mixtures::Dict{String, Float64} )
     #If the model mixtures do not sum to 1, throw an error
