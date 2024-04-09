@@ -74,7 +74,6 @@ function read_scenario_tree(scenario_info::Dict, model_mixtures::Dict{String, Fl
             error("n_samples is required for monte_carlo_tree_limit, please provide it in the config file")
         end
         if !haskey(scenario_info, "seed")
-            @info "No seed provided, using random seed"
             scenario_info["seed"] = nothing
         end
         return monte_carlo_tree_limit(scenario_info["sequence_length"], model_mixtures, scenario_info["n_samples"], seed=scenario_info["seed"])

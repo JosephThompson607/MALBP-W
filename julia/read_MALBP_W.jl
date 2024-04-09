@@ -237,7 +237,7 @@ function read_slurm_csv(file_name::String)
             scenarios = read_scenario_tree(config_file["scenario"], get_model_mixture(models_instance))
         end
         no_cycles = config_file["scenario"]["sequence_length"] + config_file["no_stations"] - 1
-        current_instance = MALBP_W_instance(file_name,
+        current_instance = MALBP_W_instance(row.config_yaml,
                         config_file["config_name"], 
                         models_instance, 
                         scenarios, 
