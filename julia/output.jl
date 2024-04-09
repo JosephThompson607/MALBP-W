@@ -135,6 +135,8 @@ function write_MALBP_W_solution_dynamic(output_filepath::String, instance::MALBP
     else
         @info("Model is not solved or feasible, no solution written")
     end
+    #writes the sequences to a file
+    CSV.write(output_filepath * "sequences.csv", instance.scenarios)
 
     #writes the sequences to a yaml file
     
