@@ -148,7 +148,7 @@ function MMALBP_from_csv_slurm(config_filepath::String, output_filepath::String,
     optimizer = optimizer_with_attributes(() -> Gurobi.Optimizer(GRB_ENV), "TimeLimit" => run_time)
     #adds the date and time to the output file path
     now = Dates.now()
-    now = Dates.format(now, "yyyy-mm-ddTHH:MM")
+    now = Dates.format(now, "yyyy-mm-dd")
     output_filepath = xp_folder * "/" * now * "_" * output_filepath 
     (instance, config_file) = instances[slurm_array_ind]
     for milp in config_file["milp_models"]
