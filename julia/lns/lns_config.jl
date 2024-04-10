@@ -23,7 +23,7 @@ struct LNSConf
     time_limit::Float64
     rep::RepairOp
     des::DestroyOp
-    change::ChangeOp
+    shake::ChangeOp
     adaptation!::Function
     seed::Union{Nothing, Int}
 end
@@ -129,6 +129,9 @@ function configure_destroy(search_strategy::Dict)
             destroy_op = random_subtree_destroy!
         elseif destroy == "random_model" || destroy == "random_model_destroy!"
             destroy_op = random_model_destroy!
+        elseif destroy == "random_start" || destroy == "random"
+            destroy_op = rand([random_station_destroy!, random_subtree_destroy!, random_model_destroy!])
+            @info "Deconstructor operator $(destroy) recognized, randomly selected $(destroy_op) from destroy operators"
         else
             @error "Deconstructor operator $(destroy) not recognized"
         end

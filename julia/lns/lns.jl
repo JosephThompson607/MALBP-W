@@ -22,28 +22,30 @@ function adapt_lns_des!(iter_no_improve::Int, lns_obj::LNSConf, m::Model; iterat
 end
 
 #adaptive lns for destroy and change operator selection
-function adapt_lns!(iter_no_improve::Int, lns_obj::LNSConf, m::Model; iteration::Int, iteration_time::Float64)
+function adapt_lns!(iter_no_improve::Int, lns_obj::LNSConf, m::Model; iteration::Int, iteration_time::Float64, init_period::Int=6)
     #retrieves the decay and change decay parameters
     decay = lns_obj.des.kwargs[:des_decay]
-    change_decay = lns_obj.change.kwargs[:change_decay]
+    change_decay = lns_obj.shake.kwargs[:change_decay]
     #decays the rewards of the destroy and change operator
     lns_obj.des.destroy_weights[lns_obj.des.name] *= decay 
-    lns_obj.change.change_weights[string(lns_obj.change.change!)] *= change_decay
+    lns_obj.shake.change_weights[string(lns_obj.shake.change!)] *= change_decay
     #rewards the destroy and change operator if there has been an improvement
     if iter_no_improve == 0
         lns_obj.des.destroy_weights[lns_obj.des.name] += (1-decay) * 1 * iteration / (1 + (iteration_time/10))
-        lns_obj.change.change_weights[string(lns_obj.change.change!)] += (1-change_decay) * 1 * iteration / (1 + (iteration_time/10))
+        lns_obj.shake.change_weights[string(lns_obj.shake.change!)] += (1-change_decay) * 1 * iteration / (1 + (iteration_time/10))
     end
-    #selects new change operator
-    if iter_no_improve % lns_obj.change.kwargs[:change_freq] == 0
+    #selects new change operator if we are passed the learning period
+    if iter_no_improve % lns_obj.shake.kwargs[:change_freq] == 0 && iteration > init_period
+        
         #randomly choses the destroy operator based on the rewards
-        change_dict = lns_obj.change.change_weights
+        change_dict = lns_obj.shake.change_weights
         change_names = collect(keys(change_dict))
         change_rewards = collect(values(change_dict))
         change_list = [no_change!, increase_destroy!, decrement_y!, change_destroy!]
         change_name = sample(change_names, Weights(change_rewards))
         change! = change_list[findfirst(x -> string(x) == change_name, change_list)]
-        lns_obj.change.change! = change!
+        @info "change operator changed to: $change! at iteration $iteration"
+        lns_obj.shake.change! = change!
     end
     return iter_no_improve, lns_obj, m
 end
@@ -124,7 +126,7 @@ function large_neighborhood_search!(m::Model, instance::MALBP_W_instance, search
                         "obj_val"=>objective_value(m), 
                         "time"=>iteration_time, 
                         "operator"=>lns_conf.des.name,
-                        "change_operator"=>string(lns_conf.change.change!))
+                        "change_operator"=>string(lns_conf.shake.change!))
         push!(obj_vals, res_dict)
         if objective_value(m) < incumbent
             incumbent = objective_value(m)
@@ -144,8 +146,9 @@ function large_neighborhood_search!(m::Model, instance::MALBP_W_instance, search
             unfix_vars!(m, instance)
             set_start_value.(x, solution)
             lns_conf.adaptation!(iter_no_improve, lns_conf, m; iteration=i, iteration_time=iteration_time)
-            @info "iter_no_improve: $iter_no_improve , iteration: $i, operator: $(lns_conf.des.name), change_operator: $(lns_conf.change.change!)"
-            lns_conf.change.change!(iter_no_improve, lns_conf, m; iteration=i, iteration_time=iteration_time, lns_conf.change.kwargs... )
+            @info "iter_no_improve: $iter_no_improve , iteration: $i, operator: $(lns_conf.des.name), change_operator: $(lns_conf.shake.change!)"
+            #Don't change the shaking operator in the first few iterations
+            lns_conf.shake.change!(iter_no_improve, lns_conf, m; iteration=i, iteration_time=iteration_time, lns_conf.shake.kwargs... )
         end
 
     end
