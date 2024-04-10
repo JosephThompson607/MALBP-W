@@ -35,17 +35,24 @@ function adapt_lns!(iter_no_improve::Int, lns_obj::LNSConf, m::Model; iteration:
         lns_obj.shake.change_weights[string(lns_obj.shake.change!)] += (1-change_decay) * 1 * iteration / (1 + (iteration_time/10))
     end
     #selects new change operator if we are passed the learning period
-    if iter_no_improve % lns_obj.shake.kwargs[:change_freq] == 0 && iteration > init_period
+    if iter_no_improve % lns_obj.shake.kwargs[:change_freq] == 0
+        if iteration >init_period
         
-        #randomly choses the destroy operator based on the rewards
-        change_dict = lns_obj.shake.change_weights
-        change_names = collect(keys(change_dict))
-        change_rewards = collect(values(change_dict))
-        change_list = [no_change!, increase_destroy!, decrement_y!, change_destroy!]
-        change_name = sample(change_names, Weights(change_rewards))
-        change! = change_list[findfirst(x -> string(x) == change_name, change_list)]
-        @info "change operator changed to: $change! at iteration $iteration"
-        lns_obj.shake.change! = change!
+            #randomly choses the destroy operator based on the rewards
+            change_dict = lns_obj.shake.change_weights
+            change_names = collect(keys(change_dict))
+            change_rewards = collect(values(change_dict))
+            change_list = [no_change!, increase_destroy!, decrement_y!, change_destroy!]
+            change_name = sample(change_names, Weights(change_rewards))
+            change! = change_list[findfirst(x -> string(x) == change_name, change_list)]
+            @info "change operator changed to: $change! at iteration $iteration"
+            lns_obj.shake.change! = change!
+        else
+            operator = rand([random_station_destroy!, random_subtree_destroy!,random_model_destroy!])
+            @info "Exploration period at iteration $iteration, trying operator: $operator"
+            update_destroy_operator!(lns_obj.des, operator)
+        end
+
     end
     return iter_no_improve, lns_obj, m
 end
