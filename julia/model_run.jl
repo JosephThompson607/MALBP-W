@@ -121,7 +121,7 @@ function MMALBP_W_dynamic_lns( instance::MALBP_W_instance, optimizer::Gurobi.Mat
     #defines the model dependent parameters
     define_dynamic_linear!(m, instance, warmstart_vars)
     #solves the model in a lns loop
-    large_neighborhood_search!(m, instance, search_strategy; lns_res_fp= output_filepath  * "lns_results.csv", md_obj_val=md_obj_val, run_time=run_time)
+    obj_dict, best_obj = large_neighborhood_search!(m, instance, search_strategy; lns_res_fp= output_filepath  * "lns_results.csv", md_obj_val=md_obj_val, run_time=run_time)
     if save_variables
         write_MALBP_W_solution_dynamic(output_filepath, instance, m, false)
     end
@@ -130,7 +130,7 @@ function MMALBP_W_dynamic_lns( instance::MALBP_W_instance, optimizer::Gurobi.Mat
         write_to_file(m, output_filepath * "model.lp")
     end
     #saves the objective function, relative gap, run time, and instance_name to a file
-    save_results(original_filepath * "dynamic/", m, run_time, instance, output_filepath, "dynamic_problem_linear_labor_recourse.csv"; prev_obj_val=md_obj_val)
+    save_results(original_filepath * "dynamic/", m, run_time, instance, output_filepath, "dynamic_problem_linear_labor_recourse.csv"; prev_obj_val=md_obj_val, best_obj_val = best_obj)
     return m
 end
 

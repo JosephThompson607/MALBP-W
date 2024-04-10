@@ -298,5 +298,5 @@ function large_neighborhood_search!(m::Model, instance::MALBP_W_instance, search
     #writes the lns_config to a yaml file
     YAML.write_file(lns_res_fp * "lns_config.yaml",lns_conf )
     println("best obj val: ", incumbent_dict)
-    return incumbent_dict
+    return incumbent_dict, incumbent
 end
