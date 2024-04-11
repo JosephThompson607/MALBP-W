@@ -155,6 +155,9 @@ function save_results(output_filepath::String, m::Model, run_time::Real, instanc
         rel_gap = "NA"
         solution_time = "NA"
     end
+    if isnothing(best_obj_val)
+        best_obj_val = -1
+    end
     if !isnothing(prev_obj_val)
     results = DataFrame(instance_name=instance.name, 
                         prev_obj_val=prev_obj_val,
