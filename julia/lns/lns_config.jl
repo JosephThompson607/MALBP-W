@@ -9,14 +9,14 @@ mutable struct DestroyOp
     kwargs::Dict
     old_kwargs::Dict
     destroy_weights::Dict{String, Float64}
-    destroy_weight_update::Function
+    weight_update::Function
 end
 
 mutable struct ChangeOp
     change!::Function
     kwargs::Dict
     change_weights::Dict{String, Float64}
-    change_weight_update::Function
+    weight_update::Function
 end
 
 struct LNSConf
@@ -32,9 +32,9 @@ end
 
 function DestroyOp(destroy!::Function,  destroy_kwargs::Dict; 
         destroy_weights::Dict=Dict{String, Float64}("random_model_destroy!"=>1., "random_station_destroy!"=>1., "random_subtree_destroy!"=>1.),
-        destroy_weight_update::Function = no_weight_update)
+        weight_update::Function = no_weight_update)
     old_destroy_kwargs = deepcopy(destroy_kwargs)
-    return DestroyOp(string(destroy!), destroy!, destroy_kwargs, old_destroy_kwargs, destroy_weights, destroy_weight_update)
+    return DestroyOp(string(destroy!), destroy!, destroy_kwargs, old_destroy_kwargs, destroy_weights, weight_update)
 end
 
 function update_destroy_operator!(des::DestroyOp, new_destroy!::Function)
@@ -42,8 +42,8 @@ function update_destroy_operator!(des::DestroyOp, new_destroy!::Function)
     des.name = string(new_destroy!)
 end
 
-function ChangeOp(change!::Function, change_kwargs::Dict; change_weights::Dict=Dict{String, Float64}("no_change!"=>1., "increase_destroy!"=>1., "decrement_y!"=>1., "change_destroy!"=>1.,  "increase_repair_time!"=>1.0), change_weight_update::Function = no_weight_update)
-    return ChangeOp(change!, change_kwargs, change_weights, change_weight_update)
+function ChangeOp(change!::Function, change_kwargs::Dict; change_weights::Dict=Dict{String, Float64}("no_change!"=>1., "increase_destroy!"=>1., "decrement_y!"=>1., "change_destroy!"=>1.,  "increase_repair_time!"=>1.0), weight_update::Function = no_weight_update)
+    return ChangeOp(change!, change_kwargs, change_weights, weight_update)
 end
 
 
@@ -74,13 +74,17 @@ function configure_change(search_strategy::Dict)
                                                             "decrement_y!"=>1.0, 
                                                             "change_destroy!"=>1.0, 
                                                             "increase_repair_time!"=>1.0))
-        change_weight_update = no_weight_update
+        weight_update = no_weight_update
     else
         if !haskey(search_strategy["change"], "kwargs")
             @info "No destroy change arguments specified, defaulting to change_freq=3"
-            search_strategy["change"]["kwargs"] = Dict("change_freq"=>3)
+            search_strategy["change"]["kwargs"] = Dict("change_freq"=>3, "change_decay"=>0.9)
         else 
             @info "Destroy change arguments specified: $(search_strategy["change"]["kwargs"])"
+            if !haskey(search_strategy["change"]["kwargs"], "change_decay")
+                @info "No change decay specified, defaulting to 0.9"
+                search_strategy["change"]["kwargs"]["change_decay"] = 0.9
+            end
         end
         if search_strategy["change"]["operator"] == "increase_destroy!" || search_strategy["change"]["operator"] == "increase_destroy"
             @info "Deconstructor change operator $(search_strategy["change"]["operator"]) recognized"
@@ -107,19 +111,21 @@ function configure_change(search_strategy::Dict)
         else
             @error "Deconstructor change operator $(search_strategy["change"]) not recognized"
         end
-        if !haskey(search_strategy["change"], "change_weight_update")
+        if !haskey(search_strategy["change"], "weight_update")
             @info "no change weight update specified, defaulting to no_weight_update"
-            change_weight_update = no_weight_update
+            weight_update = no_weight_update
         else
-            @info "change weight update specified: $(search_strategy["change"]["change_weight_update"])"
-            if search_strategy["change"]["change_weight_update"] == "iter_and_time_update"
-                change_weight_update = iter_and_time_update
-            elseif search_strategy["change"]["change_weight_update"] == "basic_update"
-                change_weight_update = basic_update
-            elseif search_strategy["change"]["change_weight_update"] == "no_weight_update"
-                change_weight_update = no_weight_update
+            @info "change weight update specified: $(search_strategy["change"]["weight_update"])"
+            if search_strategy["change"]["weight_update"] == "iter_and_time_update"
+                weight_update = iter_and_time_update
+            elseif search_strategy["change"]["weight_update"] == "basic_update"
+                weight_update = basic_update
+            elseif search_strategy["change"]["weight_update"] == "no_weight_update"
+                weight_update = no_weight_update
+            elseif search_strategy["change"]["weight_update"] == "obj_val_update"
+                weight_update = obj_val_update
             else
-                @error "Deconstructor change operator $(search_strategy["change"]["change_weight_update"]) not recognized"
+                @error "Deconstructor change operator $(search_strategy["change"]["weight_update"]) not recognized"
             end
         end
         if !haskey(search_strategy["change"], "change_weights")
@@ -129,9 +135,9 @@ function configure_change(search_strategy::Dict)
     end
     #converst change_op kwargs to symbols
     search_strategy["change"]["kwargs"] = Dict(Symbol(k) => v for (k, v) in search_strategy["change"]["kwargs"])
-    println("CHANGE WEIGHT UPDATE", change_weight_update)
+    println("CHANGE WEIGHT UPDATE", weight_update)
     println("weights", search_strategy["change"]["change_weights"])
-    change_op = ChangeOp(destroy_change, search_strategy["change"]["kwargs"], search_strategy["change"]["change_weights"], change_weight_update)
+    change_op = ChangeOp(destroy_change, search_strategy["change"]["kwargs"], search_strategy["change"]["change_weights"], weight_update)
     return change_op
 end
 
@@ -142,7 +148,7 @@ function configure_destroy(search_strategy::Dict)
         destroy_op = random_station_destroy!
         search_strategy["destroy"]["kwargs"] = Dict(Symbol("n_destroy")=>2)
         search_strategy["change"]["operator"] = no_change
-        destroy_weight_update = no_weight_update
+        weight_update = no_weight_update
     else
         @info "Deconstructor specified: $(search_strategy["destroy"]["operator"])"
         destroy = search_strategy["destroy"]["operator"]
@@ -164,8 +170,13 @@ function configure_destroy(search_strategy::Dict)
         else
             @info "Deconstructor arguments specified: $(search_strategy["destroy"]["kwargs"])"
             destroy_kwargs = search_strategy["destroy"]["kwargs"]
+            if !haskey(destroy_kwargs, "des_decay")
+                @info "No destroy decay specified, defaulting to 0.9"
+                destroy_kwargs["des_decay"] = 0.9
+            end
             #converts the keys to symbols
             destroy_kwargs = Dict(Symbol(k) => v for (k, v) in destroy_kwargs)
+
         end
         if !haskey(search_strategy["destroy"], "destroy_weights")
             @info "No destroy weights specified, defaulting to equal weights"
@@ -173,27 +184,29 @@ function configure_destroy(search_strategy::Dict)
         else
             @info "Destroy weights specified: $(search_strategy["destroy"]["destroy_weights"])"
         end
-        if !haskey(search_strategy["destroy"], "destroy_weight_update")
+        if !haskey(search_strategy["destroy"], "weight_update")
             @info "No destroy weight update specified, defaulting to no_weight_update"
-            destroy_weight_update = no_weight_update
+            weight_update = no_weight_update
         else
-            @info "Destroy weight update specified: $(search_strategy["destroy"]["destroy_weight_update"])"
-            if search_strategy["destroy"]["destroy_weight_update"] == "iter_and_time_update"
-                destroy_weight_update = iter_and_time_update
-            elseif search_strategy["destroy"]["destroy_weight_update"] == "basic_update"
-                destroy_weight_update = basic_update
-            elseif search_strategy["destroy"]["destroy_weight_update"] == "no_weight_update"
-                destroy_weight_update = no_weight_update
+            @info "Destroy weight update specified: $(search_strategy["destroy"]["weight_update"])"
+            if search_strategy["destroy"]["weight_update"] == "iter_and_time_update"
+                weight_update = iter_and_time_update
+            elseif search_strategy["destroy"]["weight_update"] == "basic_update"
+                weight_update = basic_update
+            elseif search_strategy["destroy"]["weight_update"] == "no_weight_update"
+                weight_update = no_weight_update
+            elseif search_strategy["change"]["weight_update"] == "obj_val_update"
+                weight_update = obj_val_update
             else
-                @error "Destroy weight update operator $(search_strategy["destroy"]["destroy_weight_update"]) not recognized"
+                @error "Destroy weight update operator $(search_strategy["destroy"]["weight_update"]) not recognized"
             end
         end
     end 
-        
+    println("DESTROY WEIGHT UPDATE", weight_update)
     destroy_operator = DestroyOp(destroy_op, 
                         destroy_kwargs; 
                         destroy_weights=search_strategy["destroy"]["destroy_weights"], 
-                        destroy_weight_update=destroy_weight_update)
+                        weight_update=weight_update)
     return destroy_operator
 end
 
@@ -253,6 +266,8 @@ function get_search_strategy_config(search_strategy::Dict)
             adaptation_technique = adapt_lns!
         elseif search_strategy["adaptation"] == "adapt_lns_des!"
             adaptation_technique = adapt_lns_des!
+        elseif search_strategy["adaptation"] == "no_adapt_lns!" || search_strategy["adaptation"] == "no_adapt_lns" || search_strategy["adaptation"] == "no_adapt"
+            adaptation_technique = no_adapt_lns!
         else
             @error "LNS adaptation operator $(search_strategy["adaptation"]) not recognized"
         end

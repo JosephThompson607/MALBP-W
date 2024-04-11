@@ -75,11 +75,15 @@ function large_neighborhood_search!(m::Model, instance::MALBP_W_instance, search
         lns_conf.des.destroy!(m, instance, seed=seed ; lns_conf.des.kwargs...)
         #repairs using MILP TODO: add other repair operators
         optimize!(m)
-        iteration_time = time() - step_start
+       
         #saves the results
+        iteration_time = time() - step_start
+        old_incumbent = incumbent
+        obj_val_delta = incumbent - objective_value(m)
         res_dict = Dict("instance"=> instance.config_name,
                         "iteration"=>i, 
                         "obj_val"=>objective_value(m), 
+                        "obj_val_delta"=>obj_val_delta,
                         "time"=>iteration_time, 
                         "operator"=>lns_conf.des.name,
                         "change_operator"=>string(lns_conf.change.change!))
@@ -102,10 +106,13 @@ function large_neighborhood_search!(m::Model, instance::MALBP_W_instance, search
             unfix_vars!(m, instance)
             set_start_value.(x, solution)
             lns_conf.adaptation!(iter_no_improve, lns_conf, m; 
+                                    obj_val_delta=obj_val_delta,
                                     iteration=i, 
                                     iteration_time=iteration_time, 
-                                    des_weight_update = lns_conf.des.destroy_weight_update,
-                                    change_weight_update = lns_conf.change.change_weight_update)
+                                    des_weight_update = lns_conf.des.weight_update,
+                                    change_weight_update = lns_conf.change.weight_update,
+                                    prev_best = old_incumbent,
+                                    current_best = incumbent)
             @info "iter_no_improve: $iter_no_improve , iteration: $i, operator: $(lns_conf.des.name), change_operator: $(lns_conf.change.change!)"
             #Don't change the shaking operator in the first few iterations
             lns_conf.change.change!(iter_no_improve, lns_conf, m; iteration=i, iteration_time=iteration_time, lns_conf.change.kwargs... )
