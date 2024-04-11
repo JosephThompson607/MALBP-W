@@ -8,15 +8,19 @@ end
 
 
 #adaptive lns for destroy operator selection
-function adapt_lns_des!(iter_no_improve::Int, lns_obj::LNSConf, m::Model; iteration::Int, iteration_time::Float64, weight_update::Function = no_weight_update)
+function adapt_lns_des!(iter_no_improve::Int, lns_obj::LNSConf, m::Model; iteration::Int, iteration_time::Float64, des_weight_update::Function = no_weight_update, _...)
     #retrieves the decay and change decay parameters
     decay = lns_obj.des.kwargs[:des_decay]
     #decays the rewards of the destroy and change operator
     lns_obj.des.destroy_weights[lns_obj.des.name] *= decay 
     #rewards the destroy and change operator if there has been an improvement
     if iter_no_improve == 0
-        lns_obj.des.destroy_weights[lns_obj.des.name] += (1-decay) * 1 * iteration / (1 + (iteration_time/10))
+        lns_obj.des.destroy_weights[lns_obj.des.name] = des_weight_update(lns_obj.des.destroy_weights[lns_obj.des.name]; 
+                                                                            iteration = iteration, 
+                                                                            iteration_time = iteration_time, 
+                                                                            decay = decay)
     end
+    println("destroy_weights: ", lns_obj.des.destroy_weights)
     return iter_no_improve, lns_obj, m
 end
 
@@ -27,13 +31,13 @@ function no_weight_update(weights::Float64; _...)
 end
 
 #weights the update by the number of iterations and compute time
-function iter_and_time_update(weights::Float64, iteration::Int, iteration_time::Float64, decay::Float64; _...)
+function iter_and_time_update(weights::Float64; iteration::Int, iteration_time::Float64, decay::Float64, _...)
     new_weights =  weights + (1-decay) * iteration / (1 + (iteration_time/10))
     return new_weights
 end
 
 #basic update operator
-function basic_update(weights::Float64, decay::Float64; up_amount::Float64= 1., _...)
+function basic_update(weights::Float64; decay::Float64, up_amount::Float64= 1., _...)
     return weights + (1-decay) * up_amount
 end
 
@@ -48,14 +52,14 @@ function adapt_lns!(iter_no_improve::Int, lns_obj::LNSConf, m::Model; iteration:
     lns_obj.change.change_weights[string(lns_obj.change.change!)] *= change_decay
     #rewards the destroy and change operator if there has been an improvement
     if iter_no_improve == 0
-        lns_obj.des.destroy_weights[lns_obj.des.name] += des_weight_update(lns_obj.des.destroy_weights[lns_obj.des.name], 
-                                                                            iteration, 
-                                                                            iteration_time, 
-                                                                            decay)
+        lns_obj.des.destroy_weights[lns_obj.des.name] += des_weight_update(lns_obj.des.destroy_weights[lns_obj.des.name]; 
+                                                                            iteration = iteration, 
+                                                                            iteration_time = iteration_time, 
+                                                                            decay = decay)
         lns_obj.change.change_weights[string(lns_obj.change.change!)] += change_weight_update(lns_obj.change.change_weights[string(lns_obj.change.change!)], 
-                                                                                                iteration,
-                                                                                                iteration_time, 
-                                                                                                change_decay)
+                                                                                                iteration = iteration,
+                                                                                               iteration_time =  iteration_time, 
+                                                                                               change_decay= change_decay)
     end
     #selects new change operator if we are passed the learning period
     if iter_no_improve % lns_obj.change.kwargs[:change_freq] == 0
