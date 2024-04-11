@@ -76,7 +76,7 @@ function MMALBP_W_dynamic( instance::MALBP_W_instance, optimizer::Gurobi.MathOpt
     return m
 end
 
-function MMALBP_W_dynamic( instance::MALBP_W_instance, optimizer::Gurobi.MathOptInterface.OptimizerWithAttributes, original_filepath::String, run_time::Real; save_variables::Bool=true, save_lp::Bool=false, warmstart_vars::String="", md_obj_val::Real=0.0, slurm_array_ind::Union{Int, Nothing}=nothing)
+function MMALBP_W_dynamic_ws( instance::MALBP_W_instance, optimizer::Gurobi.MathOptInterface.OptimizerWithAttributes, original_filepath::String, run_time::Real; save_variables::Bool=true, save_lp::Bool=false, warmstart_vars::String="", md_obj_val::Real=0.0, slurm_array_ind::Union{Int, Nothing}=nothing)
     #if directory is not made yet, make it
     if !isnothing(slurm_array_ind)
         output_filepath = original_filepath * "dynamic/"* instance.name * "/slurm_" * string(slurm_array_ind) * "/"
@@ -182,7 +182,7 @@ function warmstart_dynamic(config_filepath::String, output_filepath::String, run
     output_filepath = xp_folder * "/" * now * "_" * output_filepath 
     for (instance, var_folder, md_obj_val) in instances
         @info "Running instance $(instance.name), from $(config_filepath). \n Output will be saved to $(output_filepath)"
-        MMALBP_W_dynamic(instance, optimizer, output_filepath, run_time; save_variables= save_variables, save_lp=save_lp, warmstart_vars= var_folder, md_obj_val= md_obj_val)
+        MMALBP_W_dynamic_ws(instance, optimizer, output_filepath, run_time; save_variables= save_variables, save_lp=save_lp, warmstart_vars= var_folder, md_obj_val= md_obj_val)
     end
 end
 
