@@ -118,7 +118,7 @@ function MMALBP_W_dynamic_lns( instance::MALBP_W_instance, optimizer::Gurobi.Mat
     #creates the model
     m = Model(optimizer)
     set_optimizer_attribute(m, "LogFile", output_filepath * "gurobi.log")
-    #defines the model dependent parameters
+    #defines the  dyanmic model parameters
     define_dynamic_linear!(m, instance, warmstart_vars)
     #solves the model in a lns loop
     obj_dict, best_obj = large_neighborhood_search!(m, instance, search_strategy; lns_res_fp= output_filepath  * "lns_results.csv", md_obj_val=md_obj_val, run_time=run_time)

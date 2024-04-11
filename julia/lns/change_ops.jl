@@ -62,3 +62,12 @@ function change_destroy_increase_size!(iter_no_improve::Int, lns_obj::LNSConf, m
     end
     return iter_no_improve, lns_obj, m
 end
+
+#increases the runtime of the repair operator by 1 minute
+function increase_repair_time!(iter_no_improve::Int, lns_obj::LNSConf, m::Model; _...)
+    if iter_no_improve % lns_obj.change.kwargs[:change_freq] == 0
+        lns_obj.rep.repair_kwargs["time_limit"] += 60
+        set_optimizer_attribute(m, "TimeLimit", lns_obj.rep.repair_kwargs["time_limit"])
+    end
+    return iter_no_improve, lns_obj, m
+end
