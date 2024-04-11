@@ -135,8 +135,6 @@ function configure_change(search_strategy::Dict)
     end
     #converst change_op kwargs to symbols
     search_strategy["change"]["kwargs"] = Dict(Symbol(k) => v for (k, v) in search_strategy["change"]["kwargs"])
-    println("CHANGE WEIGHT UPDATE", weight_update)
-    println("weights", search_strategy["change"]["change_weights"])
     change_op = ChangeOp(destroy_change, search_strategy["change"]["kwargs"], search_strategy["change"]["change_weights"], weight_update)
     return change_op
 end
@@ -174,8 +172,7 @@ function configure_destroy(search_strategy::Dict)
                 @info "No destroy decay specified, defaulting to 0.9"
                 destroy_kwargs["des_decay"] = 0.9
             end
-            #converts the keys to symbols
-            destroy_kwargs = Dict(Symbol(k) => v for (k, v) in destroy_kwargs)
+            
 
         end
         if !haskey(search_strategy["destroy"], "destroy_weights")
@@ -202,7 +199,8 @@ function configure_destroy(search_strategy::Dict)
             end
         end
     end 
-    println("DESTROY WEIGHT UPDATE", weight_update)
+    #converts the keys to symbols
+    destroy_kwargs = Dict(Symbol(k) => v for (k, v) in destroy_kwargs)
     destroy_operator = DestroyOp(destroy_op, 
                         destroy_kwargs; 
                         destroy_weights=search_strategy["destroy"]["destroy_weights"], 
