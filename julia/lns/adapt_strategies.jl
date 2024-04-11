@@ -1,7 +1,7 @@
 #This file contains the adaptive strategies for the LNS algorithm
 
 #Does not adapt the LNS algorithm, useful for testing
-function no_adapt_lns!(iter_no_improve::Int, lns_obj::LNSConf, m::Model; iteration::Int, iteration_time::Float64)
+function no_adapt_lns!(iter_no_improve::Int, lns_obj::LNSConf, m::Model; _...)
     return iter_no_improve, lns_obj, m
 end
 
