@@ -87,13 +87,72 @@ function define_md_linear_constraints!(m::Model, instance::MALBP_W_instance)
             end
         end
     end
+    #reduntant precedence constraints
+    # for i in 1:instance.models.no_models
+    #     model = model_indexes[i]
+    #     for (prec, suc) in instance.models.models[model].precendence_relations
+    #             @constraint(m, sum( s * x_soi[s, parse(Int,prec), i] for s in 1:instance.equipment.no_stations) <= sum( s * x_soi[s, parse(Int,suc), i] for s in 1:instance.equipment.no_stations))
+    #     end
+    # end
+end
+
+#defines the redundant constraints of the model dependent MALBP-W model
+function define_md_linear_redundant_constraints!(m::Model, instance::MALBP_W_instance)
+    # usesful variables
+    model_indexes = [i for (i, model_dict) in instance.models.models]
+    #model variables
+    x_soi = m[:x_soi]
+    #PREPROCESSING 1: TASKS cannot be to early or too late
+    #calculates the infeasible task assignments
+    infeasible_tasks_forward, infeasible_tasks_backwards = get_infeasible_task_assignments(instance; productivity_per_worker = Dict(1=>1., 2=>1., 3=>1., 4=>1.))
+    #prohibits the infeasible task assignments
+    for (model, tasks) in infeasible_tasks_forward
+        i = findfirst( ==(model), model_indexes) 
+        for (task, stations) in tasks
+            for station in stations
+                @constraint(m, x_soi[station, parse(Int,task), i] == 0)
+            end
+        end
+    end
+    for (model, tasks) in infeasible_tasks_backwards
+        i = findfirst( ==(model), model_indexes) 
+        for (task,stations) in tasks
+            for station in stations
+                @constraint(m, x_soi[station,parse(Int,task), i] == 0)
+            end
+        end
+    end
+    #PREPROCESSING 2: Pairs of tasks that take up a large amount of time cannot both be started too late or too early
+    #calculates the infeasible task pairs
+    infeasible_pairs_forward, infeasible_pairs_backwards = get_infeasible_assignment_pairs(instance; productivity_per_worker = Dict(1=>1., 2=>1., 3=>1., 4=>1.)) 
+    #prohibits the infeasible task pairs
+    for (model, pairs) in infeasible_pairs_forward
+        i = findfirst( ==(model), model_indexes) 
+        for ((task1, task2), stations) in pairs
+            for station in stations
+                @constraint(m, x_soi[station, parse(Int,task1), i] + x_soi[station, parse(Int,task2), i] <= 1)
+            end
+        end
+    end
+    for (model, pairs) in infeasible_pairs_backwards
+        i = findfirst( ==(model), model_indexes) 
+        for ((task1, task2), stations) in pairs
+            for station in stations
+                @constraint(m, x_soi[station, parse(Int,task1), i] + x_soi[station, parse(Int,task2), i] <= 1)
+            end
+        end
+    end
 end
 
 
-function define_md_linear!(m::Model, instance::MALBP_W_instance)
+function define_md_linear!(m::Model, instance::MALBP_W_instance; preprocess = false)
     define_md_linear_vars!(m, instance)
     define_md_linear_obj!(m, instance)
     define_md_linear_constraints!(m, instance)   
+    if preprocess
+        @info "Preprocessing: adding redundant constraints to the model"
+        define_md_linear_redundant_constraints!(m, instance)
+    end
 end
 
 

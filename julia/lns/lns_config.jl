@@ -85,6 +85,10 @@ function configure_change(search_strategy::Dict)
                 @info "No change decay specified, defaulting to 0.9"
                 search_strategy["change"]["kwargs"]["change_decay"] = 0.9
             end
+            if !haskey(search_strategy["change"]["kwargs"], "change_freq")
+                @info "No change frequency specified, defaulting to 3"
+                search_strategy["change"]["kwargs"]["change_freq"] = 3
+            end
         end
         if search_strategy["change"]["operator"] == "increase_destroy!" || search_strategy["change"]["operator"] == "increase_destroy"
             @info "Deconstructor change operator $(search_strategy["change"]["operator"]) recognized"

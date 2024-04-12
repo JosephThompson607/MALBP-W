@@ -15,11 +15,12 @@ include("output.jl")
 include("models/model_dependent.jl")
 include("models/dynamic.jl")
 include("lns/lns.jl")
+include("heuristics/preprocessing.jl")
 
 
 
 
-function MMALBP_W_model_dependent(instance::MALBP_W_instance, optimizer::Gurobi.MathOptInterface.OptimizerWithAttributes, original_filepath::String, run_time::Real; save_variables::Bool=true, save_lp::Bool=false, slurm_array_ind::Union{Int, Nothing}=nothing)
+function MMALBP_W_model_dependent(instance::MALBP_W_instance, optimizer::Gurobi.MathOptInterface.OptimizerWithAttributes, original_filepath::String, run_time::Real;preprocessing::Bool=false, save_variables::Bool=true, save_lp::Bool=false, slurm_array_ind::Union{Int, Nothing}=nothing)
     #if directory is not made yet, make it
     if !isnothing(slurm_array_ind)
         output_filepath = original_filepath * "md/"* instance.name * "/slurm_" * string(slurm_array_ind) * "/"
@@ -33,7 +34,7 @@ function MMALBP_W_model_dependent(instance::MALBP_W_instance, optimizer::Gurobi.
     m = Model(optimizer)
     set_optimizer_attribute(m, "LogFile", output_filepath * "gurobi.log")
     #defines the model dependent parameters
-    define_md_linear!(m, instance)
+    define_md_linear!(m, instance; preprocess=preprocessing)
     #writes the model to a file
     optimize!(m)
     if save_variables
@@ -134,7 +135,7 @@ function MMALBP_W_dynamic_lns( instance::MALBP_W_instance, optimizer::Gurobi.Mat
     return m
 end
 
-function MMALBP_from_yaml(config_filepath::String, output_filepath::String, run_time::Float64, save_variables::Bool, save_lp::Bool; xp_folder::String="model_runs")
+function MMALBP_from_yaml(config_filepath::String, output_filepath::String, run_time::Float64, save_variables::Bool, save_lp::Bool; xp_folder::String="model_runs", preprocessing::Bool=false)
     config_file = get_instance_YAML(config_filepath)
     instances = read_MALBP_W_instances(config_filepath)
     optimizer = optimizer_with_attributes(() -> Gurobi.Optimizer(GRB_ENV), "TimeLimit" => run_time)
@@ -146,7 +147,7 @@ function MMALBP_from_yaml(config_filepath::String, output_filepath::String, run_
         for instance in instances
             @info "Running instance $(instance.name), of model $(milp). \n Output will be saved to $(output_filepath)"
             if milp== "model_dependent_problem_linear_labor_recourse"
-                m = MMALBP_W_model_dependent(instance, optimizer, output_filepath, run_time; save_variables= save_variables, save_lp=save_lp)
+                m = MMALBP_W_model_dependent(instance, optimizer, output_filepath, run_time; save_variables= save_variables, save_lp=save_lp, preprocessing=preprocessing)
             elseif milp == "dynamic_problem_linear_labor_recourse"
                 m = MMALBP_W_dynamic(instance, optimizer, output_filepath, run_time; save_variables= save_variables, save_lp=save_lp)
             end
@@ -230,6 +231,9 @@ function parse_commandline()
         "--save_variables"
             help = "Save the solution variables"
             action = :store_true
+        "--preprocessing"
+            help = "preprocess model constraints"
+            action = :store_true
         "--save_lp"
             help = "Save the model as a .lp file"
             action = :store_true
@@ -257,7 +261,7 @@ function main()
     end
     output_file =  parsed_args["output_file"] * "/"
     if parsed_args["xp_type"] == "config_yaml"
-        MMALBP_from_yaml(parsed_args["config_file"], output_file,parsed_args["run_time"], parsed_args["save_variables"], parsed_args["save_lp"] )
+        MMALBP_from_yaml(parsed_args["config_file"], output_file,parsed_args["run_time"], parsed_args["save_variables"], parsed_args["save_lp"]; preprocessing=parsed_args["preprocessing"] )
     elseif parsed_args["xp_type"] == "warmstart"
         warmstart_dynamic(parsed_args["config_file"], output_file,parsed_args["run_time"], parsed_args["save_variables"], parsed_args["save_lp"] )
     elseif parsed_args["xp_type"] == "csv_slurm"
