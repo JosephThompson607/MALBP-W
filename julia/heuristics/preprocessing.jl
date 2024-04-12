@@ -3,83 +3,9 @@ using GraphMakie
 using Graphs
 include("../read_MALBP_W.jl")
 
-function create_precedence_matrix(instance::MALBP_W_instance)
-    matrix_dict = Dict{String, Dict}()
-    for (model_name, model) in instance.models.models
-        task_to_index = Dict{String, Int}()
-        index_to_task = Dict{Int, String}()
-        for (i, task) in enumerate(keys(model.task_times[1]))
-            task_to_index[task] = i
-            index_to_task[i] = task
-        end
-        precedence_matrix = zeros(Int, model.no_tasks+1, model.no_tasks)
-        for (pred, suc) in model.precendence_relations
-            pred_index = task_to_index[pred]
-            suc_index = task_to_index[suc]
-            precedence_matrix[pred_index, suc_index] = 1
-        end
-        #final row is the sum of the previous rows
-        precedence_matrix[end, :] = sum(precedence_matrix, dims=1)
-        matrix_dict[model.name] = Dict("precedence_matrix" =>precedence_matrix, "task_to_index" => task_to_index, "index_to_task" => index_to_task)
-        
-        
-    end
-    return matrix_dict
-end
-
- #Function for calculating the stating number of workers at each station
-function chunk_out_tasks(productivity_per_worker::Dict{Int, Float64}, instance::MALBP_W_instance, remaining_time::Real)
-    #Here we assume tasks will be evenely distributed among stations.
-    workers_per_station = zeros(Int, instance.no_stations)
-    available_station_time = zeros(Int, instance.no_stations)
-    #sorts the dictionary by key
-    productivity_per_worker = sort(collect(productivity_per_worker), by=x->x[1])
-    #assigns workers to stations, starting with the most productive workers (first workers)
-    for (worker, productivity) in productivity_per_worker
-        for station in 1:instance.no_stations
-            available_task_time = instance.models.cycle_time * productivity
-            remaining_time -= available_task_time
-            workers_per_station[station] += 1
-            available_station_time[station] += available_task_time
-            if remaining_time <= 0
-                return workers_per_station, available_station_time
-            end
-        end
-    end
-    error("Not enough workers to complete the tasks")
-end
-
-function calculate_min_workers(instance::MALBP_W_instance, productivity_per_worker::Dict{Int, Float64})
-    min_workers = Dict{String, Dict}()
-    for (model_name, model) in instance.models.models
-        remaining_time = sum([time for (task, time) in model.task_times[1]])
-        workers_per_station, available_station_time = chunk_out_tasks(productivity_per_worker, instance, remaining_time)
-        min_workers[model_name] = Dict("workers_per_station" => workers_per_station, 
-                                    "available_station_time"=> available_station_time, 
-                                    "total_workers" => sum(workers_per_station))
-    end
-    
-    return min_workers
-end
-
-function md_assign_tasks(instance::MALBP_W_instance; productivity_per_worker::Dict{Int, Float64}= Dict(1=>1., 2=>1., 3=>1., 4=>1.), priority!::Function= x->x)
-    #creates a vector of remaining time left in the station. The length is the number of stations, and the value is the cycle time
-    min_workers = calculate_min_workers(instance, productivity_per_worker)
-    remaining_time = fill(instance.cycle_time, instance.no_stations)
-
-    #creates a matrix from the prededence constraints. The matrix is a boolean matrix with 1 if the task is a predecessor of the task in the column
-    #and 0 otherwise
-    precedence_matrix_dict = create_precedence_matrix(instance)
 
 
-    for model in instance.models
-        for (task, time) in model.task_times
-            
-        end
-    end
 
-
-end
 
 function create_correspondance_dicts(model::ModelInstance)
     #creates a dictionary that maps the task names to the index of the task in the model
@@ -103,39 +29,35 @@ function generate_precedence_graph(model::ModelInstance, task_to_index::Dict{Str
     return g
 end
 
+function calculate_positional_weight(model_name::String, model::ModelInstance , reverse::Bool = true)
+    #calculates the positional weight of the tasks in the model
+    task_to_index, index_to_task = create_correspondance_dicts(model)
+    g = generate_precedence_graph(model, task_to_index)
+    if reverse
+        reverse!(g)
+    end
+    trans_g = transitiveclosure(g)
+    nodes = collect(vertices(trans_g))
+    dependency_dict = Dict{String, Float64}()
+    for node in nodes
+        if !haskey(dependency_dict, string(index_to_task[node]))
+            dependency_dict[string(index_to_task[node])] = model.task_times[1][index_to_task[node]]
+        else
+            dependency_dict[string(index_to_task[node])] += model.task_times[1][index_to_task[node]]
+        end
+        for child in outneighbors(trans_g,node)
+            dependency_dict[string(index_to_task[node])] += model.task_times[1][index_to_task[child]]
+        end
+    end
+    return dependency_dict
+end
+   
 
-
-function calculate_depedency_time(instance::MALBP_W_instance; reverse=false, pairs::Vector = [])
+function calculate_depedency_time(instance::MALBP_W_instance; reverse=false)
     #calculates the total task time of the tasks that are in the dependency graph of the model
     dependency_time = Dict{String, Dict{String, Float64}}()
     for (model_name, model) in instance.models.models
-        dependency_time[model_name] = Dict{String, Float64}()
-        task_to_index, index_to_task = create_correspondance_dicts(model)
-        g = generate_precedence_graph(model, task_to_index)
-        if ! isnothing(pairs)
-            for pair in pairs
-                papa = popfirst!(pair)
-                for i in 2:eachindex(pair)
-                    add_edge!(g, papa, pair[i])
-                end
-            end
-        end
-        if reverse
-            reverse!(g)
-        end
-        trans_g = transitiveclosure(g)
-        nodes = collect(vertices(trans_g))
-        for node in nodes
-            if !haskey(dependency_time[model_name], string(index_to_task[node]))
-                dependency_time[model_name][string(index_to_task[node])] = model.task_times[1][index_to_task[node]]
-            else
-                dependency_time[model_name][string(index_to_task[node])] += model.task_times[1][index_to_task[node]]
-            end
-            for child in outneighbors(trans_g,node)
-                dependency_time[model_name][string(index_to_task[node])] += model.task_times[1][index_to_task[child]]
-            end
-
-        end
+        dependency_time[model_name] = calculate_positional_weight(model_name, model)
     end
     return dependency_time
 end
@@ -167,27 +89,6 @@ function get_infeasible_task_assignments(instance::MALBP_W_instance; productivit
     return infeasible_assignments_forward, infeasible_assignments_backward
 end 
 
-#Returns the possible pairs of tasks that are not already linked
-function calculate_possible_pairs(instance::MALBP_W_instance, pair_size::Int64)
-    possible_pairs = []
-    for (model_name, model) in instance.models.models
-        task_to_index, index_to_task = create_correspondance_dicts(model)
-        g = generate_precedence_graph(model, task_to_index)
-        con_comp = weakly_connected_components(g)
-        println("con_comp: ", con_comp)
-        for (i,component1) in enumerate(con_comp)
-            for component2 in con_comp[i+1:end]
-                println("component1: ", component1, " component2: ", component2)
-                for node1 in component1
-                    for node2 in component2
-                        push!(possible_pairs, [index_to_task[node1], index_to_task[node2]])
-                    end
-                end
-                
-            end
-        end
-    end
-end    
 
 
 function get_station_bans(instance::MALBP_W_instance, depedency_time::Dict{String, Dict{T, Float64}}, max_station_cap::Vector{Int64}, reverse::Bool) where T
@@ -217,7 +118,7 @@ function get_station_bans(instance::MALBP_W_instance, depedency_time::Dict{Strin
     return model_task_bans
 end
 
-function find_infeasible_pairs(instance;productivity_per_worker::Dict{Int, Float64}= Dict(1=>1., 2=>1., 3=>1., 4=>1.), reverse::Bool=true, pair_size::Int64 = 2)
+function find_infeasible_pairs(instance;productivity_per_worker::Dict{Int, Float64}= Dict(1=>1., 2=>1., 3=>1., 4=>1.), reverse::Bool=true)
     #possible_pairs = calculate_possible_pairs(instance, pair_size)
     dependency_time = combined_task_weight(instance; reverse=reverse)
     max_station_cap = calculate_max_station_capacity(instance, productivity_per_worker)
