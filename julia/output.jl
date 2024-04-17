@@ -2,6 +2,27 @@ using CSV
 using DataFrames
 using Dates
 
+
+function write_x_so_solution(output_filepath::String, instance::MALBP_W_instance, x::Array, only_nonzero::Bool=false)
+    #writes the solution to a file
+    x_soi_solution = []
+    for s in 1:instance.equipment.no_stations
+        for o in 1:instance.equipment.no_tasks
+            for i in 1:instance.models.no_models
+                if only_nonzero && value(x[s, o]) == 0
+                    continue
+                end
+                #saves the model so compatible with model dependent
+                x_soi_dict = Dict("station"=>s, "task"=>o, "model"=>i, "value"=>value(x[s, o]))
+                push!(x_soi_solution, x_soi_dict)
+            end
+        end
+    end
+    #writes the x_soi_solution as a csv
+    x_soi_solution_df = DataFrame(x_soi_solution)
+    CSV.write(output_filepath * "x_soi_solution.csv", x_soi_solution_df)
+end
+
 function write_x_soi_solution(output_filepath::String, instance::MALBP_W_instance, x::Array, only_nonzero::Bool=false)
     #writes the solution to a file
     x_soi_solution = []
@@ -101,14 +122,10 @@ function write_MALBP_W_solution_md(output_filepath::String, instance::MALBP_W_in
     if !isdir(output_filepath)
         mkdir(output_filepath)
     end
-    x = m[:x_soi]
-    u = m[:u_se]
-    y_w = m[:y_w]
-    y = m[:y]
     if is_solved_and_feasible(m) || termination_status(m) == MOI.TIME_LIMIT
-        write_x_soi_solution(output_filepath, instance, x, only_nonzero)
-        write_u_se_solution(output_filepath, instance, u, only_nonzero)
-        write_y_w_solution(output_filepath, instance, y_w, y; only_nonzero = only_nonzero)
+        write_x_soi_solution(output_filepath, instance, m[:x_soi], only_nonzero)
+        write_u_se_solution(output_filepath, instance, m[:u_se], only_nonzero)
+        write_y_w_solution(output_filepath, instance, m[:y_w], m[:y]; only_nonzero = only_nonzero)
         write_y_wts_solution(output_filepath, instance, m[:y_wts], only_nonzero)
     else
         @info("Model is not solved or feasible, no solution written")
@@ -116,6 +133,24 @@ function write_MALBP_W_solution_md(output_filepath::String, instance::MALBP_W_in
     #writes the sequences to a file
     CSV.write(output_filepath * "sequences.csv", instance.scenarios)
 end
+
+function write_MALBP_W_solution_fixed(output_filepath::String, instance::MALBP_W_instance, m::Model, only_nonzero::Bool=false)
+    #If the output_filepath does not exist, make in
+    if !isdir(output_filepath)
+        mkdir(output_filepath)
+    end
+    if is_solved_and_feasible(m) || termination_status(m) == MOI.TIME_LIMIT
+        write_x_so_solution(output_filepath, instance, m[:x_so], only_nonzero)
+        write_u_se_solution(output_filepath, instance, m[:u_se], only_nonzero)
+        write_y_w_solution(output_filepath, instance, m[:y_w], m[:y]; only_nonzero = only_nonzero)
+        write_y_wts_solution(output_filepath, instance, m[:y_wts], only_nonzero)
+    else
+        @info("Model is not solved or feasible, no solution written")
+    end
+    #writes the sequences to a file
+    CSV.write(output_filepath * "sequences.csv", instance.scenarios)
+end
+
 
 function write_MALBP_W_solution_dynamic(output_filepath::String, instance::MALBP_W_instance, m::Model, only_nonzero::Bool=false)
     #If the output_filepath does not exist, make in

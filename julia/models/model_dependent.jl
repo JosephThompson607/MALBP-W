@@ -38,7 +38,7 @@ function define_md_linear_constraints!(m::Model, instance::MALBP_W_instance)
     #constraint 1: y_w and y must sum to the sum accross all stations of y_wts for each scenario and cycle
     for w in 1:instance.no_scenarios
         for t in 1:instance.no_cycles
-        @constraint(m, y +  y_w[w] == sum(y_wts[w, t, s] for s in 1:instance.equipment.no_stations))
+        @constraint(m, y +  y_w[w] >= sum(y_wts[w, t, s] for s in 1:instance.equipment.no_stations))
         end
     end
     #constraint 2: each task is assigned to exactly one station
@@ -144,6 +144,49 @@ function define_md_linear_redundant_constraints!(m::Model, instance::MALBP_W_ins
     end
 end
 
+function heuristic_start_md!(m::Model, instance::MALBP_W_instance; 
+                                    task_assign_func::Function = ehsans_heuristic, 
+                                    worker_assign_func::Function = base_worker_assign_func, 
+                                    equipment_assign_func::Function = base_equipment_assign_func)
+    #assigns tasks to stations
+    model_indexes = [i for (i, model_dict) in instance.models.models]
+    x_soi = m[:x_soi]
+    y_wts = m[:y_wts]
+    y_w = m[:y_w]
+    y = m[:y]
+    model_task_assignments = task_assign_func(instance)
+    println("MODEL TASK ASSIGNMENTS: ", model_task_assignments)
+    for (model, station_assignments) in model_task_assignments
+        i = findfirst( ==(model), model_indexes) 
+        for (station, tasks) in station_assignments
+            for task in tasks
+                set_start_value( x_soi[station, parse(Int,task), i], 1)
+            end
+        end
+    end
+    #assigns workers to stations
+    y_start, y_w_start, y_wts_start = worker_assign_func(instance, model_task_assignments)
+    println("y_start: ", y_start)
+    for w in 1:instance.no_scenarios
+        set_start_value(y_w[w], y_w_start[w])
+        for t in 1:instance.no_cycles
+            for s in 1:instance.equipment.no_stations
+                    set_start_value(y_wts[w, t, s], y_wts_start[w, t, s])
+            end
+        end
+    end
+    set_start_value(y, y_start)
+    #assigns equipment to stations
+    u_se = m[:u_se]
+    equipment_assignments = equipment_assign_func(instance, model_task_assignments)
+    for (station, equipment) in equipment_assignments
+        for e in equipment
+            set_start_value(u_se[station, e], 1.)
+        end
+    end
+
+
+end
 
 function define_md_linear!(m::Model, instance::MALBP_W_instance; preprocess = false)
     define_md_linear_vars!(m, instance)
@@ -152,6 +195,14 @@ function define_md_linear!(m::Model, instance::MALBP_W_instance; preprocess = fa
     if preprocess
         @info "Preprocessing: adding redundant constraints to the model"
         define_md_linear_redundant_constraints!(m, instance)
+        @info "using heuristic for initial task and worker assignments"
+        time_start = time()
+        heuristic_start_md!(m, 
+                        instance, 
+                        task_assign_func = ehsans_heuristic, 
+                        worker_assign_func = worker_assignment_heuristic, 
+                        equipment_assign_func = greedy_equipment_assignment_heuristic)
+        @info "Heuristic start time: ", time() - time_start
     end
 end
 

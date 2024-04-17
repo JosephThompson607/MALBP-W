@@ -14,8 +14,10 @@ include("read_MALBP_W.jl")
 include("output.jl")
 include("models/model_dependent.jl")
 include("models/dynamic.jl")
+include("models/fixed.jl")
 include("lns/lns.jl")
 include("heuristics/preprocessing.jl")
+include("heuristics/constructive.jl")
 
 
 
@@ -44,6 +46,34 @@ function MMALBP_W_model_dependent(instance::MALBP_W_instance, optimizer::Gurobi.
         write_to_file(m, output_filepath * "model.lp")
     end
     save_results(original_filepath * "md/", m, run_time, instance, output_filepath, "model_dependent_problem_linear_labor_recourse.csv")
+    
+    return m
+end
+
+function MMALBP_W_fixed(instance::MALBP_W_instance, optimizer::Gurobi.MathOptInterface.OptimizerWithAttributes, original_filepath::String, run_time::Real;preprocessing::Bool=false, save_variables::Bool=true, save_lp::Bool=false, slurm_array_ind::Union{Int, Nothing}=nothing)
+    #if directory is not made yet, make it
+    if !isnothing(slurm_array_ind)
+        output_filepath = original_filepath * "fixed/"* instance.name * "/slurm_" * string(slurm_array_ind) * "/"
+    else
+        output_filepath = original_filepath * "fixed/"* instance.name * "/"
+    end
+    if !isdir(output_filepath)
+        mkpath(output_filepath)
+    end
+    #creates the model
+    m = Model(optimizer)
+    set_optimizer_attribute(m, "LogFile", output_filepath * "gurobi.log")
+    #defines the model dependent parameters
+    define_fixed_linear!(m, instance; preprocess=preprocessing)
+    #writes the model to a file
+    optimize!(m)
+    if save_variables
+        write_MALBP_W_solution_fixed(output_filepath, instance, m, false)
+    end
+    if save_lp
+        write_to_file(m, output_filepath * "model.lp")
+    end
+    save_results(original_filepath * "fixed/", m, run_time, instance, output_filepath, "fixed_problem_linear_labor_recourse.csv")
     
     return m
 end
@@ -143,13 +173,15 @@ function MMALBP_from_yaml(config_filepath::String, output_filepath::String, run_
     now = Dates.now()
     now = Dates.format(now, "yyyy-mm-ddTHH:MM")
     output_filepath = xp_folder * "/" * now * "_" * output_filepath 
-    for milp in config_file["milp_models"]
-        for instance in instances
+    for instance in instances
+        for milp in config_file["milp_models"]
             @info "Running instance $(instance.name), of model $(milp). \n Output will be saved to $(output_filepath)"
             if milp== "model_dependent_problem_linear_labor_recourse"
                 m = MMALBP_W_model_dependent(instance, optimizer, output_filepath, run_time; save_variables= save_variables, save_lp=save_lp, preprocessing=preprocessing)
             elseif milp == "dynamic_problem_linear_labor_recourse"
                 m = MMALBP_W_dynamic(instance, optimizer, output_filepath, run_time; save_variables= save_variables, save_lp=save_lp)
+            elseif milp == "fixed_problem_linear_labor_recourse"
+                m = MMALBP_W_fixed(instance, optimizer, output_filepath, run_time; save_variables= save_variables, save_lp=save_lp)
             end
         end
     end
@@ -170,6 +202,8 @@ function MMALBP_from_csv_slurm(config_filepath::String, output_filepath::String,
                 m = MMALBP_W_model_dependent(instance, optimizer, output_filepath, run_time; save_variables= save_variables, save_lp=save_lp, slurm_array_ind=slurm_array_ind)
             elseif milp == "dynamic_problem_linear_labor_recourse"
                 m = MMALBP_W_dynamic(instance, optimizer, output_filepath, run_time; save_variables= save_variables, save_lp=save_lp, slurm_array_ind=slurm_array_ind)
+            elseif milp == "fixed_problem_linear_labor_recourse"
+                m = MMALBP_W_fixed(instance, optimizer, output_filepath, run_time; save_variables= save_variables, save_lp=save_lp, slurm_array_ind=slurm_array_ind)
             end
     end
 end

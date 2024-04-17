@@ -1,7 +1,7 @@
 using GLMakie
 using GraphMakie
 using Graphs
-include("../read_MALBP_W.jl")
+#include("../read_MALBP_W.jl")
 
 
 
@@ -29,7 +29,7 @@ function generate_precedence_graph(model::ModelInstance, task_to_index::Dict{Str
     return g
 end
 
-function calculate_positional_weight(model_name::String, model::ModelInstance , reverse::Bool = true)
+function calculate_positional_weight( model::ModelInstance; reverse::Bool=false)
     #calculates the positional weight of the tasks in the model
     task_to_index, index_to_task = create_correspondance_dicts(model)
     g = generate_precedence_graph(model, task_to_index)
@@ -57,7 +57,7 @@ function calculate_depedency_time(instance::MALBP_W_instance; reverse=false)
     #calculates the total task time of the tasks that are in the dependency graph of the model
     dependency_time = Dict{String, Dict{String, Float64}}()
     for (model_name, model) in instance.models.models
-        dependency_time[model_name] = calculate_positional_weight(model_name, model)
+        dependency_time[model_name] = calculate_positional_weight( model, reverse=reverse)
     end
     return dependency_time
 end
