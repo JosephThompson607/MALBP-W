@@ -186,6 +186,7 @@ end
 function necessary_workers(tasks::Vector{String}, cycle_time::Real, model::ModelInstance, productivity_per_worker::Array{Float64})
     #calculates the number of workers needed to complete the tasks
     remaining_time = sum([model.task_times[1][task] for task in tasks])
+
     for (worker, productivity) in enumerate(productivity_per_worker)
         available_task_time = cycle_time * productivity
         remaining_time -= available_task_time
@@ -193,8 +194,7 @@ function necessary_workers(tasks::Vector{String}, cycle_time::Real, model::Model
             return worker
         end
     end
-    @warn("Not enough workers to complete the tasks")
-
+    @warn("Not enough workers to complete the tasks for model $(model.name)")
     return length(productivity_per_worker)
 end
 
@@ -435,7 +435,7 @@ end
 
 
 function fill_station!(instance::MALBP_W_instance,
-                        model_unfinished::Vector{Bool},
+                        unfinished_tasks::Vector{Vector{String}},
                         station::Int, 
                         models::Vector{Tuple{ModelInstance, Int64}}, 
                         c_time_si::Array{Float64, 2}, 
@@ -443,47 +443,46 @@ function fill_station!(instance::MALBP_W_instance,
                         equipment_assignments::Dict{Int64, Vector{Int64}}, 
                         capabilities_so::Array{Int,2}, 
                         precedence_matrices::Dict{String, Dict})
-    dumb_dumb = 0
-    while any(c_time_si[station,:] .> 0) && any(model_unfinished) && dumb_dumb< 100
-        println("model unfinished: ", model_unfinished)
+    while any(c_time_si[station,:] .> 0) && any([length(unfinished_tasks[i])>0 for i in 1:length(unfinished_tasks)]) 
         for (model, i) in models
             #skip if there is no capacity at the station or the model is finished
-            if c_time_si[station, i] <= 0 || !model_unfinished[i]
+            if c_time_si[station, i] <= 0 || length(unfinished_tasks[i]) <=0
+                if length(unfinished_tasks[i]) <= 0
+                    c_time_si[station, i] = 0
+                end
                 continue
             end
             precedence_matrix = precedence_matrices[model.name]["precedence_matrix"]
-            index_to_task = precedence_matrices[model.name]["index_to_task"]
-            #available_tasks = findall(precedence_matrix[end, :] .== 0)
+            task_to_index = precedence_matrices[model.name]["task_to_index"]
             progress = false
-            for (task, value) in enumerate(precedence_matrix[end, :])
-                if capabilities_so[station, task] > 0 && value == 0
-                    c_time_si[station, i] -= model.task_times[1][index_to_task[task]]
-                    precedence_matrix[end, :] = precedence_matrix[end, :] .- precedence_matrix[task, :]
+            #equipment task indexes are different from the indexes in the precedence matrix
+            for task in unfinished_tasks[i]
+                task_index = task_to_index[task]
+                o = parse(Int, task)
+                if capabilities_so[station, o] > 0 && precedence_matrix[end, task_index] == 0
+                    c_time_si[station, i] -= model.task_times[1][task]
+                    precedence_matrix[end, :] = precedence_matrix[end, :] .- precedence_matrix[task_index, :]
                     #marks the task as complete
-                    precedence_matrix[end, task] = -1
+                    precedence_matrix[end, task_index] = -1
                     progress = true
-                    #equipment task indexes are different from the indexes in the precedence matrix
-                    o = parse(Int, index_to_task[task])
+                    #removes the tasks from the list of tasks 
+                    unfinished_tasks[i] = filter(x->x!=task, unfinished_tasks[i])
                     x_soi[station, o, i] = 1
                     if c_time_si[station, i] <= 0
                         break
                     end
                 end
             end
-            #adds a task and recalculates the equipment to accomodate it
+        #adds a task and recalculates the equipment to accomodate it
             if !progress
-                task = findfirst(precedence_matrix[end, :] .== 0)
-                if isnothing(task)
-                    println("model unfinished", model_unfinished)
-                    println("i: ", i)
-                    println("no task found")
-                    println("precedence_matrix: ", precedence_matrix[end, :])
-                end
-                c_time_si[station, i] -= model.task_times[1][index_to_task[task]]
-                precedence_matrix[end, :] = precedence_matrix[end, :] .- precedence_matrix[task, :]
+                task = popfirst!(unfinished_tasks[i])
+                task_index = task_to_index[task]
+                o = parse(Int, task)
+                c_time_si[station, i] -= model.task_times[1][task]
+                precedence_matrix[end, :] = precedence_matrix[end, :] .- precedence_matrix[task_index, :]
                 #marks the task as complete
-                precedence_matrix[end, task] = -1
-                x_soi[station, task, i] = 1
+                precedence_matrix[end, task_index] = -1
+                x_soi[station, o, i] = 1
                 x_soi_station = x_soi[station, :, :]
                 assigned_tasks = sum(x_soi_station, dims=2)
                 assigned_tasks = dropdims(assigned_tasks, dims=2)
@@ -492,60 +491,45 @@ function fill_station!(instance::MALBP_W_instance,
                 equipment_assignment, capabilities_so[station, :] = greedy_set_cover(assigned_tasks, instance, station)
                 equipment_assignments[station] = equipment_assignment
             end 
-            println("precedence matrix end", precedence_matrix[end, :])
-            println("all done: ", all(precedence_matrix[end, :] .< 0))
-            if all(precedence_matrix[end, :] .< 0)
-                model_unfinished[i] = false
-            end
-            println(" model unfinished: ", model_unfinished)
         end
-        dumb_dumb += 1
     end
 end
+
 
 function task_equip_heuristic(instance::MALBP_W_instance; order_function::Function = positional_weight_order)
     precedence_matrices = create_precedence_matrices(instance; order_function= order_function)
     #orders the models by decreasing probability
     models = [(model, index) for (index,(model_name, model)) in enumerate(instance.models.models)]
+    #we need to sort the tasks by the order function so that it is respected in the assignment
+    remaining_tasks = [ [task for (_, task) in order_function(model)] for (model,_) in models]
     models = sort(models, by=x->x[1].probability, rev=true)
     capabilities_so = zeros(Int, instance.equipment.no_stations, instance.equipment.no_tasks)
-    r_oe = permutedims((stack(instance.equipment.r_oe)), [2,1])
     c_time_si = calculate_c_time_si(instance)
     x_soi = zeros(Int, instance.equipment.no_stations, instance.equipment.no_tasks, instance.models.no_models)
     equipment_assignments = Dict{Int, Vector{Int64}}()
-    models_unfinished = fill(true, instance.models.no_models)
+    #Gets all of the remaining tasks for the two models
     for station in 1:instance.equipment.no_stations
-        fill_station!(instance, models_unfinished, station, models, c_time_si, x_soi, equipment_assignments, capabilities_so,  precedence_matrices)
+        fill_station!(instance, remaining_tasks, station, models, c_time_si, x_soi, equipment_assignments, capabilities_so,  precedence_matrices)
     end
     y, y_w, y_wts = worker_assignment_heuristic(instance, x_soi)
     return x_soi, y, y_w, y_wts, equipment_assignments
 end
 
 
-function task_equip_heuristic2(instance::MALBP_W_instance; order_function::Function = positional_weight_order)
-    precedence_matrices = create_precedence_matrices(instance; order_function= order_function)
-    #orders the models by decreasing probability
-    models = [(model, index) for (index,(model_name, model)) in enumerate(instance.models.models)]
-    models = sort(models, by=x->x[1].probability, rev=true)
-    capabilities_so = zeros(Int, instance.equipment.no_stations, instance.equipment.no_tasks)
-    r_oe = permutedims((stack(instance.equipment.r_oe)), [2,1])
-    c_time_si = calculate_c_time_si(instance)
-    x_soi = zeros(Int, instance.equipment.no_stations, instance.equipment.no_tasks, instance.models.no_models)
-    equipment_assignments = Dict{Int, Vector{Int64}}()
-    models_unfinished = fill(true, instance.models.no_models)
-    for station in 1:instance.equipment.no_stations
-        fill_station!(instance, models_unfinished, station, models, c_time_si, x_soi, equipment_assignments, capabilities_so,  precedence_matrices)
-    end
-    y, y_w, y_wts = worker_assignment_heuristic(instance, x_soi)
-    return x_soi, y, y_w, y_wts, equipment_assignments
-end
+
 
 #config_filepath = "SALBP_benchmark/MM_instances/julia_debug.yaml"
- config_filepath = "SALBP_benchmark/MM_instances/medium_instance_config_S10.yaml"
+config_filepath = "SALBP_benchmark/MM_instances/medium_instance_config_S10.yaml"
 instances = read_MALBP_W_instances(config_filepath)
-instance = instances[2]
+instance = instances[1]
 
-# x_soi, y, y_w, y_wts, equipment_assignments = task_equip_heuristic(instance)
+x_soi, y, y_w, y_wts, equipment_assignments = task_equip_heuristic2(instance)
+
+#println(findall(x->x>0, x_soi))
+# for (i, instance) in enumerate(instances)
+#     println(i, instance)
+#      x_soi, y, y_w, y_wts, equipment_assignments = task_equip_heuristic(instance)
+#      end
 # seq_equip_cost = calculate_equip_cost(equipment_assignments, instance)
 # seq_worker_cost = calculate_worker_cost(y, y_w, instance)
 # rev_seq_total = seq_equip_cost + seq_worker_cost
@@ -585,8 +569,14 @@ for instance in instances
     seq_worker_cost = calculate_worker_cost(y, y_w, instance)
     task_equip_total = seq_equip_cost + seq_worker_cost
 
-    push!(results, (instance.name, seq_total, two_step_total ,rev_seq_total, rev_two_step_total, task_equip_total))
-end
-#turns results to DataFrame
-results_df = DataFrame(results, [:instance, :seq_total, :two_step_total, :rev_seq_total, :rev_two_step_total, :task_equip_total])
-println(results_df)
+    x_soi, y, y_w, y_wts, equipment_assignments = task_equip_heuristic(instance; order_function = reverse_positional_weight_order)
+    seq_equip_cost = calculate_equip_cost(equipment_assignments, instance)
+    seq_worker_cost = calculate_worker_cost(y, y_w, instance)
+    task_equip_rev_total = seq_equip_cost + seq_worker_cost
+
+
+     push!(results, (instance.name, seq_total, two_step_total ,rev_seq_total, rev_two_step_total, task_equip_total, task_equip_rev_total))
+ end
+# #turns results to DataFrame
+ results_df = DataFrame(results, [:instance, :seq_total, :two_step_total, :rev_seq_total, :rev_two_step_total, :task_equip_total, :task_equip_rev_total])
+ println(results_df)
