@@ -1,5 +1,5 @@
-using GLMakie
-using GraphMakie
+#using GLMakie
+#using GraphMakie
 using Graphs
 #include("../read_MALBP_W.jl")
 
