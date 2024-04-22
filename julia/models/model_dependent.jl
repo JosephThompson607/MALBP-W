@@ -189,14 +189,14 @@ end
 
 
 
-function define_md_linear!(m::Model, instance::MALBP_W_instance; preprocess = false, start_heuristic::Function = sequential_heuristic_start_md)
+function define_md_linear!(m::Model, instance::MALBP_W_instance; preprocess = false, start_heuristic::Function = task_equip_heuristic)
     define_md_linear_vars!(m, instance)
     define_md_linear_obj!(m, instance)
     define_md_linear_constraints!(m, instance)   
     if preprocess
         @info "Preprocessing: adding redundant constraints to the model"
         define_md_linear_redundant_constraints!(m, instance)
-        @info "using heuristic for initial task and worker assignments"
+        @info "using heuristic $(start_heuristic) for initial task and worker assignments"
         time_start = time()
         #task_assignments, equip_assignments = MMALBP_W_model_dependent_decomposition_solve(instance; preprocessing=false)
         model_task_assignments, y_start, y_w_start, y_wts_start, equipment_assignments  = start_heuristic(instance)

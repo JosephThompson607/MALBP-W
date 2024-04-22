@@ -183,7 +183,7 @@ function ehsans_heuristic(instance::MALBP_W_instance; order_function::Function =
     return x_soi
 end
 
-function necessary_workers(tasks::Vector{String}, cycle_time::Real, model::ModelInstance, productivity_per_worker::Array{Float64})
+function necessary_workers(tasks::Vector{String}, cycle_time::Real, model::ModelInstance, productivity_per_worker::Array{Float64}= [1., 1., 1., 1.])
     #calculates the number of workers needed to complete the tasks
     remaining_time = sum([model.task_times[1][task] for task in tasks])
 
@@ -195,7 +195,7 @@ function necessary_workers(tasks::Vector{String}, cycle_time::Real, model::Model
         end
     end
     @warn("Not enough workers to complete the tasks for model $(model.name)")
-    return length(productivity_per_worker)
+    return length(productivity_per_worker) 
 end
 
 function base_worker_assign_func(instance::MALBP_W_instance, x_soi::Array{Int64,3}; productivity_per_worker::Array{Float64}= [1., 1., 1., 1.])
@@ -223,13 +223,27 @@ function worker_assignment_heuristic(instance::MALBP_W_instance, x_soi::Array{In
     y_wts = base_worker_assign_func(instance, x_soi, productivity_per_worker = productivity_per_worker)
     y_w = zeros(Int, instance.no_scenarios)
     y = 0
+    peak_wts = (0,0, 0)
     for (w, scenario) in enumerate(eachrow(instance.scenarios))
         for t in 1:instance.no_cycles
-            needed_workers = sum(y_wts[w, t, :])
-            y = max(y, needed_workers)
+            y_current = 0
+            peak_current =0
+            station_index = (0,0,0)
+            for (station,station_workers) in enumerate(y_wts[w, t, :])
+                if station_workers > peak_current
+                    peak_current = station_workers
+                    station_index = (w, t, station)
+                end
+                y_current += station_workers
+            end
+            if y_current > y
+                peak_wts = station_index
+                y = y_current
+            end
+
         end
     end
-    return y, y_w, y_wts
+    return y, y_w, y_wts, peak_wts
 end
 
 function greedy_set_cover(tasks_to_assign::Vector{Int}, instance::MALBP_W_instance, station::Int)
@@ -336,7 +350,7 @@ function two_step_ehsans(instance::MALBP_W_instance; order_function::Function = 
         x_soi[:,:,i] = model_assignments
         equipment_assignments = greedy_equipment_assignment_heuristic(instance, x_soi)
     end
-    y, y_w, y_wts = worker_assignment_heuristic(instance, x_soi)
+    y, y_w, y_wts, _ = worker_assignment_heuristic(instance, x_soi)
     
     return x_soi, y, y_w, y_wts, equipment_assignments
 end
@@ -511,20 +525,307 @@ function task_equip_heuristic(instance::MALBP_W_instance; order_function::Functi
     for station in 1:instance.equipment.no_stations
         fill_station!(instance, remaining_tasks, station, models, c_time_si, x_soi, equipment_assignments, capabilities_so,  precedence_matrices)
     end
-    y, y_w, y_wts = worker_assignment_heuristic(instance, x_soi)
+    y, y_w, y_wts, _ = worker_assignment_heuristic(instance, x_soi)
     return x_soi, y, y_w, y_wts, equipment_assignments
+end
+
+function x_soi_to_dict(instance::MALBP_W_instance, x_soi::Array{Int,3})
+    model_task_assignments_so = Dict{String, Dict{Int, Vector{String}}}()
+    model_task_assignments_os = Dict{String, Dict{String, Int}}()
+    for (i,(model_name, model)) in enumerate(instance.models.models)
+        model_task_assignments_so[model_name] = Dict{Int, Vector{String}}()
+        model_task_assignments_os[model_name] = Dict{String, Int}()
+        for station in 1:instance.equipment.no_stations
+            model_task_assignments_so[model_name][station] = []
+            for (task, _) in instance.models.models[model_name].task_times[1]
+                if x_soi[station, parse(Int, task), i] == 1
+                    model_task_assignments_os[model_name][task] = station
+                    push!(model_task_assignments_so[model_name][station], task)
+                end
+            end
+        end
+    end
+    return model_task_assignments_so, model_task_assignments_os
+end
+
+#For each task generates the list of tasks that are depending on it, and the list of tasks that it depends on
+function precedence_relations_dict(instance::MALBP_W_instance)
+    predecessors = Dict{String, Dict{String, Vector{String}}}()
+    successors = Dict{String, Dict{String, Vector{String}}}()
+    for (model_name, model) in instance.models.models
+        predecessors[model_name] = Dict{String, Vector{String}}()
+        successors[model_name] = Dict{String, Vector{String}}()
+        for (task_name , task) in model.task_times[1]
+            predecessors[model_name][task_name] = []
+            successors[model_name][task_name] = []
+            for (pred, suc) in model.precendence_relations
+                if pred == task_name
+                    push!(successors[model_name][task_name], suc)
+                end
+                if suc == task_name
+                    push!(predecessors[model_name][task_name], pred)
+                end
+            end
+        end
+    end
+    return predecessors, successors
+end
+
+
+function calculate_left(x_os::Dict{String, Dict{String, Int}}, task::String, model::String, predecessors::Dict{String, Dict{String, Vector{String}}}; _...)
+    left = 1
+    for pred in predecessors[model][task]
+        pred_station = x_os[model][pred]
+        if pred_station > left
+            left = pred_station
+        end
+    end
+    return left
+end
+
+function calculate_right(x_os::Dict{String, Dict{String, Int}}, task::String, model::String, successors::Dict{String, Dict{String, Vector{String}}}; max_stations::Int)
+    right = max_stations
+    for suc in successors[model][task]
+        suc_station = x_os[model][suc]
+        if suc_station < right
+            right = suc_station
+        end
+    end
+    return right
+end
+
+# function calculate_station_range(x_os::Dict{String, Dict{String, Int}}, task::String, model::String, predecessors::Dict{String, Dict{String, Vector{String}}}, successors::Dict{String, Dict{String, Vector{String}}})
+#     station = x_os[model][task]
+#     station_range = []
+#     left = calculate_left(x_os, task, model, predecessors)
+#     right = calculate_right(x_os, task, model, successors)
+#     station_range = collect(left: right )
+#     station_range = [s for s in station_range if s != station]
+#     return station_range
+# end
+
+#Calculates the number of workers needed at a station, returns nothing if the tasks cannot be completed
+function necessary_workers_w_block(tasks::Vector{String}, cycle_time::Real, model::ModelInstance, productivity_per_worker::Array{Float64}= [1., 1., 1., 1.])
+    #calculates the number of workers needed to complete the tasks
+    #println("tasks: ", tasks)
+    remaining_time = sum([model.task_times[1][task] for task in tasks])
+    #println("total task time: ", remaining_time)
+    for (worker, productivity) in enumerate(productivity_per_worker)
+        available_task_time = cycle_time * productivity
+        remaining_time -= available_task_time
+        if remaining_time <= 0
+            return worker
+        end
+    end
+    return nothing
 end
 
 
 
 
-#config_filepath = "SALBP_benchmark/MM_instances/julia_debug.yaml"
-config_filepath = "SALBP_benchmark/MM_instances/medium_instance_config_S10.yaml"
-instances = read_MALBP_W_instances(config_filepath)
-instance = instances[1]
+function opt1_insertion!(x_soi::Array{Int,3}, station::Int, left::Int, right::Int, task::String,model::String, i::Int, instance::MALBP_W_instance, x_os::Dict{String, Dict{String, Int}}, x_so::Dict{String, Dict{Int64, Vector{String}}})
+    o = parse(Int, task)
+    y_s = necessary_workers_w_block(x_so[model][station], instance.models.cycle_time, instance.models.models[model])
+    y_s_without_task = necessary_workers_w_block(filter(x->x!=task, x_so[model][station]), instance.models.cycle_time, instance.models.models[model])
+    for s_prime in left:right
+        y_s_prime = necessary_workers_w_block(x_so[model][s_prime], instance.models.cycle_time, instance.models.models[model])
+        total_workers = y_s + y_s_prime
+        new_y_sprime = necessary_workers_w_block([x_so[model][s_prime]; task], instance.models.cycle_time, instance.models.models[model])
+        if isnothing(new_y_sprime)
+            continue
+        end
+        new_workers = y_s_without_task + new_y_sprime
+        if new_workers < total_workers
+            push!(x_so[model][s_prime], task)
+            #remove the task from the previous station
+            x_so[model][station] = filter(x->x!=task, x_so[model][station])
+            x_os[model][task] = station
+            x_soi[station, o, i] = 0
+            x_soi[s_prime, o, i] = 1
+            return true
+        end 
+    end
+    return false
+end
 
-x_soi, y, y_w, y_wts, equipment_assignments = task_equip_heuristic2(instance)
+function task_1opt(instance::MALBP_W_instance, x_soi::Array{Int,3},; n_iterations::Int=100)
+    #calculates the total cost of the equipment assignments
+    #equipment_assignments = greedy_equipment_assignment_heuristic(instance, x_soi)
+    #y, y_w, y_wts, peak = worker_assignment_heuristic(instance, x_soi)
+    #calculates the total cost of the workers
+    #cost = calculate_worker_cost(y, y_w, instance)
+    #cost += calculate_equip_cost(equipment_assignments, instance)
+    predecessors, successors = precedence_relations_dict(instance)
+    counter = 0
+    x_so, x_os = x_soi_to_dict(instance, x_soi)
+    while counter < n_iterations
+        for (i,(model_name, model)) in enumerate(instance.models.models)
+            for (task1, station) in x_os[model_name]
+                left = calculate_left(x_os, task1, model_name, predecessors)
+                improvement = opt1_insertion!( x_soi, station, left, station-1, task1, model_name, i, instance ,x_os, x_so)
+                if improvement
+                    continue
+                end
+                right = calculate_right(x_os, task1, model_name, successors, max_stations = instance.equipment.no_stations)
+                improvement = opt1_insertion!(x_soi, station, station+1, right, task1, model_name, i, instance, x_os, x_so)
+            end
+        end
+        counter += 1
+    end
+    equipment_assignments = greedy_equipment_assignment_heuristic(instance, x_soi)
+    y, y_w, y_wts, peak = worker_assignment_heuristic(instance, x_soi)
 
+    return x_soi, y, y_w, y_wts, equipment_assignments
+end 
+
+
+function check_bounds(left::Int, right::Int, station::Int, x_os::Dict{String, Dict{String, Int}}, task::String, model::String, comp_dict::Dict{String, Dict{String, Vector{String}}}; max_stations::Int)
+    # We need to make sure that task2 is not being put before its predecessors
+    if left >= station
+        task_bounds = calculate_left(x_os, task, model, comp_dict)
+        if task_bounds > station
+            return false
+        else
+            return true
+        end
+    # We need to make sure that task2 is not being put after its successors
+    elseif right <= station
+        task_bounds = calculate_right(x_os, task, model, comp_dict, max_stations = max_stations)
+        if task_bounds < station
+            return false
+        else
+            return true
+        end
+    else
+        #println("left: ", left, " right: ", right, " station: ", station, " task: ", task, " model: ", model)
+        @warn("bounds improperly set for task $(task) at station $(station) in model $(model)")
+    end
+end
+
+function opt2_insertion!(x_soi::Array{Int,3}, 
+                        iteration ::Int,
+                        station::Int, 
+                        left::Int, 
+                        right::Int, 
+                        task::String,
+                        model::String, 
+                        i::Int, 
+                        instance::MALBP_W_instance, 
+                        comp_dict::Dict{String, Dict{String, Vector{String}}},
+                        x_os::Dict{String, Dict{String, Int}}, 
+                        x_so::Dict{String, Dict{Int64, Vector{String}}})
+    #we need to determine what function to use to check the other tasks
+    o = parse(Int, task)
+    #println("original station: ", station, " tasks: ", x_so[model][station])
+    y_s = necessary_workers_w_block(x_so[model][station], instance.models.cycle_time, instance.models.models[model])
+    #println("station: ", station, " task: ", task, " workers at station: ", y_s)
+    #println("left: ", left, " right: ", right)
+    for s_prime in left:right
+        #println("s prime: ", s_prime, "tasks: ", x_so[model][s_prime])
+        y_s_prime = necessary_workers_w_block(x_so[model][s_prime], instance.models.cycle_time, instance.models.models[model])
+        total_workers = y_s + y_s_prime
+        #println("s prime: ", s_prime, " s ", station, " task ", task, " total workers ", total_workers)
+        for task2 in x_so[model][s_prime]
+            #println("task2: ", task2)
+            removed_1 = filter(x->x!=task, x_so[model][station])
+            #println("removing task: ", task, " from station: ", station, " adding task: ", task2, )
+            new_y_s = necessary_workers_w_block([removed_1; task2], instance.models.cycle_time, instance.models.models[model])
+            #println(" removing task: ", task2, " from station: ", s_prime, " adding task: ", task,)
+            removed_2 = filter(x->x!=task2, x_so[model][s_prime])
+            new_y_sprime = necessary_workers_w_block([removed_2; task], instance.models.cycle_time, instance.models.models[model])
+            #Swaps are invalid if they violate worker or precedence constraints
+            
+            # if check_bounds(left, right, station, x_os, task2, model, comp_dict, max_stations = instance.equipment.no_stations)
+            #     println("task2: ", task2, " sprime ", s_prime, " task1: ", task,  " station ", station, " left ", left, " right ", right,)
+            #     println( " x_o2s ", x_os[model][task2], " station ", station, " x_o1s ", x_os[model][task], " comp_dict ", comp_dict[model][task2])
+            # end
+  
+
+            if isnothing(new_y_s) || isnothing(new_y_sprime) || !check_bounds(left, right, station, x_os, task2, model, comp_dict, max_stations = instance.equipment.no_stations)
+                continue
+            end
+            new_workers = new_y_s + new_y_sprime
+            #println("y_s_prime: ", y_s_prime, " new_y_sprime: ", new_y_sprime, " y_s: ", y_s, " new y_s: ", new_y_s)
+            #println("new_workers: ", new_workers, " total workers ", total_workers)
+            
+            if new_workers < total_workers || (new_workers == total_workers && rand() < (0.5))
+                println("IMPROVEMENT", " total workers ", total_workers, " new workers ", new_workers, " diff: ", total_workers - new_workers)
+                o2 = parse(Int, task2)
+                # update x_so
+                push!(x_so[model][s_prime], task)
+                push!(x_so[model][station], task2)
+                x_so[model][s_prime] = filter(x->x!=task2, x_so[model][s_prime])
+                x_so[model][station] = filter(x->x!=task, x_so[model][station])
+                #update x_os
+                x_os[model][task] = station
+                x_os[model][task2] = s_prime
+                #update x_soi
+                x_soi[s_prime, o, i] = 1
+                x_soi[s_prime, o2, i] = 0
+                x_soi[station, o, i] = 0
+                x_soi[station, o2, i] = 1
+                return true
+            end 
+        end
+    end
+    return false
+end
+
+function task_2opt(instance::MALBP_W_instance, x_soi::Array{Int,3},; n_iterations::Int=100)
+    #calculates the total cost of the equipment assignments
+    #equipment_assignments = greedy_equipment_assignment_heuristic(instance, x_soi)
+    #y, y_w, y_wts, peak = worker_assignment_heuristic(instance, x_soi)
+    #calculates the total cost of the workers
+    #cost = calculate_worker_cost(y, y_w, instance)
+    #cost += calculate_equip_cost(equipment_assignments, instance)
+    predecessors, successors = precedence_relations_dict(instance)
+    counter = 0
+    x_so, x_os = x_soi_to_dict(instance, x_soi)
+    while counter < n_iterations
+        for (i,(model_name, model)) in enumerate(instance.models.models)
+            for (task1, station) in x_os[model_name]
+                left = calculate_left(x_os, task1, model_name, predecessors)
+                #println("task 1: ", task1, " station: ", station)
+                #println("LEFT: ", left)
+                improvement = opt2_insertion!( x_soi, counter, station, left, station-1, task1, model_name, i, instance ,  successors, x_os, x_so)
+                if improvement
+                    continue
+                end
+                right = calculate_right(x_os, task1, model_name, successors, max_stations = instance.equipment.no_stations)
+                #println("RIGHT: ", right)
+                improvement = opt2_insertion!(x_soi, counter, station, station+1, right, task1, model_name, i, instance, predecessors, x_os, x_so)
+            end
+        end
+        counter += 1
+    end
+    equipment_assignments = greedy_equipment_assignment_heuristic(instance, x_soi)
+    y, y_w, y_wts, peak = worker_assignment_heuristic(instance, x_soi)
+
+    return x_soi, y, y_w, y_wts, equipment_assignments
+end 
+
+
+
+
+# config_filepath = "SALBP_benchmark/MM_instances/julia_debug.yaml"
+# #config_filepath = "SALBP_benchmark/MM_instances/medium_instance_config_S10.yaml"
+# instances = read_MALBP_W_instances(config_filepath)
+# instance = instances[2]
+
+# x_soi, y, y_w, y_wts, equipment_assignments = task_equip_heuristic(instance)
+# total_cost = calculate_equip_cost(equipment_assignments, instance) + calculate_worker_cost(y, y_w, instance)
+# println("original cost: ", total_cost, " y ", y, " u_se ", equipment_assignments)
+
+
+# # x_soi, y, y_w, y_wts, equipment_assignments = task_1opt(instance, x_soi, n_iterations=100)
+# # total_cost = calculate_equip_cost(equipment_assignments, instance) + calculate_worker_cost(y, y_w, instance)
+# # println("new cost: ", total_cost, " y ", y, " u_se ", equipment_assignments)
+# 5000
+# x_soi, y, y_w, y_wts, equipment_assignments = task_2opt(instance, x_soi, n_iterations= 10000 )
+# total_cost = calculate_equip_cost(equipment_assignments, instance) + calculate_worker_cost(y, y_w, instance)
+# println("new cost 2opt: ", total_cost, " y ", y, " u_se ", equipment_assignments)
+
+#x_soi, y, y_w, y_wts, equipment_assignments = task_1opt(instance, x_soi, equipment_assignments)
 #println(findall(x->x>0, x_soi))
 # for (i, instance) in enumerate(instances)
 #     println(i, instance)
@@ -541,42 +842,42 @@ x_soi, y, y_w, y_wts, equipment_assignments = task_equip_heuristic2(instance)
 # x_soi = ehsans_heuristic(instance)
 # u_se = greedy_equipment_assignment_heuristic(instance, x_soi)
 # y, y_w, y_wts = worker_assignment_heuristic(instance, x_soi)
-results = []
-for instance in instances
-    model_task_assignments, y, y_w, y_wts, equipment_assignments = sequential_heuristic_start_md(instance; order_function = reverse_positional_weight_order)
-    seq_equip_cost = calculate_equip_cost(equipment_assignments, instance)
-    seq_worker_cost = calculate_worker_cost(y, y_w, instance)
-    rev_seq_total = seq_equip_cost + seq_worker_cost
+# results = []
+# for instance in instances
+#     model_task_assignments, y, y_w, y_wts, equipment_assignments = sequential_heuristic_start_md(instance; order_function = reverse_positional_weight_order)
+#     seq_equip_cost = calculate_equip_cost(equipment_assignments, instance)
+#     seq_worker_cost = calculate_worker_cost(y, y_w, instance)
+#     rev_seq_total = seq_equip_cost + seq_worker_cost
 
-    model_task_assignments, y, y_w, y_wts, equipment_assignments = sequential_heuristic_start_md(instance)
-    seq_equip_cost = calculate_equip_cost(equipment_assignments, instance)
-    seq_worker_cost = calculate_worker_cost(y, y_w, instance)
-    seq_total = seq_equip_cost + seq_worker_cost
+#     model_task_assignments, y, y_w, y_wts, equipment_assignments = sequential_heuristic_start_md(instance)
+#     seq_equip_cost = calculate_equip_cost(equipment_assignments, instance)
+#     seq_worker_cost = calculate_worker_cost(y, y_w, instance)
+#     seq_total = seq_equip_cost + seq_worker_cost
 
-    model_task_assignments, y, y_w, y_wts, equipment_assignments = two_step_ehsans(instance)
-    two_step_equip_cost = calculate_equip_cost(equipment_assignments, instance)
-    two_step_worker_cost = calculate_worker_cost(y, y_w, instance)
-    two_step_total = two_step_equip_cost + two_step_worker_cost
-
-
-    model_task_assignments, y, y_w, y_wts, equipment_assignments = two_step_ehsans(instance; order_function = reverse_positional_weight_order, reverse=true)
-    two_step_equip_cost = calculate_equip_cost(equipment_assignments, instance)
-    two_step_worker_cost = calculate_worker_cost(y, y_w, instance)
-    rev_two_step_total = two_step_equip_cost + two_step_worker_cost
-
-    x_soi, y, y_w, y_wts, equipment_assignments = task_equip_heuristic(instance)
-    seq_equip_cost = calculate_equip_cost(equipment_assignments, instance)
-    seq_worker_cost = calculate_worker_cost(y, y_w, instance)
-    task_equip_total = seq_equip_cost + seq_worker_cost
-
-    x_soi, y, y_w, y_wts, equipment_assignments = task_equip_heuristic(instance; order_function = reverse_positional_weight_order)
-    seq_equip_cost = calculate_equip_cost(equipment_assignments, instance)
-    seq_worker_cost = calculate_worker_cost(y, y_w, instance)
-    task_equip_rev_total = seq_equip_cost + seq_worker_cost
+#     model_task_assignments, y, y_w, y_wts, equipment_assignments = two_step_ehsans(instance)
+#     two_step_equip_cost = calculate_equip_cost(equipment_assignments, instance)
+#     two_step_worker_cost = calculate_worker_cost(y, y_w, instance)
+#     two_step_total = two_step_equip_cost + two_step_worker_cost
 
 
-     push!(results, (instance.name, seq_total, two_step_total ,rev_seq_total, rev_two_step_total, task_equip_total, task_equip_rev_total))
- end
-# #turns results to DataFrame
- results_df = DataFrame(results, [:instance, :seq_total, :two_step_total, :rev_seq_total, :rev_two_step_total, :task_equip_total, :task_equip_rev_total])
- println(results_df)
+#     model_task_assignments, y, y_w, y_wts, equipment_assignments = two_step_ehsans(instance; order_function = reverse_positional_weight_order, reverse=true)
+#     two_step_equip_cost = calculate_equip_cost(equipment_assignments, instance)
+#     two_step_worker_cost = calculate_worker_cost(y, y_w, instance)
+#     rev_two_step_total = two_step_equip_cost + two_step_worker_cost
+
+#     x_soi, y, y_w, y_wts, equipment_assignments = task_equip_heuristic(instance)
+#     seq_equip_cost = calculate_equip_cost(equipment_assignments, instance)
+#     seq_worker_cost = calculate_worker_cost(y, y_w, instance)
+#     task_equip_total = seq_equip_cost + seq_worker_cost
+
+#     x_soi, y, y_w, y_wts, equipment_assignments = task_equip_heuristic(instance; order_function = reverse_positional_weight_order)
+#     seq_equip_cost = calculate_equip_cost(equipment_assignments, instance)
+#     seq_worker_cost = calculate_worker_cost(y, y_w, instance)
+#     task_equip_rev_total = seq_equip_cost + seq_worker_cost
+
+
+#      push!(results, (instance.name, seq_total, two_step_total ,rev_seq_total, rev_two_step_total, task_equip_total, task_equip_rev_total))
+#  end
+# # #turns results to DataFrame
+#  results_df = DataFrame(results, [:instance, :seq_total, :two_step_total, :rev_seq_total, :rev_two_step_total, :task_equip_total, :task_equip_rev_total])
+#  println(results_df)
