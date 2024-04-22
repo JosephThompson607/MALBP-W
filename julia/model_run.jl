@@ -23,7 +23,7 @@ include("heuristics/md_warmstart.jl")
 
 
 
-function MMALBP_W_model_dependent(instance::MALBP_W_instance, optimizer::Gurobi.MathOptInterface.OptimizerWithAttributes, original_filepath::String, run_time::Real;preprocessing::Bool=false, save_variables::Bool=true, save_lp::Bool=false, slurm_array_ind::Union{Int, Nothing}=nothing)
+function MMALBP_W_model_dependent(instance::MALBP_W_instance, optimizer::Gurobi.MathOptInterface.OptimizerWithAttributes, original_filepath::String, run_time::Real; preprocessing::Bool=false, save_variables::Bool=true, save_lp::Bool=false, slurm_array_ind::Union{Int, Nothing}=nothing)
     #if directory is not made yet, make it
     if !isnothing(slurm_array_ind)
         output_filepath = original_filepath * "md/"* instance.name * "/slurm_" * string(slurm_array_ind) * "/"
@@ -79,7 +79,7 @@ function MMALBP_W_fixed(instance::MALBP_W_instance, optimizer::Gurobi.MathOptInt
     return m
 end
 
-function MMALBP_W_dynamic( instance::MALBP_W_instance, optimizer::Gurobi.MathOptInterface.OptimizerWithAttributes, original_filepath::String, run_time::Real; save_variables::Bool=true, save_lp::Bool=false, slurm_array_ind::Union{Int, Nothing}=nothing)
+function MMALBP_W_dynamic( instance::MALBP_W_instance, optimizer::Gurobi.MathOptInterface.OptimizerWithAttributes, original_filepath::String, run_time::Real; save_variables::Bool=true, save_lp::Bool=false, slurm_array_ind::Union{Int, Nothing}=nothing, preprocessing::Bool=false, )
     
     #if directory is not made yet, make it
     if !isnothing(slurm_array_ind)
@@ -94,7 +94,7 @@ function MMALBP_W_dynamic( instance::MALBP_W_instance, optimizer::Gurobi.MathOpt
     m = Model(optimizer)
     set_optimizer_attribute(m, "LogFile", output_filepath * "gurobi.log")
     #defines the model dependent parameters
-    define_dynamic_linear!(m, instance)
+    define_dynamic_linear!(m, instance, preprocessing=preprocessing)
     #writes the model to a file
     optimize!(m)
     if save_variables
@@ -108,7 +108,7 @@ function MMALBP_W_dynamic( instance::MALBP_W_instance, optimizer::Gurobi.MathOpt
     return m
 end
 
-function MMALBP_W_dynamic_ws( instance::MALBP_W_instance, optimizer::Gurobi.MathOptInterface.OptimizerWithAttributes, original_filepath::String, run_time::Real; save_variables::Bool=true, save_lp::Bool=false, warmstart_vars::String="", md_obj_val::Real=0.0, slurm_array_ind::Union{Int, Nothing}=nothing)
+function MMALBP_W_dynamic_ws( instance::MALBP_W_instance, optimizer::Gurobi.MathOptInterface.OptimizerWithAttributes, original_filepath::String, run_time::Real; save_variables::Bool=true, save_lp::Bool=false, warmstart_vars::String="", md_obj_val::Real=0.0, slurm_array_ind::Union{Int, Nothing}=nothing, preprocessing::Bool=false)
     #if directory is not made yet, make it
     if !isnothing(slurm_array_ind)
         output_filepath = original_filepath * "dynamic/"* instance.name * "/slurm_" * string(slurm_array_ind) * "/"
@@ -122,7 +122,7 @@ function MMALBP_W_dynamic_ws( instance::MALBP_W_instance, optimizer::Gurobi.Math
     m = Model(optimizer)
     set_optimizer_attribute(m, "LogFile", output_filepath * "gurobi.log")
     #defines the model dependent parameters
-    define_dynamic_linear!(m, instance, warmstart_vars)
+    define_dynamic_linear!(m, instance, warmstart_vars, preprocessing=preprocessing)
     #writes the model to a file
     optimize!(m)
     if save_variables
@@ -137,7 +137,7 @@ function MMALBP_W_dynamic_ws( instance::MALBP_W_instance, optimizer::Gurobi.Math
 end
 
 function MMALBP_W_dynamic_lns( instance::MALBP_W_instance, optimizer::Gurobi.MathOptInterface.OptimizerWithAttributes, original_filepath::String, run_time::Real, search_strategy::String; 
-                                save_variables::Bool=true, save_lp::Bool=false, warmstart_vars::String="", md_obj_val::Real=0.0, slurm_array_ind::Union{Int, Nothing}=nothing)
+                                save_variables::Bool=true, save_lp::Bool=false, warmstart_vars::String="", md_obj_val::Real=0.0, slurm_array_ind::Union{Int, Nothing}=nothing, preprocessing::Bool=false)
     #if directory is not made yet, make it
     if !isnothing(slurm_array_ind)
         output_filepath = original_filepath * "dynamic/"* instance.name * "/slurm_" * string(slurm_array_ind) * "/"
@@ -151,7 +151,7 @@ function MMALBP_W_dynamic_lns( instance::MALBP_W_instance, optimizer::Gurobi.Mat
     m = Model(optimizer)
     set_optimizer_attribute(m, "LogFile", output_filepath * "gurobi.log")
     #defines the  dyanmic model parameters
-    define_dynamic_linear!(m, instance, warmstart_vars)
+    define_dynamic_linear!(m, instance, warmstart_vars, preprocessing=preprocessing)
     #solves the model in a lns loop
     obj_dict, best_obj = large_neighborhood_search!(m, instance, search_strategy; lns_res_fp= output_filepath  * "lns_results.csv", md_obj_val=md_obj_val, run_time=run_time)
     if save_variables
@@ -180,7 +180,7 @@ function MMALBP_from_yaml(config_filepath::String, output_filepath::String, run_
             if milp== "model_dependent_problem_linear_labor_recourse"
                 m = MMALBP_W_model_dependent(instance, optimizer, output_filepath, run_time; save_variables= save_variables, save_lp=save_lp, preprocessing=preprocessing)
             elseif milp == "dynamic_problem_linear_labor_recourse"
-                m = MMALBP_W_dynamic(instance, optimizer, output_filepath, run_time; save_variables= save_variables, save_lp=save_lp)
+                m = MMALBP_W_dynamic(instance, optimizer, output_filepath, run_time; save_variables= save_variables, save_lp=save_lp, preprocessing=preprocessing)
             elseif milp == "fixed_problem_linear_labor_recourse"
                 m = MMALBP_W_fixed(instance, optimizer, output_filepath, run_time; save_variables= save_variables, save_lp=save_lp)
             end
@@ -188,7 +188,7 @@ function MMALBP_from_yaml(config_filepath::String, output_filepath::String, run_
     end
 end
 
-function MMALBP_from_csv_slurm(config_filepath::String, output_filepath::String, run_time::Float64, save_variables::Bool, save_lp::Bool, slurm_array_ind::Int ; xp_folder::String="model_runs")
+function MMALBP_from_csv_slurm(config_filepath::String, output_filepath::String, run_time::Float64, save_variables::Bool, save_lp::Bool, slurm_array_ind::Int ; xp_folder::String="model_runs", preprocessing::Bool=false)
     
     instances = read_slurm_csv(config_filepath)
     optimizer = optimizer_with_attributes(() -> Gurobi.Optimizer(GRB_ENV), "TimeLimit" => run_time)
@@ -200,16 +200,16 @@ function MMALBP_from_csv_slurm(config_filepath::String, output_filepath::String,
     for milp in config_file["milp_models"]
             @info "Running instance $(instance.name), of model $(milp). \n Output will be saved to $(output_filepath)"
             if milp== "model_dependent_problem_linear_labor_recourse"
-                m = MMALBP_W_model_dependent(instance, optimizer, output_filepath, run_time; save_variables= save_variables, save_lp=save_lp, slurm_array_ind=slurm_array_ind)
+                m = MMALBP_W_model_dependent(instance, optimizer, output_filepath, run_time; save_variables= save_variables, save_lp=save_lp, slurm_array_ind=slurm_array_ind,  preprocessing=preprocessing)
             elseif milp == "dynamic_problem_linear_labor_recourse"
-                m = MMALBP_W_dynamic(instance, optimizer, output_filepath, run_time; save_variables= save_variables, save_lp=save_lp, slurm_array_ind=slurm_array_ind)
+                m = MMALBP_W_dynamic(instance, optimizer, output_filepath, run_time; save_variables= save_variables, save_lp=save_lp, slurm_array_ind=slurm_array_ind, preprocessing=preprocessing)
             elseif milp == "fixed_problem_linear_labor_recourse"
                 m = MMALBP_W_fixed(instance, optimizer, output_filepath, run_time; save_variables= save_variables, save_lp=save_lp, slurm_array_ind=slurm_array_ind)
             end
     end
 end
 
-function warmstart_dynamic(config_filepath::String, output_filepath::String, run_time::Float64, save_variables::Bool, save_lp::Bool; xp_folder::String="model_runs")
+function warmstart_dynamic(config_filepath::String, output_filepath::String, run_time::Float64, save_variables::Bool, save_lp::Bool; xp_folder::String="model_runs", preprocessing=preprocessing)
     instances = read_md_results(config_filepath)
     optimizer = optimizer_with_attributes(() -> Gurobi.Optimizer(GRB_ENV), "TimeLimit" => run_time)
     #adds the date and time to the output file path
@@ -218,11 +218,11 @@ function warmstart_dynamic(config_filepath::String, output_filepath::String, run
     output_filepath = xp_folder * "/" * now * "_" * output_filepath 
     for (instance, var_folder, md_obj_val) in instances
         @info "Running instance $(instance.name), from $(config_filepath). \n Output will be saved to $(output_filepath)"
-        MMALBP_W_dynamic_ws(instance, optimizer, output_filepath, run_time; save_variables= save_variables, save_lp=save_lp, warmstart_vars= var_folder, md_obj_val= md_obj_val)
+        MMALBP_W_dynamic_ws(instance, optimizer, output_filepath, run_time; save_variables= save_variables, save_lp=save_lp, warmstart_vars= var_folder, md_obj_val= md_obj_val, preprocessing=preprocessing)
     end
 end
 
-function MMALBP_W_LNS(config_filepath::String, output_filepath::String, run_time::Float64, save_variables::Bool, save_lp::Bool, search_strategy_fp::String; xp_folder::String="model_runs")
+function MMALBP_W_LNS(config_filepath::String, output_filepath::String, run_time::Float64, save_variables::Bool, save_lp::Bool, search_strategy_fp::String; xp_folder::String="model_runs", preprocessing=preprocessing)
     instances = read_md_results(config_filepath)
     optimizer = optimizer_with_attributes(() -> Gurobi.Optimizer(GRB_ENV), "TimeLimit" => run_time)
     #adds the date and time to the output file path
@@ -231,12 +231,12 @@ function MMALBP_W_LNS(config_filepath::String, output_filepath::String, run_time
     output_filepath = xp_folder * "/" * now * "_" * output_filepath 
     for (instance, var_folder, md_obj_val) in instances
         @info "Running instance $(instance.name), from $(config_filepath). \n Output will be saved to $(output_filepath)"
-        MMALBP_W_dynamic_lns(instance, optimizer, output_filepath, run_time,  search_strategy_fp; save_variables= save_variables, save_lp=save_lp, warmstart_vars= var_folder, md_obj_val= md_obj_val)
+        MMALBP_W_dynamic_lns(instance, optimizer, output_filepath, run_time,  search_strategy_fp; save_variables= save_variables, save_lp=save_lp, warmstart_vars= var_folder, md_obj_val= md_obj_val, preprocessing=preprocessing)
     end
 end
 
 #Runs the LNS model on a list of instances using a slurm array index
-function MMALBP_W_LNS(config_filepath::String, output_filepath::String, run_time::Float64, save_variables::Bool, save_lp::Bool, search_strategy_fp::String, slurm_array_ind::Int; xp_folder::String="model_runs")
+function MMALBP_W_LNS(config_filepath::String, output_filepath::String, run_time::Float64, save_variables::Bool, save_lp::Bool, search_strategy_fp::String, slurm_array_ind::Int; xp_folder::String="model_runs", preprocessing=preprocessing)
     instances = read_md_results(config_filepath)
     optimizer = optimizer_with_attributes(() -> Gurobi.Optimizer(GRB_ENV), "TimeLimit" => run_time)
     #adds the date and time to the output file path
@@ -245,7 +245,7 @@ function MMALBP_W_LNS(config_filepath::String, output_filepath::String, run_time
     output_filepath = xp_folder * "/" * now * "_" * output_filepath 
     instance, var_folder, md_obj_val = instances[slurm_array_ind]
     @info "Running instance $(instance.name), from $(config_filepath). \n Output will be saved to $(output_filepath)"
-    MMALBP_W_dynamic_lns(instance, optimizer, output_filepath, run_time,  search_strategy_fp; save_variables= save_variables, save_lp=save_lp, warmstart_vars= var_folder, md_obj_val= md_obj_val, slurm_array_ind=slurm_array_ind)
+    MMALBP_W_dynamic_lns(instance, optimizer, output_filepath, run_time,  search_strategy_fp; save_variables= save_variables, save_lp=save_lp, warmstart_vars= var_folder, md_obj_val= md_obj_val, slurm_array_ind=slurm_array_ind, preprocessing=preprocessing)
 end
 
 function parse_commandline()
@@ -298,9 +298,9 @@ function main()
     if parsed_args["xp_type"] == "config_yaml"
         MMALBP_from_yaml(parsed_args["config_file"], output_file,parsed_args["run_time"], parsed_args["save_variables"], parsed_args["save_lp"]; preprocessing=parsed_args["preprocessing"] )
     elseif parsed_args["xp_type"] == "warmstart"
-        warmstart_dynamic(parsed_args["config_file"], output_file,parsed_args["run_time"], parsed_args["save_variables"], parsed_args["save_lp"] )
+        warmstart_dynamic(parsed_args["config_file"], output_file,parsed_args["run_time"], parsed_args["save_variables"], parsed_args["save_lp"];  preprocessing=parsed_args["preprocessing"] )
     elseif parsed_args["xp_type"] == "csv_slurm"
-        MMALBP_from_csv_slurm(parsed_args["config_file"], output_file,parsed_args["run_time"], parsed_args["save_variables"], parsed_args["save_lp"], parsed_args["slurm_array_ind"] )
+        MMALBP_from_csv_slurm(parsed_args["config_file"], output_file,parsed_args["run_time"], parsed_args["save_variables"], parsed_args["save_lp"], parsed_args["slurm_array_ind"];  preprocessing=parsed_args["preprocessing"] )
         if isnothing(parsed_args["slurm_array_ind"])
             error("Slurm array index is required for slurm experiments")
         end
@@ -308,7 +308,7 @@ function main()
         if isnothing(parsed_args["LNS_config"]) && parsed_args["xp_type"] == "lns"
             error("LNS config file is required for LNS experiments")
         end
-        MMALBP_W_LNS(parsed_args["config_file"], output_file,parsed_args["run_time"], parsed_args["save_variables"], parsed_args["save_lp"], parsed_args["LNS_config"] )
+        MMALBP_W_LNS(parsed_args["config_file"], output_file,parsed_args["run_time"], parsed_args["save_variables"], parsed_args["save_lp"], parsed_args["LNS_config"], preprocessing=parsed_args["preprocessing"] )
     elseif parsed_args["xp_type"] == "slurm_array_lns"
         if isnothing(parsed_args["LNS_config"]) && parsed_args["xp_type"] == "lns"
             error("LNS config file is required for LNS experiments")

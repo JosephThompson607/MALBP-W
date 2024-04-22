@@ -198,16 +198,73 @@ function warmstart_dynamic_from_md_setup!(m::Model, vars_fp::String, instance::M
     end
 end
 
-
-function define_dynamic_linear!(m::Model, instance::MALBP_W_instance)
-    define_dynamic_linear_vars!(m, instance)
-    define_dynamic_linear_obj!(m, instance)
-    define_dynamic_linear_constraints!(m, instance)   
+function define_dynamic_linear_redundant_constraints!(m::Model, instance::MALBP_W_instance)
+    # usesful variables
+    model_indexes = [i for (i, model_dict) in instance.models.models]
+    #model variables
+    x_wsoj = m[:x_wsoj]
+    #PREPROCESSING 1: TASKS cannot be to early or too late
+    #calculates the infeasible task assignments
+    infeasible_tasks_forward, infeasible_tasks_backwards = get_infeasible_task_assignments(instance; productivity_per_worker = Dict(1=>1., 2=>1., 3=>1., 4=>1.))
+    #prohibits the infeasible task assignments
+    for (w,scenario) in enumerate(eachrow(instance.scenarios))
+        for j in 1:instance.sequence_length
+            model = scenario.sequence[j]
+            tasks = infeasible_tasks_forward[model]
+            for (task, stations) in tasks
+                for station in stations
+                    @constraint(m, x_wsoj[w, station, parse(Int,task), j] == 0)
+                end
+            end
+            model = scenario.sequence[j]
+            tasks = infeasible_tasks_backwards[model]
+            for (task, stations) in tasks
+                for station in stations
+                    @constraint(m, x_wsoj[w, station, parse(Int,task), j] == 0)
+                end
+            end
+        end
+    end
+    #PREPROCESSING 2: Pairs of tasks that take up a large amount of time cannot both be started too late or too early
+    #calculates the infeasible task pairs
+    infeasible_pairs_forward, infeasible_pairs_backwards = get_infeasible_assignment_pairs(instance; productivity_per_worker = Dict(1=>1., 2=>1., 3=>1., 4=>1.)) 
+    #prohibits the infeasible task pairs
+    for (w,scenario) in enumerate(eachrow(instance.scenarios))
+        for j in 1:instance.sequence_length
+            model = scenario.sequence[j]
+            pairs = infeasible_pairs_forward[model]
+            for ((task1, task2), stations) in pairs
+                for station in stations
+                    @constraint(m, x_wsoj[w, station, parse(Int,task1), j] + x_wsoj[w, station, parse(Int,task2), j] <= 1)
+                end
+            end
+            pairs = infeasible_pairs_backwards[model]
+            for ((task1, task2), stations) in pairs
+                for station in stations
+                    @constraint(m, x_wsoj[w, station, parse(Int,task1), j] + x_wsoj[w, station, parse(Int,task2), j] <= 1)
+                end
+            end
+        end
+    end
 end
 
-function define_dynamic_linear!(m::Model, instance::MALBP_W_instance, warmstart_vars_fp::String)
+
+function define_dynamic_linear!(m::Model, instance::MALBP_W_instance; preprocessing = true)
+    define_dynamic_linear_vars!(m, instance)
+    define_dynamic_linear_obj!(m, instance)
+    define_dynamic_linear_constraints!(m, instance)
+    if preprocessing   
+        define_dynamic_linear_redundant_constraints!(m, instance)
+    end
+
+end
+
+function define_dynamic_linear!(m::Model, instance::MALBP_W_instance, warmstart_vars_fp::String; preprocessing = true)
     define_dynamic_linear_vars!(m, instance)
     warmstart_dynamic_from_md_setup!(m, warmstart_vars_fp, instance)
     define_dynamic_linear_obj!(m, instance)
     define_dynamic_linear_constraints!(m, instance)   
+    if preprocessing   
+        define_dynamic_linear_redundant_constraints!(m, instance)
+    end
 end
