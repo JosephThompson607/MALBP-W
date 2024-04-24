@@ -55,7 +55,7 @@ function large_neighborhood_search!(m::Model, instance::MALBP_W_instance, search
     seed = lns_conf.seed
     #sets the time limit for the model
     set_optimizer_attribute(m, "TimeLimit", lns_conf.rep.repair_kwargs["time_limit"])
-    write_to_file(m, "my_model.mps")
+    #write_to_file(m, "my_model.mps")
     start_time = time()
     obj_vals = []
     incumbent = Inf
