@@ -59,7 +59,7 @@ function define_dynamic_linear_constraints!(m::Model, instance::MALBP_W_instance
     #constraint 1: y_w and y must sum to the sum accross all stations of y_wts for each scenario and cycle
     for w in 1:instance.no_scenarios
         for t in 1:instance.no_cycles
-        @constraint(m, y +  y_w[w] == sum(y_wts[w, t, s] for s in 1:instance.equipment.no_stations))
+        @constraint(m, y +  y_w[w] >= sum(y_wts[w, t, s] for s in 1:instance.equipment.no_stations))
         end
     end
     #constraint 2: each task is assigned to exactly one station
