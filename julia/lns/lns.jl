@@ -8,7 +8,8 @@ include("adapt_strategies.jl")
 
 #function to unfix all fixed variables in the model and load their 
 function unfix_vars!(m::Model , instance::MALBP_W_instance)
-    x_wsoj = m[:x_wsoj]
+    
+
     u_se = m[:u_se]
     y_wts = m[:y_wts]
     y_w = m[:y_w]
@@ -18,9 +19,22 @@ function unfix_vars!(m::Model , instance::MALBP_W_instance)
         set_lower_bound(y, 0)
     end
     #unfixes task assignment variables
-    for x in x_wsoj
-        if is_fixed(x)
-            unfix(x)
+    #if the model has x_wsoj
+    if haskey(m, :x_wsoj)
+        x_wsoj = m[:x_wsoj]
+        for x in x_wsoj
+            if is_fixed(x)
+                unfix(x)
+            end
+        end
+   
+    #if the model has x_soi
+    elseif haskey(m, :x_soi)
+        x_soi = m[:x_soi]
+        for x in x_soi
+            if is_fixed(x)
+                unfix(x)
+            end
         end
     end
     #unfixes equipment assignment variables
@@ -50,8 +64,8 @@ end
 
 
 
-function large_neighborhood_search!(m::Model, instance::MALBP_W_instance, search_strategy_fp::String; lns_res_fp::String="", md_obj_val::Union{Nothing, Float64}=nothing, run_time::Real=600.0 )
-    lns_conf = read_search_strategy_YAML(search_strategy_fp, run_time)
+function large_neighborhood_search!(m::Model, instance::MALBP_W_instance, search_strategy_fp::String; lns_res_fp::String="", md_obj_val::Union{Nothing, Float64}=nothing, run_time::Real=600.0, model_dependent=false )
+    lns_conf = read_search_strategy_YAML(search_strategy_fp, run_time, model_dependent=model_dependent)
     seed = lns_conf.seed
     #sets the time limit for the model
     set_optimizer_attribute(m, "TimeLimit", lns_conf.rep.repair_kwargs["time_limit"])

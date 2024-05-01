@@ -5,6 +5,7 @@ end
 
 mutable struct DestroyOp
     name::String
+    destroy_list::Array{Function}
     destroy!::Function
     kwargs::Dict
     old_kwargs::Dict
@@ -32,9 +33,10 @@ end
 
 function DestroyOp(destroy!::Function,  destroy_kwargs::Dict; 
         destroy_weights::Dict=Dict{String, Float64}("random_model_destroy!"=>1., "random_station_destroy!"=>1., "random_subtree_destroy!"=>1.),
-        weight_update::Function = no_weight_update)
+        weight_update::Function = no_weight_update,
+        destroy_list::Array{Function} = [random_model_destroy!, random_station_destroy!, random_subtree_destroy!])
     old_destroy_kwargs = deepcopy(destroy_kwargs)
-    return DestroyOp(string(destroy!), destroy!, destroy_kwargs, old_destroy_kwargs, destroy_weights, weight_update)
+    return DestroyOp(string(destroy!),destroy_list, destroy!, destroy_kwargs, old_destroy_kwargs, destroy_weights, weight_update)
 end
 
 function update_destroy_operator!(des::DestroyOp, new_destroy!::Function)
@@ -48,7 +50,7 @@ end
 
 
 
-function read_search_strategy_YAML(config_filepath::String, run_time::Float64)
+function read_search_strategy_YAML(config_filepath::String, run_time::Float64; model_dependent::Bool=false)
     config_file = YAML.load(open(config_filepath))
     #if the LNS section is not in the config file, return an empty dictionary
 
@@ -59,7 +61,7 @@ function read_search_strategy_YAML(config_filepath::String, run_time::Float64)
         config_file["lns"]["time_limit"] = run_time
     end
     search_strategy = config_file["lns"]
-    search_strategy = get_search_strategy_config(search_strategy)
+    search_strategy = get_search_strategy_config(search_strategy; model_dependent=model_dependent)
     return search_strategy
 end
 
@@ -143,7 +145,7 @@ function configure_change(search_strategy::Dict)
     return change_op
 end
 
-function configure_destroy(search_strategy::Dict)
+function configure_destroy(search_strategy::Dict; model_dependent::Bool=false)
     if !haskey(search_strategy, "destroy") || !haskey(search_strategy["destroy"], "operator")
         @info "No destroy specified, defaulting to random_station_destroy"
         search_strategy["destroy"] = Dict()
@@ -153,6 +155,29 @@ function configure_destroy(search_strategy::Dict)
         weight_update = no_weight_update
     else
         @info "Deconstructor specified: $(search_strategy["destroy"]["operator"])"
+        if (haskey(search_strategy, "formulation") && search_strategy["formulation"] == "md") || model_dependent
+            @info "Running model depedent formulation"
+            destroy_list = [random_station_destroy_md!, random_model_destroy_md!]
+            if haskey(search_strategy["destroy"], "operator")
+                destroy = search_strategy["destroy"]["operator"]
+            else
+                @info destroy operator specified, defaulting to random
+                destroy = "random"
+            end
+            if destroy == "random_station" || destroy == "random_station_destroy!"
+                destroy_op = random_station_destroy_md!
+            elseif destroy == "random_model" || destroy == "random_model_destroy!"
+                destroy_op = random_model_destroy_md!
+            elseif destroy == "random_start" || destroy == "random"
+                destroy_op = rand(destroy_list)
+                @info "Deconstructor operator $(destroy) recognized, randomly selected $(destroy_op) from destroy operators"
+            else
+                @error "Deconstructor operator $(destroy) not recognized"
+            end
+            search_strategy["destroy"]["destroy_weights"] = Dict("random_station_destroy_md!"=>0.5, "random_model_destroy_md!"=>0.5)
+    else
+
+        destroy_list = [random_station_destroy!, random_subtree_destroy!, random_model_destroy!]
         destroy = search_strategy["destroy"]["operator"]
         if destroy == "random_station" || destroy == "random_station_destroy!"
             destroy_op = random_station_destroy!
@@ -161,11 +186,12 @@ function configure_destroy(search_strategy::Dict)
         elseif destroy == "random_model" || destroy == "random_model_destroy!"
             destroy_op = random_model_destroy!
         elseif destroy == "random_start" || destroy == "random"
-            destroy_op = rand([random_station_destroy!, random_subtree_destroy!, random_model_destroy!])
-            @info "Deconstructor operator $(destroy) recognized, randomly selected $(destroy_op) from destroy operators"
+            destroy_op = rand(destroy_list)
+            @info "randomly selected $(destroy_op) from destroy operators"
         else
             @error "Deconstructor operator $(destroy) not recognized"
         end
+    end
         if !haskey(search_strategy["destroy"], "kwargs")
             @info "No destroy arguments specified, defaulting to n_destroy=2"
             destroy_kwargs = Dict("n_destroy"=>2, "des_decay"=>0.9)
@@ -208,7 +234,8 @@ function configure_destroy(search_strategy::Dict)
     destroy_operator = DestroyOp(destroy_op, 
                         destroy_kwargs; 
                         destroy_weights=search_strategy["destroy"]["destroy_weights"], 
-                        weight_update=weight_update)
+                        weight_update=weight_update,
+                        destroy_list=destroy_list)
     return destroy_operator
 end
 
@@ -240,7 +267,7 @@ function configure_repair(search_strategy::Dict)
     return repair_operator
 end
 
-function get_search_strategy_config(search_strategy::Dict)
+function get_search_strategy_config(search_strategy::Dict; model_dependent::Bool=false)
     if !haskey(search_strategy, "n_iterations")
         @info "No number of iterations specified, defaulting to 10000"
         search_strategy["n_iterations"] = 10000
@@ -277,7 +304,7 @@ function get_search_strategy_config(search_strategy::Dict)
     #repair configuration
     repair_op = configure_repair(search_strategy)
     #destroy configuration
-    destroy_op = configure_destroy(search_strategy)
+    destroy_op = configure_destroy(search_strategy; model_dependent=model_dependent)
     #change configuration
     change_op = configure_change(search_strategy)
     #setting the seed (if not none)

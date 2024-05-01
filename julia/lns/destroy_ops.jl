@@ -29,6 +29,31 @@ function random_model_destroy!(m::Model, instance::MALBP_W_instance; seed:: Unio
     end
 end
 
+function random_model_destroy_md!(m::Model, instance::MALBP_W_instance; seed:: Union{Nothing, Int}=nothing, n_destroy::Int=1,_...)
+    if !isnothing(seed)
+        Random.seed!(seed)
+    end
+    if n_destroy >= instance.models.no_models
+        @info "n_destroy is greater than the number of models, setting n_destroy to the number of models"
+        return
+    else
+        models = sample(collect(keys(instance.models.models)), n_destroy)
+    end
+    x_soi = m[:x_soi]
+    y_wts = m[:y_wts]
+    #fixes the task assignment, equipment, and worker assignment for the models that are not in the models list
+    println("models: ", models)
+    model_indexes = Dict(model_name => i for (i, model_name) in enumerate(keys(instance.models.models)))
+    for (model_name, data) in instance.models.models
+        if  model_name in models
+            continue
+        else
+            i  = model_indexes[model_name]
+            fix.(x_soi[ :, :, i], start_value.(x_soi[ :, :, i]), force=true)
+        end
+    end
+end
+
 function random_station_destroy!(m::Model, instance::MALBP_W_instance; seed::Union{Nothing, Int}=nothing, n_destroy::Int=1, _...)
     #if the seed is not none, set the seed
     if !isnothing(seed)
@@ -51,6 +76,35 @@ function random_station_destroy!(m::Model, instance::MALBP_W_instance; seed::Uni
             continue
         else
             fix.(x_wsoj[:, s, :, :], start_value.(x_wsoj[:, s, :, :]), force=true)
+            fix.(u_se[s, :], start_value.(u_se[s, :]), force=true)
+            fix.(y_wts[:, :, s], start_value.(y_wts[:, :, s]), force=true)
+        end
+    end
+end
+
+#Randomly destroys stations for the md formulation
+function random_station_destroy_md!(m::Model, instance::MALBP_W_instance; seed::Union{Nothing, Int}=nothing, n_destroy::Int=1, _...)
+    #if the seed is not none, set the seed
+    if !isnothing(seed)
+        Random.seed!(seed)
+    end
+    #randomly select no_stations stations to remove
+    if n_destroy >= instance.equipment.no_stations
+        @info "n_destroy is greater than the number of stations, setting n_destroy to the number of stations"
+        return
+    else
+        station = rand(1:(instance.equipment.no_stations - n_destroy+1) )
+        stations = [station:station + n_destroy-1;]
+    end
+    x_soi = m[:x_soi]
+    u_se = m[:u_se]
+    y_wts = m[:y_wts]
+    #fixes the task assignment, equipment, and worker assignment for the stations that are not in the stations list
+    for s in 1:instance.equipment.no_stations
+        if s in stations
+            continue
+        else
+            fix.(x_soi[ s, :, :], start_value.(x_soi[ s, :, :]), force=true)
             fix.(u_se[s, :], start_value.(u_se[s, :]), force=true)
             fix.(y_wts[:, :, s], start_value.(y_wts[:, :, s]), force=true)
         end

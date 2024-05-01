@@ -34,7 +34,8 @@ end
 
 #selects new destroy randomly from destroy operators using their weight
 function select_destroy!(lns_obj::LNSConf; filter_out_current=true)
-    operator_list = [random_station_destroy!, random_subtree_destroy!,random_model_destroy!]
+    operator_list = lns_obj.des.destroy_list
+    println("operator_list: ", operator_list)
     destroy_weights = copy(lns_obj.des.destroy_weights)
     #filters out the current operator
     if filter_out_current
@@ -43,7 +44,9 @@ function select_destroy!(lns_obj::LNSConf; filter_out_current=true)
     end
     weights = collect(values(destroy_weights))
     destroy_names = collect(keys(destroy_weights))
+    println("destroy names: ", destroy_names)
     destroy_choice = sample(destroy_names, Weights(weights))
+    println("destroy_choice: ", destroy_choice)
     destroy = operator_list[findfirst(x -> string(x) == destroy_choice, operator_list)]
     update_destroy_operator!(lns_obj.des, destroy)
 end

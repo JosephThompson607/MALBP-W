@@ -158,6 +158,7 @@ function set_initial_values!(m::Model, instance::MALBP_W_instance;
     y_wts = m[:y_wts]
     y_w = m[:y_w]
     y = m[:y]
+    u_se = m[:u_se]
 
     #assigns tasks to stations
     for s in 1:instance.equipment.no_stations
@@ -179,7 +180,11 @@ function set_initial_values!(m::Model, instance::MALBP_W_instance;
     end
     set_start_value(y, y_start)
     #assigns equipment to stations
-    u_se = m[:u_se]
+    for s in 1:instance.equipment.no_stations
+        for e in 1:instance.equipment.no_equipment
+            set_start_value(u_se[s, e], 0)
+        end
+    end
     for (station, equipment) in equipment_assignments
         for e in equipment
             set_start_value(u_se[station, e], 1.)

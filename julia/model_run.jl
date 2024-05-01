@@ -166,6 +166,36 @@ function MMALBP_W_dynamic_lns( instance::MALBP_W_instance, optimizer::Gurobi.Mat
     return m
 end
 
+function MMALBP_W_md_lns( instance::MALBP_W_instance, optimizer::Gurobi.MathOptInterface.OptimizerWithAttributes, original_filepath::String, run_time::Real, search_strategy::String; 
+                                save_variables::Bool=true, save_lp::Bool=false, slurm_array_ind::Union{Int, Nothing}=nothing, preprocessing::Bool=true)
+    #if directory is not made yet, make it
+    if !isnothing(slurm_array_ind)
+        output_filepath = original_filepath * "md/"* instance.name * "/slurm_" * string(slurm_array_ind) * "/"
+    else
+        output_filepath = original_filepath * "md/"* instance.name * "/"
+    end
+    if !isdir(output_filepath )
+        mkpath(output_filepath)
+    end
+    #creates the model
+    m = Model(optimizer)
+    set_optimizer_attribute(m, "LogFile", output_filepath * "gurobi.log")
+    #defines the  dyanmic model parameters
+    define_md_linear!(m, instance; preprocess=true)
+    #solves the model in a lns loop
+    obj_dict, best_obj = large_neighborhood_search!(m, instance, search_strategy; lns_res_fp= output_filepath  * "lns_results.csv",  run_time=run_time, model_dependent=true)
+    if save_variables
+        write_MALBP_W_solution_md(output_filepath, instance, m, false)
+    end
+    #writes the model to a file
+    if save_lp
+        write_to_file(m, output_filepath * "model.lp")
+    end
+    #saves the objective function, relative gap, run time, and instance_name to a file
+    save_results(original_filepath * "md/", m, run_time, instance, output_filepath, "md_lns_results.csv"; best_obj_val = best_obj)
+    return m
+end
+
 function MMALBP_from_yaml(config_filepath::String, output_filepath::String, run_time::Float64, save_variables::Bool, save_lp::Bool; xp_folder::String="model_runs", preprocessing::Bool=false)
     config_file = get_instance_YAML(config_filepath)
     instances = read_MALBP_W_instances(config_filepath)
@@ -185,6 +215,21 @@ function MMALBP_from_yaml(config_filepath::String, output_filepath::String, run_
                 m = MMALBP_W_fixed(instance, optimizer, output_filepath, run_time; save_variables= save_variables, save_lp=save_lp)
             end
         end
+    end
+end
+
+function MMALBP_md_lns_from_yaml(config_filepath::String, output_filepath::String, run_time::Float64, save_variables::Bool, save_lp::Bool, search_strategy_fp::String; xp_folder::String="model_runs", preprocessing::Bool=false)
+    config_file = get_instance_YAML(config_filepath)
+    instances = read_MALBP_W_instances(config_filepath)
+    optimizer = optimizer_with_attributes(() -> Gurobi.Optimizer(GRB_ENV), "TimeLimit" => run_time)
+    #adds the date and time to the output file path
+    now = Dates.now()
+    now = Dates.format(now, "yyyy-mm-ddTHH:MM")
+    output_filepath = xp_folder * "/" * now * "_" * output_filepath 
+    for instance in instances
+        @info "Running instance $(instance.name), \n Output will be saved to $(output_filepath)"
+        m = MMALBP_W_md_lns(instance, optimizer, output_filepath, run_time, search_strategy_fp; save_variables= save_variables, save_lp=save_lp, preprocessing=preprocessing)
+
     end
 end
 
@@ -304,6 +349,11 @@ function main()
         if isnothing(parsed_args["slurm_array_ind"])
             error("Slurm array index is required for slurm experiments")
         end
+    elseif parsed_args["xp_type"] == "lns_md"
+        if isnothing(parsed_args["LNS_config"]) && parsed_args["xp_type"] == "lns"
+            error("LNS config file is required for LNS experiments")
+        end
+        MMALBP_md_lns_from_yaml(parsed_args["config_file"], output_file,parsed_args["run_time"], parsed_args["save_variables"], parsed_args["save_lp"], parsed_args["LNS_config"]; preprocessing=parsed_args["preprocessing"] )
     elseif parsed_args["xp_type"] == "lns"
         if isnothing(parsed_args["LNS_config"]) && parsed_args["xp_type"] == "lns"
             error("LNS config file is required for LNS experiments")

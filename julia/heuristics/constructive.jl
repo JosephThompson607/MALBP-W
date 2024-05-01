@@ -85,62 +85,6 @@ function create_precedence_matrices(instance::MALBP_W_instance; order_function::
     end
     return matrix_dict
 end
- 
- 
- #Function for calculating the stating number of workers at each station
- function chunk_out_tasks(productivity_per_worker::Dict{Int, Float64}, instance::MALBP_W_instance, remaining_time::Real)
-    #Here we assume tasks will be evenely distributed among stations.
-    workers_per_station = zeros(Int, instance.no_stations)
-    available_station_time = zeros(Int, instance.no_stations)
-    #sorts the dictionary by key
-    productivity_per_worker = sort(collect(productivity_per_worker), by=x->x[1])
-    #assigns workers to stations, starting with the most productive workers (first workers)
-    for (worker, productivity) in productivity_per_worker
-        for station in 1:instance.no_stations
-            available_task_time = instance.models.cycle_time * productivity
-            remaining_time -= available_task_time
-            workers_per_station[station] += 1
-            available_station_time[station] += available_task_time
-            if remaining_time <= 0
-                return workers_per_station, available_station_time
-            end
-        end
-    end
-    error("Not enough workers to complete the tasks")
-end
-
-
-function calculate_min_workers(instance::MALBP_W_instance, productivity_per_worker::Dict{Int, Float64})
-    min_workers = Dict{String, Dict}()
-    for (model_name, model) in instance.models.models
-        remaining_time = sum([time for (task, time) in model.task_times[1]])
-        workers_per_station, available_station_time = chunk_out_tasks(productivity_per_worker, instance, remaining_time)
-        min_workers[model_name] = Dict("workers_per_station" => workers_per_station, 
-                                    "available_station_time"=> available_station_time, 
-                                    "total_workers" => sum(workers_per_station))
-    end
-    
-    return min_workers
-end
-
-function md_assign_tasks(instance::MALBP_W_instance; productivity_per_worker::Dict{Int, Float64}= Dict(1=>1., 2=>1., 3=>1., 4=>1.), priority!::Function= x->x)
-    #creates a vector of remaining time left in the station. The length is the number of stations, and the value is the cycle time
-    min_workers = calculate_min_workers(instance, productivity_per_worker)
-    remaining_time = fill(instance.cycle_time, instance.no_stations)
-
-    #creates a matrix from the prededence constraints. The matrix is a boolean matrix with 1 if the task is a predecessor of the task in the column
-    #and 0 otherwise
-    precedence_matrix_dict = create_precedence_matrices(instance)
-
-
-    for model in instance.models
-        for (task, time) in model.task_times
-            
-        end
-    end
-
-
-end
 
 function calculate_new_cycle_time(model::ModelInstance, no_stations::Int, cycle_time::Int)
     #calculates the new cycle time based on the heuristic
