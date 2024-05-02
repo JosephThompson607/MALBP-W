@@ -178,7 +178,6 @@ function configure_destroy(search_strategy::Dict; model_dependent::Bool=false)
             end
             search_strategy["destroy"]["destroy_weights"] = Dict("random_station_destroy_md!"=>0.5, "random_model_destroy_md!"=>0.5)
     else
-
         destroy_list = [random_station_destroy!, random_subtree_destroy!, random_model_destroy!]
         destroy = search_strategy["destroy"]["operator"]
         if destroy == "random_station" || destroy == "random_station_destroy!"
@@ -189,6 +188,8 @@ function configure_destroy(search_strategy::Dict; model_dependent::Bool=false)
             destroy_op = random_model_destroy!
         elseif destroy == "random_station_model" || destroy == "random_station_model_destroy!"
             destroy_op = random_station_model_destroy!
+        elseif destroy == "peak_station" || destroy == "peak_station_destroy!"
+            destroy_op = peak_station_destroy!
         elseif destroy == "random_start" || destroy == "random"
             destroy_op = rand(destroy_list)
             @info "randomly selected $(destroy_op) from destroy operators"

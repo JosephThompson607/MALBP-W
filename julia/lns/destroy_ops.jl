@@ -54,7 +54,6 @@ function random_model_destroy_md!(m::Model, instance::MALBP_W_instance; seed:: U
         models = sample(collect(keys(instance.models.models)), n_destroy)
     end
     x_soi = m[:x_soi]
-    y_wts = m[:y_wts]
     #fixes the task assignment, equipment, and worker assignment for the models that are not in the models list
     println("models: ", models)
     model_indexes = Dict(model_name => i for (i, model_name) in enumerate(keys(instance.models.models)))
@@ -146,6 +145,52 @@ function random_subtree_destroy!(m::Model, instance::MALBP_W_instance; seed::Uni
             #fixes the task assignment and worker assignment for the stations that are not in the stations list
             fix.(x_wsoj[w, :, :, :], start_value.(x_wsoj[w, :, :, :]), force=true)
             fix.(y_wts[w, :, :], start_value.(y_wts[w, :, :]), force=true)
+        end
+    end
+end
+
+function peak_station_destroy!(m::Model, instance::MALBP_W_instance; seed::Union{Nothing, Int}=nothing, n_destroy::Int=1, _...)
+    println("running peak station destroy")
+    #if the seed is not none, set the seed
+    if !isnothing(seed)
+        Random.seed!(seed)
+    end
+    y_wts = m[:y_wts]
+
+    station_workers = []
+    for s in 1:instance.equipment.no_stations
+        push!(station_workers, sum(start_value.(y_wts[:, :, s])))
+    end
+    println("station workers: ", station_workers)
+    max_station = argmax(station_workers)
+    println("max station: ", max_station)
+
+    #randomly select no_stations stations to remove
+    if n_destroy >= instance.equipment.no_stations
+        @info "n_destroy is greater than the number of stations, setting n_destroy to the number of stations"
+        return
+    else
+        left = max_station - floor(n_destroy/2)
+        if left < 1
+            left = 1
+            right = n_destroy
+        else
+            right = max_station + ceil(n_destroy/2)
+        end
+        stations = [left:right;]
+        println("stations: ", stations)
+    end
+    x_wsoj = m[:x_wsoj]
+    u_se = m[:u_se]
+    
+    #fixes the task assignment, equipment, and worker assignment for the stations that are not in the stations list
+    for s in 1:instance.equipment.no_stations
+        if s in stations
+            continue
+        else
+            fix.(x_wsoj[:, s, :, :], start_value.(x_wsoj[:, s, :, :]), force=true)
+            fix.(u_se[s, :], start_value.(u_se[s, :]), force=true)
+            fix.(y_wts[:, :, s], start_value.(y_wts[:, :, s]), force=true)
         end
     end
 end
