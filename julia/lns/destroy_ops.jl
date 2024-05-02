@@ -29,6 +29,20 @@ function random_model_destroy!(m::Model, instance::MALBP_W_instance; seed:: Unio
     end
 end
 
+#calls the random station destroy and the random model destroy functions, good for larger instances
+function random_station_model_destroy!(m::Model, instance::MALBP_W_instance; seed::Union{Nothing, Int}=nothing, n_destroy::Int=1, _...)
+    random_model_destroy!(m, instance; seed=seed, n_destroy=n_destroy)
+    random_station_destroy!(m, instance; seed=seed, n_destroy=n_destroy)
+end
+
+#calls the random station destroy and the random model destroy functions for the model dependent formulation, good for larger instances
+function random_station_model_destroy_md!(m::Model, instance::MALBP_W_instance; seed::Union{Nothing, Int}=nothing, n_destroy::Int=1, _...)
+    random_model_destroy_md!(m, instance; seed=seed, n_destroy=n_destroy)
+    random_station_destroy_md!(m, instance; seed=seed, n_destroy=n_destroy)
+end
+
+
+#randomly destroys models for the md formulation
 function random_model_destroy_md!(m::Model, instance::MALBP_W_instance; seed:: Union{Nothing, Int}=nothing, n_destroy::Int=1,_...)
     if !isnothing(seed)
         Random.seed!(seed)

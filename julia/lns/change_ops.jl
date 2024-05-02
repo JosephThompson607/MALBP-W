@@ -5,11 +5,11 @@ function no_change!(iter_no_improve::Int, lns_obj::LNSConf, m::Model; _...)
 end
 
 function decrement_y!(iter_no_improve::Int, lns_obj::LNSConf, m::Model; _...)
-    if iter_no_improve % lns_obj.change.kwargs[:change_freq] == 0
+    if iter_no_improve > 0 && iter_no_improve % lns_obj.change.kwargs[:change_freq] == 0
         y = m[:y]
         fix.(y, start_value(y)-1, force=true)
 
-    elseif iter_no_improve % lns_obj.change.kwargs[:change_freq] in [1:lns_obj.change.kwargs[:fix_steps];];
+    elseif iter_no_improve > 0 && iter_no_improve % lns_obj.change.kwargs[:change_freq] in [1:lns_obj.change.kwargs[:fix_steps];];
         y = m[:y]
         fix.(y, start_value(y), force=true)
     end
@@ -17,7 +17,7 @@ function decrement_y!(iter_no_improve::Int, lns_obj::LNSConf, m::Model; _...)
 end
 
 function increase_destroy!(iter_no_improve::Int, lns_obj::LNSConf, m::Model; _...)
-    if iter_no_improve % lns_obj.change.kwargs[:change_freq] == 0
+    if iter_no_improve > 0 &&  iter_no_improve % lns_obj.change.kwargs[:change_freq] == 0 
         lns_obj.des.kwargs[:n_destroy] += 1
     end
     return iter_no_improve, lns_obj, m
@@ -25,7 +25,7 @@ end
 
 function change_destroy!(iter_no_improve::Int, lns_obj::LNSConf, m::Model;  
                             filter_out_current = true, _...)
-    if iter_no_improve % lns_obj.change.kwargs[:change_freq] == 0
+    if iter_no_improve > 0 && iter_no_improve % lns_obj.change.kwargs[:change_freq] == 0
         #randomly chooses from the destroy operators
         select_destroy!(lns_obj; filter_out_current=filter_out_current)
     end
@@ -53,7 +53,7 @@ end
 
 #increases the size of destroy block if no improvement until it reaches a limit, then changes the destroy operator
 function change_destroy_increase_size!(iter_no_improve::Int, lns_obj::LNSConf, m::Model; filter_out_current=true,  _...)
-    if iter_no_improve % lns_obj.change.kwargs[:change_freq] == 0
+    if iter_no_improve > 0 && iter_no_improve % lns_obj.change.kwargs[:change_freq] == 0
         if lns_obj.des.kwargs[:n_destroy] < lns_obj.des.kwargs[:destroy_limit] 
             lns_obj.des.kwargs[:n_destroy] += 1
         else
@@ -68,7 +68,7 @@ end
 
 #increases the runtime of the repair operator by 1 minute
 function increase_repair_time!(iter_no_improve::Int, lns_obj::LNSConf, m::Model; _...)
-    if iter_no_improve % lns_obj.change.kwargs[:change_freq] == 0
+    if iter_no_improve > 0 && iter_no_improve % lns_obj.change.kwargs[:change_freq] == 0
         lns_obj.rep.repair_kwargs["time_limit"] += 60
         set_optimizer_attribute(m, "TimeLimit", lns_obj.rep.repair_kwargs["time_limit"])
     end

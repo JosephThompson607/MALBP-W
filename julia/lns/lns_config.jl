@@ -168,6 +168,8 @@ function configure_destroy(search_strategy::Dict; model_dependent::Bool=false)
                 destroy_op = random_station_destroy_md!
             elseif destroy == "random_model" || destroy == "random_model_destroy!"
                 destroy_op = random_model_destroy_md!
+            elseif destroy == "random_station_model" || destroy == "random_station_model_destroy!"
+                destroy_op = random_station_model_destroy_md!
             elseif destroy == "random_start" || destroy == "random"
                 destroy_op = rand(destroy_list)
                 @info "Deconstructor operator $(destroy) recognized, randomly selected $(destroy_op) from destroy operators"
@@ -185,6 +187,8 @@ function configure_destroy(search_strategy::Dict; model_dependent::Bool=false)
             destroy_op = random_subtree_destroy!
         elseif destroy == "random_model" || destroy == "random_model_destroy!"
             destroy_op = random_model_destroy!
+        elseif destroy == "random_station_model" || destroy == "random_station_model_destroy!"
+            destroy_op = random_station_model_destroy!
         elseif destroy == "random_start" || destroy == "random"
             destroy_op = rand(destroy_list)
             @info "randomly selected $(destroy_op) from destroy operators"

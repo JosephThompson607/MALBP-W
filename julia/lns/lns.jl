@@ -130,7 +130,8 @@ function large_neighborhood_search!(m::Model, instance::MALBP_W_instance, search
                                     current_best = incumbent)
             #Don't change the shaking operator in the first few iterations
             lns_conf.change.change!(iter_no_improve, lns_conf, m; iteration=i, iteration_time=iteration_time, lns_conf.change.kwargs... )
-            @info "iter_no_improve: $iter_no_improve , iteration: $i, operator: $(lns_conf.des.name), change_operator: $(lns_conf.change.change!)"
+            @info "iter_no_improve: $iter_no_improve , iteration: $i, operator: $(lns_conf.des.name), change_operator: $(lns_conf.change.change!), 
+            destroy size $(lns_conf.des.kwargs)"
         end
 
     end
