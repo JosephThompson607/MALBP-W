@@ -233,6 +233,20 @@ function MMALBP_md_lns_from_yaml(config_filepath::String, output_filepath::Strin
     end
 end
 
+function MMALBP_md_lns_from_slurm(config_filepath::String, output_filepath::String, run_time::Float64, save_variables::Bool, save_lp::Bool, search_strategy_fp::String, slurm_array_ind::Int; xp_folder::String="model_runs", preprocessing::Bool=false)
+    config_file = get_instance_YAML(config_filepath)
+    instances = read_slurm_csv(config_filepath)
+    optimizer = optimizer_with_attributes(() -> Gurobi.Optimizer(GRB_ENV), "TimeLimit" => run_time)
+    #adds the date and time to the output file path
+    now = Dates.now()
+    now = Dates.format(now, "yyyy-mm-ddTHH:MM")
+    output_filepath = xp_folder * "/" * now * "_" * output_filepath 
+    (instance, config_file) = instances[slurm_array_ind]
+    @info "Running instance $(instance.name), \n Output will be saved to $(output_filepath), on slurm array index $(slurm_array_ind)"
+    m = MMALBP_W_md_lns(instance, optimizer, output_filepath, run_time, search_strategy_fp; save_variables= save_variables, save_lp=save_lp, preprocessing=preprocessing)
+
+end
+
 function MMALBP_from_csv_slurm(config_filepath::String, output_filepath::String, run_time::Float64, save_variables::Bool, save_lp::Bool, slurm_array_ind::Int ; xp_folder::String="model_runs", preprocessing::Bool=false)
     
     instances = read_slurm_csv(config_filepath)
@@ -359,13 +373,22 @@ function main()
             error("LNS config file is required for LNS experiments")
         end
         MMALBP_W_LNS(parsed_args["config_file"], output_file,parsed_args["run_time"], parsed_args["save_variables"], parsed_args["save_lp"], parsed_args["LNS_config"], preprocessing=parsed_args["preprocessing"] )
+    elseif parsed_args["xp_type"] == "slurm_array_lns_md"
+        if isnothing(parsed_args["LNS_config"]) 
+            error("LNS config file is required for LNS experiments")
+        elseif isnothing(parsed_args["slurm_array_ind"])
+            error("Slurm array index is required for slurm LNS experiments")
+        end
+        MMALBP_md_lns_from_slurm(parsed_args["config_file"], output_file,parsed_args["run_time"], parsed_args["save_variables"], parsed_args["save_lp"], parsed_args["LNS_config"], parsed_args["slurm_array_ind"] )
     elseif parsed_args["xp_type"] == "slurm_array_lns"
-        if isnothing(parsed_args["LNS_config"]) && parsed_args["xp_type"] == "lns"
+        if isnothing(parsed_args["LNS_config"]) 
             error("LNS config file is required for LNS experiments")
         elseif isnothing(parsed_args["slurm_array_ind"])
             error("Slurm array index is required for slurm LNS experiments")
         end
         MMALBP_W_LNS(parsed_args["config_file"], output_file,parsed_args["run_time"], parsed_args["save_variables"], parsed_args["save_lp"], parsed_args["LNS_config"], parsed_args["slurm_array_ind"] )
+    else
+        error("Invalid xp_type")
     end
 end
 main()

@@ -77,7 +77,7 @@ function large_neighborhood_search!(m::Model, instance::MALBP_W_instance, search
     #best_m = copy(m)
     #saves the initial objective value
     if !isnothing(md_obj_val)
-        res_dict = Dict("instance"=> instance.config_name,"iteration"=>0, "obj_val"=>md_obj_val, "time"=>0.0, "operator"=>"initial")
+        res_dict = Dict("instance"=> instance.config_name,"iteration"=>0, "obj_val"=>md_obj_val, "time"=>0.0, "operator"=>"initial", "change_operator"=> "initial", "destroy_size"=>0.0)
         push!(obj_vals, res_dict)
         incumbent = md_obj_val
     end
@@ -101,7 +101,8 @@ function large_neighborhood_search!(m::Model, instance::MALBP_W_instance, search
                         "obj_val_delta"=>obj_val_delta,
                         "time"=>iteration_time, 
                         "operator"=>lns_conf.des.name,
-                        "change_operator"=>string(lns_conf.change.change!))
+                        "change_operator"=>string(lns_conf.change.change!),
+                        "destroy_size"=>lns_conf.des.kwargs[:n_destroy])
         push!(obj_vals, res_dict)
         if objective_value(m) < incumbent
             incumbent = objective_value(m)
