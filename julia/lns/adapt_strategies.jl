@@ -102,7 +102,7 @@ function adapt_lns!(iter_no_improve::Int, lns_obj::LNSConf, m::Model; iteration:
             @info "change operator changed to: $change! at iteration $iteration"
             lns_obj.change.change! = change!
         else
-            operator = rand([random_station_destroy!, random_subtree_destroy!,random_model_destroy!])
+            operator = rand(lns_obj.des.destroy_list)
             @info "Exploration period at iteration $iteration, trying operator: $operator"
             update_destroy_operator!(lns_obj.des, operator)
         end

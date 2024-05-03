@@ -205,6 +205,7 @@ function define_md_linear!(m::Model, instance::MALBP_W_instance; preprocess = fa
         time_start = time()
         #task_assignments, equip_assignments = MMALBP_W_model_dependent_decomposition_solve(instance; preprocessing=false)
         model_task_assignments, y_start, y_w_start, y_wts_start, equipment_assignments  = start_heuristic(instance)
+        total_cost = calculate_equip_cost(equipment_assignments, instance) + calculate_worker_cost(y_start, y_w_start, instance)
         set_initial_values!(m, 
                             instance, 
                             x_soi_start = model_task_assignments, 
@@ -213,7 +214,9 @@ function define_md_linear!(m::Model, instance::MALBP_W_instance; preprocess = fa
                             y_wts_start = y_wts_start, 
                             equipment_assignments = equipment_assignments)
         @info "Heuristic start time: ", time() - time_start
+        return total_cost
     end
+    return nothing
 end
 
 
