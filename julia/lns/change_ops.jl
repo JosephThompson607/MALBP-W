@@ -52,13 +52,30 @@ function select_destroy!(lns_obj::LNSConf; filter_out_current=true)
 end
 
 #increases the size of destroy block if no improvement until it reaches a limit, then changes the destroy operator
-function change_destroy_increase_size!(iter_no_improve::Int, lns_obj::LNSConf, m::Model; filter_out_current=true,  _...)
+function increase_size_change_destroy!(iter_no_improve::Int, lns_obj::LNSConf, m::Model; filter_out_current=true,  _...)
     if iter_no_improve > 0 && iter_no_improve % lns_obj.change.kwargs[:change_freq] == 0
         if lns_obj.des.kwargs[:n_destroy] < lns_obj.des.kwargs[:destroy_limit] 
             lns_obj.des.kwargs[:n_destroy] += 1
         else
             #resets the size of block to destroy
             lns_obj.des.kwargs[:n_destroy]= lns_obj.des.old_kwargs[:n_destroy]
+            #randomly chooses from the destroy operators
+            select_destroy!(lns_obj; filter_out_current=filter_out_current)
+        end
+    end
+    return iter_no_improve, lns_obj, m
+end
+
+#increases the size of destroy block if no improvement until it reaches a limit, then changes the destroy operator
+function change_destroy_increase_size!(iter_no_improve::Int, lns_obj::LNSConf, m::Model; filter_out_current=true,  _...)
+    if iter_no_improve > 0 && iter_no_improve % lns_obj.change.kwargs[:change_freq] == 0 
+        if iter_no_improve < lns_obj.change.kwargs[:size_period]
+            #resets the size of block to destroy
+            lns_obj.des.kwargs[:n_destroy]= lns_obj.des.old_kwargs[:n_destroy]
+            #randomly chooses from the destroy operators
+            select_destroy!(lns_obj; filter_out_current=filter_out_current)         
+        else
+            lns_obj.des.kwargs[:n_destroy] += 1
             #randomly chooses from the destroy operators
             select_destroy!(lns_obj; filter_out_current=filter_out_current)
         end
