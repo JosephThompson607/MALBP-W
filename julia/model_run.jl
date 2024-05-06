@@ -243,7 +243,7 @@ function MMALBP_md_lns_from_slurm(config_filepath::String, output_filepath::Stri
     output_filepath = xp_folder * "/" * now * "_" * output_filepath 
     (instance, config_file) = instances[slurm_array_ind]
     @info "Running instance $(instance.name), \n Output will be saved to $(output_filepath), on slurm array index $(slurm_array_ind)"
-    m = MMALBP_W_md_lns(instance, optimizer, output_filepath, run_time, search_strategy_fp; save_variables= save_variables, save_lp=save_lp, preprocessing=preprocessing)
+    m = MMALBP_W_md_lns(instance, optimizer, output_filepath, run_time, search_strategy_fp; save_variables= save_variables, save_lp=save_lp, preprocessing=preprocessing, slurm_array_ind=slurm_array_ind)
 
 end
 
