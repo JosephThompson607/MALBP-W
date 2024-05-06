@@ -1,4 +1,5 @@
-function random_model_destroy!(m::Model, instance::MALBP_W_instance; seed:: Union{Nothing, Int}=nothing, n_destroy::Int=1,_...)
+function random_model_destroy!(m::Model, instance::MALBP_W_instance; seed:: Union{Nothing, Int}=nothing, percent_destroy::Float64 = 0.25,_...)
+    n_destroy = max(1,round(Int, instance.models.no_models * percent_destroy))
     if !isnothing(seed)
         Random.seed!(seed)
     end
@@ -30,20 +31,21 @@ function random_model_destroy!(m::Model, instance::MALBP_W_instance; seed:: Unio
 end
 
 #calls the random station destroy and the random model destroy functions, good for larger instances
-function random_station_model_destroy!(m::Model, instance::MALBP_W_instance; seed::Union{Nothing, Int}=nothing, n_destroy::Int=1, _...)
-    random_model_destroy!(m, instance; seed=seed, n_destroy=n_destroy)
-    random_station_destroy!(m, instance; seed=seed, n_destroy=n_destroy)
+function random_station_model_destroy!(m::Model, instance::MALBP_W_instance; seed::Union{Nothing, Int}=nothing, percent_destroy::Float64 = 0.25, _...)
+    random_model_destroy!(m, instance; seed=seed, percent_destroy=percent_destroy)
+    random_station_destroy!(m, instance; seed=seed, percent_destroy=percent_destroy)
 end
 
 #calls the random station destroy and the random model destroy functions for the model dependent formulation, good for larger instances
-function random_station_model_destroy_md!(m::Model, instance::MALBP_W_instance; seed::Union{Nothing, Int}=nothing, n_destroy::Int=1, _...)
-    random_model_destroy_md!(m, instance; seed=seed, n_destroy=n_destroy)
-    random_station_destroy_md!(m, instance; seed=seed, n_destroy=n_destroy)
+function random_station_model_destroy_md!(m::Model, instance::MALBP_W_instance; seed::Union{Nothing, Int}=nothing, percent_destroy::Float64 = 0.25, _...)
+    random_model_destroy_md!(m, instance; seed=seed, percent_destroy=percent_destroy)
+    random_station_destroy_md!(m, instance; seed=seed, percent_destroy=percent_destroy)
 end
 
 
 #randomly destroys models for the md formulation
-function random_model_destroy_md!(m::Model, instance::MALBP_W_instance; seed:: Union{Nothing, Int}=nothing, n_destroy::Int=1,_...)
+function random_model_destroy_md!(m::Model, instance::MALBP_W_instance; seed:: Union{Nothing, Int}=nothing, percent_destroy::Float64 = 0.25,_...)
+    n_destroy = max(1,round(Int, instance.models.no_models * percent_destroy))
     if !isnothing(seed)
         Random.seed!(seed)
     end
@@ -67,7 +69,8 @@ function random_model_destroy_md!(m::Model, instance::MALBP_W_instance; seed:: U
     end
 end
 
-function random_station_destroy!(m::Model, instance::MALBP_W_instance; seed::Union{Nothing, Int}=nothing, n_destroy::Int=1, _...)
+function random_station_destroy!(m::Model, instance::MALBP_W_instance; seed::Union{Nothing, Int}=nothing, percent_destroy::Float64 = 0.25, _...)
+    n_destroy = max(1,round(Int, instance.equipment.no_stations * percent_destroy))
     #if the seed is not none, set the seed
     if !isnothing(seed)
         Random.seed!(seed)
@@ -96,7 +99,8 @@ function random_station_destroy!(m::Model, instance::MALBP_W_instance; seed::Uni
 end
 
 #Randomly destroys stations for the md formulation
-function random_station_destroy_md!(m::Model, instance::MALBP_W_instance; seed::Union{Nothing, Int}=nothing, n_destroy::Int=1, _...)
+function random_station_destroy_md!(m::Model, instance::MALBP_W_instance; seed::Union{Nothing, Int}=nothing, percent_destroy::Float64 = 0.25, _...)
+    n_destroy = max(1,round(Int, instance.equipment.no_stations * percent_destroy))
     #if the seed is not none, set the seed
     if !isnothing(seed)
         Random.seed!(seed)
@@ -124,7 +128,8 @@ function random_station_destroy_md!(m::Model, instance::MALBP_W_instance; seed::
     end
 end
 
-function random_subtree_destroy!(m::Model, instance::MALBP_W_instance; seed::Union{Nothing, Int}=nothing, n_destroy::Int=1, depth::Int=1, _...)
+function random_subtree_destroy!(m::Model, instance::MALBP_W_instance; seed::Union{Nothing, Int}=nothing, percent_destroy::Float64=0.25, depth::Int=1, _...)
+    n_destroy = max(1, round(Int, instance.models.no_models ^ depth * percent_destroy))
     #if the seed is not none, set the seed
     if !isnothing(seed)
         Random.seed!(seed)
@@ -149,7 +154,8 @@ function random_subtree_destroy!(m::Model, instance::MALBP_W_instance; seed::Uni
     end
 end
 
-function peak_station_destroy!(m::Model, instance::MALBP_W_instance; seed::Union{Nothing, Int}=nothing, n_destroy::Int=1, _...)
+function peak_station_destroy!(m::Model, instance::MALBP_W_instance; seed::Union{Nothing, Int}=nothing, percent_destroy::Float64, _...)
+    n_destroy = max(1,round(Int, instance.equipment.no_stations * percent_destroy))
     #if the seed is not none, set the seed
     if !isnothing(seed)
         Random.seed!(seed)
@@ -173,7 +179,7 @@ function peak_station_destroy!(m::Model, instance::MALBP_W_instance; seed::Union
             left = 1
             right = n_destroy
         else
-            right = max_station + ceil(n_destroy/2)
+            right = max_station + round(n_destroy/2)
         end
         stations = [left:right;]
         println("stations: ", stations)
@@ -193,7 +199,8 @@ function peak_station_destroy!(m::Model, instance::MALBP_W_instance; seed::Union
     end
 end
 
-function peak_station_destroy_md!(m::Model, instance::MALBP_W_instance; seed::Union{Nothing, Int}=nothing, n_destroy::Int=1, _...)
+function peak_station_destroy_md!(m::Model, instance::MALBP_W_instance; seed::Union{Nothing, Int}=nothing, percent_destroy::Float64=0.25, _...)
+    n_destroy = max(1,round(Int, instance.equipment.no_stations * percent_destroy))
     #if the seed is not none, set the seed
     if !isnothing(seed)
         Random.seed!(seed)
@@ -217,7 +224,7 @@ function peak_station_destroy_md!(m::Model, instance::MALBP_W_instance; seed::Un
             left = 1
             right = n_destroy
         else
-            right = max_station + ceil(n_destroy/2)
+            right = max_station + round(n_destroy/2)
         end
         stations = [left:right;]
         println("stations: ", stations)

@@ -66,9 +66,10 @@ end
 
 function large_neighborhood_search!(m::Model, instance::MALBP_W_instance, search_strategy_fp::String; lns_res_fp::String="", md_obj_val::Union{Nothing, Float64}=nothing, run_time::Real=600.0, model_dependent=false )
     lns_conf = read_search_strategy_YAML(search_strategy_fp, run_time, model_dependent=model_dependent)
+    set_destroy_size!(lns_conf.des, instance)
     seed = lns_conf.seed
     #sets the time limit for the model
-    set_optimizer_attribute(m, "TimeLimit", lns_conf.rep.repair_kwargs["time_limit"])
+    set_optimizer_attribute(m, "TimeLimit", lns_conf.rep.kwargs[:time_limit])
     #write_to_file(m, "my_model.mps")
     start_time = time()
     obj_vals = []
@@ -85,6 +86,9 @@ function large_neighborhood_search!(m::Model, instance::MALBP_W_instance, search
     #main loop of algorithm
     iter_no_improve = 0
     for i in 1: lns_conf.n_iterations
+        println("mip repair kwargs: ", lns_conf.rep.kwargs)
+        set_optimizer_attribute(m, "MIPGap", lns_conf.rep.kwargs[:mip_gap])
+        lns_conf.rep.kwargs[:mip_gap] *= lns_conf.rep.kwargs[:mip_gap_decay]
         #calls the destroy operator
         step_start = time()
         lns_conf.des.destroy!(m, instance, seed=seed ; lns_conf.des.kwargs...)

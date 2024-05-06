@@ -224,7 +224,7 @@ function MMALBP_md_lns_from_yaml(config_filepath::String, output_filepath::Strin
     optimizer = optimizer_with_attributes(() -> Gurobi.Optimizer(GRB_ENV), "TimeLimit" => run_time)
     #adds the date and time to the output file path
     now = Dates.now()
-    now = Dates.format(now, "yyyy-mm-ddTHH:MM")
+    now = Dates.format(now, "yyyy-mm-dd")
     output_filepath = xp_folder * "/" * now * "_" * output_filepath 
     for instance in instances
         @info "Running instance $(instance.name), \n Output will be saved to $(output_filepath)"
@@ -239,7 +239,7 @@ function MMALBP_md_lns_from_slurm(config_filepath::String, output_filepath::Stri
     optimizer = optimizer_with_attributes(() -> Gurobi.Optimizer(GRB_ENV), "TimeLimit" => run_time)
     #adds the date and time to the output file path
     now = Dates.now()
-    now = Dates.format(now, "yyyy-mm-ddTHH:MM")
+    now = Dates.format(now, "yyyy-mm-dd")
     output_filepath = xp_folder * "/" * now * "_" * output_filepath 
     (instance, config_file) = instances[slurm_array_ind]
     @info "Running instance $(instance.name), \n Output will be saved to $(output_filepath), on slurm array index $(slurm_array_ind)"
@@ -273,7 +273,7 @@ function warmstart_dynamic(config_filepath::String, output_filepath::String, run
     optimizer = optimizer_with_attributes(() -> Gurobi.Optimizer(GRB_ENV), "TimeLimit" => run_time)
     #adds the date and time to the output file path
     now = Dates.now()
-    now = Dates.format(now, "yyyy-mm-ddTHH:MM")
+    now = Dates.format(now, "yyyy-mm-dd")
     output_filepath = xp_folder * "/" * now * "_" * output_filepath 
     for (instance, var_folder, md_obj_val) in instances
         @info "Running instance $(instance.name), from $(config_filepath). \n Output will be saved to $(output_filepath)"
@@ -286,7 +286,7 @@ function MMALBP_W_LNS(config_filepath::String, output_filepath::String, run_time
     optimizer = optimizer_with_attributes(() -> Gurobi.Optimizer(GRB_ENV), "TimeLimit" => run_time)
     #adds the date and time to the output file path
     now = Dates.now()
-    now = Dates.format(now, "yyyy-mm-ddTHH:MM")
+    now = Dates.format(now, "yyyy-mm-dd")
     output_filepath = xp_folder * "/" * now * "_" * output_filepath 
     for (instance, var_folder, md_obj_val) in instances
         @info "Running instance $(instance.name), from $(config_filepath). \n Output will be saved to $(output_filepath)"

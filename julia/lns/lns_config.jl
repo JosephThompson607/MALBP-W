@@ -1,6 +1,6 @@
 mutable struct RepairOp
     repair!::Function
-    repair_kwargs::Dict
+    kwargs::Dict
 end
 
 mutable struct DestroyOp
@@ -150,7 +150,7 @@ function configure_destroy(search_strategy::Dict; model_dependent::Bool=false)
         @info "No destroy specified, defaulting to random_station_destroy"
         search_strategy["destroy"] = Dict()
         destroy_op = random_station_destroy!
-        search_strategy["destroy"]["kwargs"] = Dict(Symbol("n_destroy")=>2)
+        search_strategy["destroy"]["kwargs"] = Dict(Symbol("percent_destroy")=>0.25)
         search_strategy["change"]["operator"] = no_change
         weight_update = no_weight_update
     else
@@ -201,7 +201,7 @@ function configure_destroy(search_strategy::Dict; model_dependent::Bool=false)
     end
         if !haskey(search_strategy["destroy"], "kwargs")
             @info "No destroy arguments specified, defaulting to n_destroy=2"
-            destroy_kwargs = Dict("n_destroy"=>2, "des_decay"=>0.9)
+            destroy_kwargs = Dict("n_destroy"=>2, "des_decay"=>0.9, "percent_destroy"=> 0.25)
         else
             @info "Deconstructor arguments specified: $(search_strategy["destroy"]["kwargs"])"
             destroy_kwargs = search_strategy["destroy"]["kwargs"]
@@ -251,7 +251,7 @@ function configure_repair(search_strategy::Dict)
         @info "No repair specified, defaulting to MILP"
         search_strategy["repair"] = Dict()
         repair_op = optimize!
-        search_strategy["repair"]["kwargs"] = Dict("time_limit"=>100)
+        search_strategy["repair"]["kwargs"] = Dict("time_limit"=>100, "mip_gap"=>1e-2, "mip_gap_decay"=>0.9)
     else
         @info "Repair operator specified: $(search_strategy["repair"]["operator"])"
         repair = search_strategy["repair"]["operator"]
@@ -262,15 +262,24 @@ function configure_repair(search_strategy::Dict)
         end
         if !haskey(search_strategy["repair"], "kwargs")
             @info "No repair arguments specified, defaulting to time_limit=100"
-            repair_kwargs = Dict("time_limit"=>100)
+            kwargs = Dict("time_limit"=>100, "mip_gap"=>1e-2, "mip_gap_decay"=>0.99)
         else
+            if !haskey(search_strategy["repair"]["kwargs"], "mip_gap_decay")
+                @info "No mip_gap decay specified, defaulting to 0.99"
+                search_strategy["repair"]["kwargs"]["mip_gap_decay"] = 0.99
+            end
+            if !haskey(search_strategy["repair"]["kwargs"], "mip_gap")
+                @info "No mip_gap specified, defaulting to 1e-2"
+                search_strategy["repair"]["kwargs"]["mip_gap"] = 1e-2
+            end
             @info "Repair arguments specified: $(search_strategy["repair"]["kwargs"])"
-            repair_kwargs = search_strategy["repair"]["kwargs"]
+            kwargs = search_strategy["repair"]["kwargs"]
             #converts the keys to symbols
-            search_strategy["repair"]["kwargs"] = Dict(Symbol(k) => v for (k, v) in repair_kwargs)
+            
         end
     end
-    repair_operator = RepairOp(repair_op, repair_kwargs)
+    kwargs = Dict(Symbol(k) => v for (k, v) in kwargs)
+    repair_operator = RepairOp(repair_op, kwargs)
     return repair_operator
 end
 
@@ -327,4 +336,15 @@ function get_search_strategy_config(search_strategy::Dict; model_dependent::Bool
     adaptation_technique,
     search_strategy["seed"])
     return lns_obj
+end
+
+
+#sets the smallest percentage to increase destroy size for the destroy operator
+function set_destroy_size!(des::DestroyOp, instance::MALBP_W_instance)
+    if !haskey(des.kwargs, :percent_destroy)
+        percent_destroy = min( 1/instance.equipment.no_stations, 1/instance.models.no_models )
+         @info "No percent destroy specified, defaulting to the smallest amount that can change an operator: $percent_destroy"
+         des.kwargs[:percent_destroy] = percent_destroy
+         des.old_kwargs[:percent_destroy] = percent_destroy
+    end
 end
