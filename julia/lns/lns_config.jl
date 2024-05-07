@@ -150,7 +150,7 @@ function configure_destroy(search_strategy::Dict; model_dependent::Bool=false)
         @info "No destroy specified, defaulting to random_station_destroy"
         search_strategy["destroy"] = Dict()
         destroy_op = random_station_destroy!
-        search_strategy["destroy"]["kwargs"] = Dict(Symbol("percent_destroy")=>0.25)
+        search_strategy["destroy"]["kwargs"] = Dict()
         search_strategy["change"]["operator"] = no_change
         weight_update = no_weight_update
     else
@@ -201,7 +201,7 @@ function configure_destroy(search_strategy::Dict; model_dependent::Bool=false)
     end
         if !haskey(search_strategy["destroy"], "kwargs")
             @info "No destroy arguments specified, defaulting to n_destroy=2"
-            destroy_kwargs = Dict("n_destroy"=>2, "des_decay"=>0.9, "percent_destroy"=> 0.25)
+            destroy_kwargs = Dict("n_destroy"=>2, "des_decay"=>0.9, )
         else
             @info "Deconstructor arguments specified: $(search_strategy["destroy"]["kwargs"])"
             destroy_kwargs = search_strategy["destroy"]["kwargs"]
