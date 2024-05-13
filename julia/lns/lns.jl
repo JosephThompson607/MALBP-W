@@ -106,7 +106,7 @@ function large_neighborhood_search!(m::Model, instance::MALBP_W_instance, search
                         "time"=>iteration_time, 
                         "operator"=>lns_conf.des.name,
                         "change_operator"=>string(lns_conf.change.change!),
-                        "destroy_size"=>lns_conf.des.kwargs[:n_destroy])
+                        "destroy_size"=>lns_conf.des.kwargs[:percent_destroy])
         push!(obj_vals, res_dict)
         if objective_value(m) < incumbent
             incumbent = objective_value(m)
@@ -118,6 +118,9 @@ function large_neighborhood_search!(m::Model, instance::MALBP_W_instance, search
         end
         if time() - start_time > lns_conf.time_limit
             @info "Time limit reached, stopping LNS at iteration $i"
+            break
+        elseif lns_conf.des.kwargs[:percent_destroy] >= 1.0 && iter_no_improve >= 5
+            @info "solved full problem, no improvement"
             break
         end
         if i < lns_conf.n_iterations
