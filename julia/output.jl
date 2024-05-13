@@ -180,6 +180,11 @@ end
 
 
 function save_results(output_filepath::String, m::Model, run_time::Real, instance::MALBP_W_instance, var_fp::String, output_csv::String; prev_obj_val::Union{Real, Nothing}=nothing, best_obj_val::Union{Real, Nothing}=nothing)
+    #copies the config files to the output folder
+    cp(instance.equipment.filepath, var_fp * "equipment.yaml")
+    cp(instance.models.filepath, var_fp * "models.yaml")
+    cp(instance.filepath, var_fp * "instance.yaml")
+    
     #saves the objective function, relative gap, run time, and instance_name to a file
     if is_solved_and_feasible(m)  || termination_status(m) == MOI.TIME_LIMIT
         obj_val = objective_value(m)
