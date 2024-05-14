@@ -83,6 +83,7 @@ function random_station_destroy!(m::Model, instance::MALBP_W_instance; seed::Uni
         station = rand(1:(instance.equipment.no_stations - n_destroy+1) )
         stations = [station:station + n_destroy-1;]
     end
+    println("stations: ", stations)
     x_wsoj = m[:x_wsoj]
     u_se = m[:u_se]
     y_wts = m[:y_wts]

@@ -95,9 +95,9 @@ function configure_change(search_strategy::Dict)
         if search_strategy["change"]["operator"] == "increase_destroy!" || search_strategy["change"]["operator"] == "increase_destroy"
             @info "Deconstructor change operator $(search_strategy["change"]["operator"]) recognized"
             destroy_change = increase_destroy!
-        elseif search_strategy["change"]["operator"] == "no_change!"
+        elseif search_strategy["change"]["operator"] == "no_change!" || search_strategy["change"]["operator"] == "no_change"
             @info "Deconstructor change operator $(search_strategy["change"]["operator"]) recognized"
-            destroy_change = no_change
+            destroy_change = no_change!
         elseif search_strategy["change"]["operator"] == "decrement_y!"
             @info "Deconstructor change operator $(search_strategy["change"]["operator"]) recognized"
             destroy_change = decrement_y!
