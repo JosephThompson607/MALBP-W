@@ -145,9 +145,9 @@ function large_neighborhood_search!(m::Model, instance::MALBP_W_instance, search
     end
     #writes the results to a csv
     obj_df = DataFrame(obj_vals)
-    CSV.write(lns_res_fp, obj_df)
-    #writes the lns_config to a yaml file
-    YAML.write_file(lns_res_fp * "lns_config.yaml",lns_conf )
+    CSV.write(lns_res_fp  * "lns_results.csv", obj_df)
+    println("conf_fp", lns_conf.conf_fp)
+    cp(lns_conf.conf_fp, lns_res_fp* "lns_conf.yaml")
     println("best obj val: ", incumbent_dict)
     return incumbent_dict, incumbent
 end

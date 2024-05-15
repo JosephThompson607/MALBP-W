@@ -21,6 +21,7 @@ mutable struct ChangeOp
 end
 
 struct LNSConf
+    conf_fp::String
     n_iterations::Union{Int, Nothing}
     n_iter_no_improve::Int
     time_limit::Float64
@@ -61,7 +62,7 @@ function read_search_strategy_YAML(config_filepath::String, run_time::Float64; m
         config_file["lns"]["time_limit"] = run_time
     end
     search_strategy = config_file["lns"]
-    search_strategy = get_search_strategy_config(search_strategy; model_dependent=model_dependent)
+    search_strategy = get_search_strategy_config(search_strategy, config_filepath; model_dependent=model_dependent)
     return search_strategy
 end
 
@@ -283,7 +284,7 @@ function configure_repair(search_strategy::Dict)
     return repair_operator
 end
 
-function get_search_strategy_config(search_strategy::Dict; model_dependent::Bool=false)
+function get_search_strategy_config(search_strategy::Dict, config_filepath::String; model_dependent::Bool=false)
     if !haskey(search_strategy, "n_iterations")
         @info "No number of iterations specified, defaulting to 10000"
         search_strategy["n_iterations"] = 10000
@@ -327,7 +328,8 @@ function get_search_strategy_config(search_strategy::Dict; model_dependent::Bool
     if !haskey(search_strategy, "seed")
         search_strategy["seed"] = nothing
     end
-    lns_obj = LNSConf(search_strategy["n_iterations"], 
+    lns_obj = LNSConf(config_filepath,
+        search_strategy["n_iterations"], 
     search_strategy["n_iter_no_improve"], 
     search_strategy["time_limit"], 
     repair_op, 

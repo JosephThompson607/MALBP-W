@@ -153,7 +153,7 @@ function MMALBP_W_dynamic_lns( instance::MALBP_W_instance, optimizer::Gurobi.Mat
     #defines the  dyanmic model parameters
     define_dynamic_linear!(m, instance, warmstart_vars, preprocessing=preprocessing)
     #solves the model in a lns loop
-    obj_dict, best_obj = large_neighborhood_search!(m, instance, search_strategy; lns_res_fp= output_filepath  * "lns_results.csv", md_obj_val=md_obj_val, run_time=run_time)
+    obj_dict, best_obj = large_neighborhood_search!(m, instance, search_strategy; lns_res_fp= output_filepath  , md_obj_val=md_obj_val, run_time=run_time)
     if save_variables
         write_MALBP_W_solution_dynamic(output_filepath, instance, m, false)
     end
@@ -183,7 +183,7 @@ function MMALBP_W_md_lns( instance::MALBP_W_instance, optimizer::Gurobi.MathOptI
     #defines the  dyanmic model parameters
     start_value = define_md_linear!(m, instance; preprocess=true)
     #solves the model in a lns loop
-    obj_dict, best_obj = large_neighborhood_search!(m, instance, search_strategy; lns_res_fp= output_filepath  * "lns_results.csv", md_obj_val=start_value, run_time=run_time, model_dependent=true)
+    obj_dict, best_obj = large_neighborhood_search!(m, instance, search_strategy; lns_res_fp= output_filepath  , md_obj_val=start_value, run_time=run_time, model_dependent=true)
     if save_variables
         write_MALBP_W_solution_md(output_filepath, instance, m, false)
     end
