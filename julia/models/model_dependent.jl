@@ -96,6 +96,21 @@ function define_md_linear_constraints!(m::Model, instance::MALBP_W_instance)
     # end
 end
 
+#This function fixes the task assignments so the same task is at the same station accross models
+function define_fixed_linear_constraints!(m::Model, instance::MALBP_W_instance)
+    # usesful variables
+    model_indexes = [i for (i, model_dict) in instance.models.models]
+    #model variables
+    x_soi = m[:x_soi]
+    #constraint fix: each task is assigned to the same station for all models
+    for i in 1:(instance.models.no_models-1)
+        for i_prime in (i+1):instance.models.no_models
+            @constraint(m, x_soi[:, :, i] .== x_soi[:, :, i_prime])
+        end
+    end
+
+end
+
 #defines the redundant constraints of the model dependent MALBP-W model
 function define_md_linear_redundant_constraints!(m::Model, instance::MALBP_W_instance)
     # usesful variables
@@ -193,7 +208,6 @@ function set_initial_values!(m::Model, instance::MALBP_W_instance;
 end
 
 
-
 function define_md_linear!(m::Model, instance::MALBP_W_instance; preprocess = false, start_heuristic::Function = task_equip_heuristic)
     define_md_linear_vars!(m, instance)
     define_md_linear_obj!(m, instance)
@@ -220,3 +234,9 @@ function define_md_linear!(m::Model, instance::MALBP_W_instance; preprocess = fa
 end
 
 
+function define_fixed_linear_from_md!(m::Model, instance::MALBP_W_instance; preprocess = false, start_heuristic::Function = task_equip_heuristic)
+    define_md_linear_vars!(m, instance)
+    define_md_linear_obj!(m, instance)
+    define_md_linear_constraints!(m, instance)   
+    define_fixed_constraint!(m, instance)
+end
