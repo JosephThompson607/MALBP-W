@@ -558,3 +558,7 @@ Manifest.toml
 .vscode/
 slurm_jobs/
 .ipynb_checkpoints/
+analysis/sampling_eval.ipynb
+analysis/sampling_eval.ipynb
+analysis/__pycache__/report_functions.cpython-39.pyc
+analysis/__pycache__/report_functions.cpython-312.pyc
