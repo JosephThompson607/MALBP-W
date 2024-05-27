@@ -4,11 +4,15 @@ function random_model_destroy!(m::Model, instance::MALBP_W_instance; seed:: Unio
         Random.seed!(seed)
     end
     if n_destroy >= instance.models.no_models
+        if percent_destroy >= 1.0
         @info "n_destroy is greater than the number of models, setting n_destroy to the number of models"
         return
-    else
-        models = sample(collect(keys(instance.models.models)), n_destroy)
+        else
+            @info "percent destroy is not at 100% yet, will set 1 below the number of models"
+            n_destroy = instance.models.no_models - 1
+        end
     end
+    models = sample(collect(keys(instance.models.models)), n_destroy)
     x_wsoj = m[:x_wsoj]
     y_wts = m[:y_wts]
     #fixes the task assignment, equipment, and worker assignment for the models that are not in the models list
@@ -50,11 +54,16 @@ function random_model_destroy_md!(m::Model, instance::MALBP_W_instance; seed:: U
         Random.seed!(seed)
     end
     if n_destroy >= instance.models.no_models
+        if percent_destroy >= 1.0
         @info "n_destroy is greater than the number of models, setting n_destroy to the number of models"
         return
-    else
-        models = sample(collect(keys(instance.models.models)), n_destroy)
+        else
+            @info "percent destroy is not at 100% yet, will set 1 below the number of models"
+            n_destroy = instance.models.no_models - 1
+        end
     end
+    models = sample(collect(keys(instance.models.models)), n_destroy)
+    
     x_soi = m[:x_soi]
     #fixes the task assignment, equipment, and worker assignment for the models that are not in the models list
     println("models: ", models)
@@ -75,14 +84,18 @@ function random_station_destroy!(m::Model, instance::MALBP_W_instance; seed::Uni
     if !isnothing(seed)
         Random.seed!(seed)
     end
-    #randomly select no_stations stations to remove
+
     if n_destroy >= instance.equipment.no_stations
-        @info "n_destroy is greater than the number of stations, setting n_destroy to the number of stations"
-        return
-    else
-        station = rand(1:(instance.equipment.no_stations - n_destroy+1) )
-        stations = [station:station + n_destroy-1;]
+        if percent_destroy >= 1.0
+            @info "n_destroy is greater than the number of stations, setting n_destroy to the number of stations"
+            return
+        else
+            @info "percent destroy is not at 100% yet, will set 1 below the number of stations"
+            n_destroy = instance.equipment.no_stations - 1
+        end
     end
+    station = rand(1:(instance.equipment.no_stations - n_destroy+1) )
+    stations = [station:station + n_destroy-1;]
     println("stations: ", stations)
     x_wsoj = m[:x_wsoj]
     u_se = m[:u_se]
@@ -106,14 +119,19 @@ function random_station_destroy_md!(m::Model, instance::MALBP_W_instance; seed::
     if !isnothing(seed)
         Random.seed!(seed)
     end
-    #randomly select no_stations stations to remove
     if n_destroy >= instance.equipment.no_stations
-        @info "n_destroy is greater than the number of stations, setting n_destroy to the number of stations"
-        return
-    else
-        station = rand(1:(instance.equipment.no_stations - n_destroy+1) )
-        stations = [station:station + n_destroy-1;]
+        if percent_destroy >= 1.0
+            @info "n_destroy is greater than the number of stations, setting n_destroy to the number of stations"
+            return
+        else
+            @info "percent destroy is not at 100% yet, will set 1 below the number of stations"
+            n_destroy = instance.equipment.no_stations - 1
+        end
+
     end
+    station = rand(1:(instance.equipment.no_stations - n_destroy+1) )
+    stations = [station:station + n_destroy-1;]
+
     x_soi = m[:x_soi]
     u_se = m[:u_se]
     y_wts = m[:y_wts]
@@ -131,6 +149,15 @@ end
 
 function random_subtree_destroy!(m::Model, instance::MALBP_W_instance; seed::Union{Nothing, Int}=nothing, percent_destroy::Float64=0.25, depth::Int=1, _...)
     n_destroy = max(1, round(Int, instance.models.no_models ^ depth * percent_destroy))
+
+    if percent_destroy >= 1.0
+        @info "n_destroy is greater than the number of models, setting n_destroy to the number of models"
+        return
+    #if the percent is not at 100, set the n_destroy to the number of models^depth -1
+    elseif n_destroy == instance.models.no_models ^ depth  
+        @info "percent destroy is not at 100% yet, will set 1 below the number of models"
+        n_destroy = instance.models.no_models ^ depth - 1
+    end
     #if the seed is not none, set the seed
     if !isnothing(seed)
         Random.seed!(seed)
