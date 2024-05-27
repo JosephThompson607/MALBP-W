@@ -82,7 +82,6 @@ function uniform_limit(sequence_length::Int, model_mixtures::Dict{String, Float6
     end
     #uniformly generates n points between zero and 1
     points = [1/(n_samples*sequence_length) * i for i in 1:(n_samples*sequence_length)]
-    println("the points are: ", points)
     #shuffles the points
     points = shuffle(points)
     final_sequences = []
@@ -96,13 +95,8 @@ function uniform_limit(sequence_length::Int, model_mixtures::Dict{String, Float6
         current_sequence = []
        for j in 1:sequence_length
             #finds the model that the point falls into
-            println("the model ranges are: ", model_ranges )
-            println("the point is: ", points[(i-1)*sequence_length + j])
-            println("with an index of: ", (i-1)*sequence_length + j)
             model_index = findfirst(x -> x >= points[(i-1)*sequence_length + j], model_ranges)
             model = model_keys[model_index]
-            println("the model probabilities are: ", model_ranges, " the model mixtures are: ", model_mixtures)
-            println("The model is ", model)
             push!(current_sequence, model)
         end
         push!(final_sequences, Dict("sequence" => current_sequence, "probability" => 1/n_samples))
