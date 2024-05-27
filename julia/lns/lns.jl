@@ -87,7 +87,8 @@ function large_neighborhood_search!(m::Model, instance::MALBP_W_instance, search
     iter_no_improve = 0
     for i in 1: lns_conf.n_iterations
         println("mip repair kwargs: ", lns_conf.rep.kwargs)
-        set_optimizer_attribute(m, "MIPGap", lns_conf.rep.kwargs[:mip_gap])
+        gap = max(1e-4, lns_conf.rep.kwargs[:mip_gap])
+        set_optimizer_attribute(m, "MIPGap", gap)
         lns_conf.rep.kwargs[:mip_gap] *= lns_conf.rep.kwargs[:mip_gap_decay]
         #calls the destroy operator
         step_start = time()

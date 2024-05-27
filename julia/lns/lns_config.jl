@@ -181,8 +181,28 @@ function configure_destroy(search_strategy::Dict; model_dependent::Bool=false)
             end
             search_strategy["destroy"]["destroy_weights"] = Dict("random_station_destroy_md!"=>0.5, "random_model_destroy_md!"=>0.5)
     else
-        destroy_list = [random_station_destroy!, random_subtree_destroy!, random_model_destroy!]
+       
+        if haskey(search_strategy["destroy"], "destroy_list")
+            @info "Destroy list specified: $(search_strategy["destroy"]["destroy_list"])"
+        else
+            @info "No destroy list specified, defaulting to all"
+        end
+
+        if haskey(search_strategy["destroy"], "destroy_list") && search_strategy["destroy"]["destroy_list"] == "all"
+            destroy_list = [random_station_destroy!, random_subtree_destroy!, random_model_destroy!, random_station_model_destroy!, random_model_subtree_destroy!, random_station_subtree_destroy!, peak_station_destroy!]
+        elseif haskey(search_strategy["destroy"], "destroy_list") && search_strategy["destroy"]["destroy_list"] == "enhanced_random"
+            destroy_list = [random_station_destroy!, random_subtree_destroy!, random_model_destroy!, random_station_model_destroy!, random_model_subtree_destroy!, random_station_subtree_destroy!,]
+        elseif haskey(search_strategy["destroy"], "destroy_list") && search_strategy["destroy"]["destroy_list"] == "basic_random"
+            destroy_list = [random_station_destroy!, random_subtree_destroy!, random_model_destroy!]
+        elseif haskey(search_strategy["destroy"], "destroy_list") && search_strategy["destroy"]["destroy_list"] == "mixed_random"
+            destroy_list = [random_station_model_destroy!, random_model_subtree_destroy!, random_station_subtree_destroy!]  
+        else
+            destroy_list = [random_station_destroy!, random_subtree_destroy!, random_model_destroy!]
+        end
+        @info "Destroy list: $destroy_list"
+
         destroy = search_strategy["destroy"]["operator"]
+        
         if destroy == "random_station" || destroy == "random_station_destroy!"
             destroy_op = random_station_destroy!
         elseif destroy == "random_subtree" || destroy == "random_subtree_destroy!"
@@ -191,6 +211,10 @@ function configure_destroy(search_strategy::Dict; model_dependent::Bool=false)
             destroy_op = random_model_destroy!
         elseif destroy == "random_station_model" || destroy == "random_station_model_destroy!"
             destroy_op = random_station_model_destroy!
+        elseif destroy == "random_model_subtree" || destroy == "random_model_subtree_destroy!"
+            destroy_op = random_model_subtree_destroy!
+        elseif destroy  == "random_station_subtree" || destroy == "random_station_subtree_destroy!"
+            destroy_op = random_station_subtree_destroy!
         elseif destroy == "peak_station" || destroy == "peak_station_destroy!"
             destroy_op = peak_station_destroy!
         elseif destroy == "random_start" || destroy == "random"
@@ -215,7 +239,9 @@ function configure_destroy(search_strategy::Dict; model_dependent::Bool=false)
         end
         if !haskey(search_strategy["destroy"], "destroy_weights")
             @info "No destroy weights specified, defaulting to equal weights"
-            search_strategy["destroy"]["destroy_weights"] = Dict("random_station_destroy!"=>0.33, "random_subtree_destroy!"=>0.33, "random_model_destroy!"=>0.33)
+            weights = [1 for i in destroy_list]
+            destroy_names = [string(destroy) for destroy in destroy_list]
+            search_strategy["destroy"]["destroy_weights"] = Dict(zip(destroy_names, weights))
         else
             @info "Destroy weights specified: $(search_strategy["destroy"]["destroy_weights"])"
         end
@@ -252,7 +278,7 @@ function configure_repair(search_strategy::Dict)
         @info "No repair specified, defaulting to MILP"
         search_strategy["repair"] = Dict()
         repair_op = optimize!
-        search_strategy["repair"]["kwargs"] = Dict("time_limit"=>100, "mip_gap"=>1e-2, "mip_gap_decay"=>0.9)
+        search_strategy["repair"]["kwargs"] = Dict("time_limit"=>100, "mip_gap"=>1e-2, "mip_gap_decay"=>0.95)
     else
         @info "Repair operator specified: $(search_strategy["repair"]["operator"])"
         repair = search_strategy["repair"]["operator"]
@@ -263,11 +289,11 @@ function configure_repair(search_strategy::Dict)
         end
         if !haskey(search_strategy["repair"], "kwargs")
             @info "No repair arguments specified, defaulting to time_limit=100"
-            kwargs = Dict("time_limit"=>100, "mip_gap"=>1e-2, "mip_gap_decay"=>0.99)
+            kwargs = Dict("time_limit"=>100, "mip_gap"=>1e-2, "mip_gap_decay"=>0.95)
         else
             if !haskey(search_strategy["repair"]["kwargs"], "mip_gap_decay")
-                @info "No mip_gap decay specified, defaulting to 0.99"
-                search_strategy["repair"]["kwargs"]["mip_gap_decay"] = 0.99
+                @info "No mip_gap decay specified, defaulting to 0.95"
+                search_strategy["repair"]["kwargs"]["mip_gap_decay"] = 0.95
             end
             if !haskey(search_strategy["repair"]["kwargs"], "mip_gap")
                 @info "No mip_gap specified, defaulting to 1e-2"
@@ -343,8 +369,14 @@ end
 
 #sets the smallest percentage to increase destroy size for the destroy operator
 function set_destroy_size!(des::DestroyOp, instance::MALBP_W_instance)
-    if !haskey(des.kwargs, :percent_destroy)
+    mixed_random_list = [random_station_model_destroy!, random_model_subtree_destroy!, random_station_subtree_destroy!]
+    if !haskey(des.kwargs, :percent_destroy) && length([i for i in des.destroy_list for j in mixed_random_list if i == j]) == 0
         percent_destroy = min( 1/instance.equipment.no_stations, 1/instance.models.no_models )
+         @info "No percent destroy specified, defaulting to the smallest amount that can change an operator: $percent_destroy"
+         des.kwargs[:percent_destroy] = percent_destroy
+         des.old_kwargs[:percent_destroy] = percent_destroy
+    elseif !haskey(des.kwargs, :percent_destroy)
+        percent_destroy = 1/ (instance.equipment.no_stations * instance.models.no_models)
          @info "No percent destroy specified, defaulting to the smallest amount that can change an operator: $percent_destroy"
          des.kwargs[:percent_destroy] = percent_destroy
          des.old_kwargs[:percent_destroy] = percent_destroy

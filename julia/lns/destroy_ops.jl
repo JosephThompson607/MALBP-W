@@ -36,8 +36,27 @@ end
 
 #calls the random station destroy and the random model destroy functions, good for larger instances
 function random_station_model_destroy!(m::Model, instance::MALBP_W_instance; seed::Union{Nothing, Int}=nothing, percent_destroy::Float64 = 0.25, _...)
-    random_model_destroy!(m, instance; seed=seed, percent_destroy=percent_destroy)
-    random_station_destroy!(m, instance; seed=seed, percent_destroy=percent_destroy)
+    #chooses randomly between splitting the percent destroy between the two destroy functions or using the percent destroy for one and set the other to 1
+    percent_station, percent_model = rand([(percent_destroy, 1.00), (1.00,percent_destroy), (sqrt(percent_destroy), sqrt(percent_destroy))])
+    random_model_destroy!(m, instance; seed=seed, percent_destroy=percent_model)
+    random_station_destroy!(m, instance; seed=seed, percent_destroy=percent_station)
+end
+
+#calls the random station destroy and the random subtree destroy functions
+function random_station_subtree_destroy!(m::Model, instance::MALBP_W_instance; seed::Union{Nothing, Int}=nothing, percent_destroy::Float64 = 0.25, depth::Int=1, _...)
+    #chooses randomly between splitting the percent destroy between the two destroy functions or using the percent destroy for one and set the other to 1
+    percent_subtree, percent_station = rand([(percent_destroy, 1.00), (1.00,percent_destroy), (sqrt(percent_destroy), sqrt(percent_destroy))])
+    
+    random_subtree_destroy!(m, instance; seed=seed, percent_destroy=percent_subtree, depth=depth)
+    random_station_destroy!(m, instance; seed=seed, percent_destroy=percent_station)
+end
+
+#calls the random model and the random subtree destroy functions
+function random_model_subtree_destroy!(m::Model, instance::MALBP_W_instance; seed::Union{Nothing, Int}=nothing, percent_destroy::Float64 = 0.25, depth::Int=1, _...)
+    #chooses randomly between splitting the percent destroy between the two destroy functions or using the percent destroy for one and set the other to 1
+    percent_subtree, percent_model = rand([(percent_destroy, 1.00), (1.00,percent_destroy), (sqrt(percent_destroy), sqrt(percent_destroy))])
+    random_subtree_destroy!(m, instance; seed=seed, percent_destroy=percent_subtree, depth=depth)
+    random_model_destroy!(m, instance; seed=seed, percent_destroy=percent_model)
 end
 
 #calls the random station destroy and the random model destroy functions for the model dependent formulation, good for larger instances
