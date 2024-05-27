@@ -46,7 +46,6 @@ end
 function random_station_subtree_destroy!(m::Model, instance::MALBP_W_instance; seed::Union{Nothing, Int}=nothing, percent_destroy::Float64 = 0.25, depth::Int=1, _...)
     #chooses randomly between splitting the percent destroy between the two destroy functions or using the percent destroy for one and set the other to 1
     percent_subtree, percent_station = rand([(percent_destroy, 1.00), (1.00,percent_destroy), (sqrt(percent_destroy), sqrt(percent_destroy))])
-    
     random_subtree_destroy!(m, instance; seed=seed, percent_destroy=percent_subtree, depth=depth)
     random_station_destroy!(m, instance; seed=seed, percent_destroy=percent_station)
 end
