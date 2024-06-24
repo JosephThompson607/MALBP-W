@@ -3,10 +3,10 @@
 #defines the decision variables for the model dependent MALBP-W model
 function define_fixed_linear_vars!(m::Model, instance::MALBP_W_instance)
     #defines the variables
-    @variable(m, x_so[1:instance.equipment.no_stations, 1:instance.equipment.no_tasks], Bin, base_name="x_so")
-    @variable(m, u_se[1:instance.equipment.no_stations, 1:instance.equipment.no_equipment], Bin, base_name="u_se")
-    @variable(m, instance.max_workers>=y_wts[1:instance.no_scenarios, 1:instance.no_cycles, 1:instance.no_stations] >=0, Int, base_name="y_wts")
-    @variable(m, y_w[1:instance.no_scenarios]>=0, Int, base_name="y_w")
+    @variable(m, x_so[1:instance.equipment.n_stations, 1:instance.equipment.n_tasks], Bin, base_name="x_so")
+    @variable(m, u_se[1:instance.equipment.n_stations, 1:instance.equipment.n_equipment], Bin, base_name="u_se")
+    @variable(m, instance.max_workers>=y_wts[1:instance.sequences.n_scenarios, 1:instance.num_cycles, 1:instance.n_stations] >=0, Int, base_name="y_wts")
+    @variable(m, y_w[1:instance.sequences.n_scenarios]>=0, Int, base_name="y_w")
     @variable(m, y>=0, Int, base_name="y")
 
 end
@@ -20,8 +20,8 @@ function define_fixed_linear_obj!(m::Model, instance::MALBP_W_instance)
     @objective(m, 
             Min, 
             instance.worker_cost * y + 
-            instance.recourse_cost * sum(y_w[w] * instance.scenarios[w, "probability"] for w in 1:instance.no_scenarios) + 
-            sum(instance.equipment.c_se[s][e] * u_se[s, e] for s in 1:instance.equipment.no_stations, e in 1:instance.equipment.no_equipment)
+            instance.recourse_cost * sum(y_w[w] * instance.sequences.sequences[w, "probability"] for w in 1:instance.sequences.n_scenarios) + 
+            sum(instance.equipment.c_se[s][e] * u_se[s, e] for s in 1:instance.equipment.n_stations, e in 1:instance.equipment.n_equipment)
             )
 end
 
@@ -38,7 +38,7 @@ function define_fixed_linear_constraints!(m::Model, instance::MALBP_W_instance)
     #creates the combined precedence relations and combined tasks
     combined_precendent = []
     combined_task_times = Dict{String, Float64}()
-    for i in 1:instance.models.no_models
+    for i in 1:instance.models.n_models
         model = model_indexes[i]
         for (prec, suc) in instance.models.models[model].precendence_relations
             if (prec, suc) in combined_precendent
@@ -56,53 +56,53 @@ function define_fixed_linear_constraints!(m::Model, instance::MALBP_W_instance)
         end
     end
     #constraint 1: y_w and y must sum to the sum accross all stations of y_wts for each scenario and cycle
-    for w in 1:instance.no_scenarios
-        for t in 1:instance.no_cycles
-        @constraint(m, y +  y_w[w] >= sum(y_wts[w, t, s] for s in 1:instance.equipment.no_stations))
+    for w in 1:instance.sequences.n_scenarios
+        for t in 1:instance.num_cycles
+        @constraint(m, y +  y_w[w] >= sum(y_wts[w, t, s] for s in 1:instance.equipment.n_stations))
         end
     end
     #constraint 2: each task is assigned to exactly one station
-    for o in 1:instance.equipment.no_tasks
-        for i in 1:instance.models.no_models
+    for o in 1:instance.equipment.n_tasks
+        for i in 1:instance.models.n_models
         #If the task is not a task of the model, then it is not assigned to any station
             if string(o) ∉ keys(combined_task_times)
                 continue
             end
-            @constraint(m, sum(x_so[s, o] for s in 1:instance.equipment.no_stations) == 1)
+            @constraint(m, sum(x_so[s, o] for s in 1:instance.equipment.n_stations) == 1)
         end
         
     end
     # #constraint 3: sum of task times of each assigned task for each model must be less than the cycle time times the number of workers y_wts
-    for w in eachrow(instance.scenarios)
+    for w in eachrow(instance.sequences.sequences)
         w_index = rownumber(w)
-        for t in 1:instance.no_cycles
-            for s in 1:instance.equipment.no_stations
+        for t in 1:instance.num_cycles
+            for s in 1:instance.equipment.n_stations
                 @constraint(m, sum(task_time * x_so[s, parse(Int,o)] for (o, task_time) in combined_task_times) <= instance.models.cycle_time * y_wts[w_index, t, s])
             end
         end
     end
     #constraint 4: tasks can only be assigned to stations that have the correct equipment
-    for s in 1:instance.equipment.no_stations
-        for o in 1:instance.equipment.no_tasks
+    for s in 1:instance.equipment.n_stations
+        for o in 1:instance.equipment.n_tasks
                 if string(o) ∉ keys(combined_task_times)
                     continue
                 end
-                @constraint(m, x_so[s, o] <= sum(instance.equipment.r_oe[o][e] * u_se[s, e] for e in 1:instance.equipment.no_equipment))
+                @constraint(m, x_so[s, o] <= sum(instance.equipment.r_oe[o][e] * u_se[s, e] for e in 1:instance.equipment.n_equipment))
 
         end
     end
     #constraint 5: precedence precedence_relations
-    for k in 1:instance.equipment.no_stations
+    for k in 1:instance.equipment.n_stations
         for (prec, suc) in combined_precendent
                 @constraint(m, sum( x_so[s, parse(Int,prec)] for s in 1:k) >= sum( x_so[s, parse(Int,suc)] for s in 1:k))
         end
     end
 
     #reduntant precedence constraints
-    # for i in 1:instance.models.no_models
+    # for i in 1:instance.models.n_models
     #     model = model_indexes[i]
     #     for (prec, suc) in instance.models.models[model].precendence_relations
-    #             @constraint(m, sum( s * x_so[s, parse(Int,prec), i] for s in 1:instance.equipment.no_stations) <= sum( s * x_so[s, parse(Int,suc), i] for s in 1:instance.equipment.no_stations))
+    #             @constraint(m, sum( s * x_so[s, parse(Int,prec), i] for s in 1:instance.equipment.n_stations) <= sum( s * x_so[s, parse(Int,suc), i] for s in 1:instance.equipment.n_stations))
     #     end
     # end
 end
@@ -178,10 +178,10 @@ function heuristic_start_fixed!(m::Model, instance::MALBP_W_instance;
     #assigns workers to stations
     y_start, y_w_start, y_wts_start = worker_assign_func(instance, model_task_assignments)
     println("y_start: ", y_start)
-    for w in 1:instance.no_scenarios
+    for w in 1:instance.sequences.n_scenarios
         set_start_value(y_w[w], y_w_start[w])
-        for t in 1:instance.no_cycles
-            for s in 1:instance.equipment.no_stations
+        for t in 1:instance.num_cycles
+            for s in 1:instance.equipment.n_stations
                     set_start_value(y_wts[w, t, s], y_wts_start[w, t, s])
             end
         end

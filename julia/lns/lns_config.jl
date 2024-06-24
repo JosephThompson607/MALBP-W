@@ -5,7 +5,7 @@ end
 
 mutable struct DestroyOp
     name::String
-    destroy_list::Array{Function}
+    destroy_list::Vector{Function}
     destroy!::Function
     kwargs::Dict
     old_kwargs::Dict
@@ -51,10 +51,13 @@ end
 
 
 
-function read_search_strategy_YAML(config_filepath::String, run_time::Float64; model_dependent::Bool=false)
-    config_file = YAML.load(open(config_filepath))
+function read_search_strategy_YAML(config_filepath::Union{Nothing,String}, run_time::Float64; model_dependent::Bool=false, config_dict::Union{Nothing, Dict}=nothing)
+    if !isnothing(config_dict)
+        config_file = config_dict
+    else
+        config_file = YAML.load(open(config_filepath))
+    end
     #if the LNS section is not in the config file, return an empty dictionary
-
     if !haskey(config_file, "lns")
         return Dict()
     elseif !haskey(config_file["lns"], "time_limit")
@@ -146,6 +149,16 @@ function configure_change(search_strategy::Dict)
     return change_op
 end
 
+function parse_destroy_list(destroy_list::Array{String})
+    #new destroy list is a vector of runner_functions
+    new_destroy_list = Vector{Function}()
+    for i in destroy_list
+        i = getfield(Main, Symbol(i))
+        push!(new_destroy_list, i)
+    end
+    return new_destroy_list
+end
+
 function configure_destroy(search_strategy::Dict; model_dependent::Bool=false)
     if !haskey(search_strategy, "destroy") || !haskey(search_strategy["destroy"], "operator")
         @info "No destroy specified, defaulting to random_station_destroy"
@@ -183,11 +196,10 @@ function configure_destroy(search_strategy::Dict; model_dependent::Bool=false)
     else
        
         if haskey(search_strategy["destroy"], "destroy_list")
-            @info "Destroy list specified: $(search_strategy["destroy"]["destroy_list"])"
+            @info "Destroy list specified: $(search_strategy["destroy"]["destroy_list"])   the type is:  $(typeof(search_strategy["destroy"]["destroy_list"]))"
         else
             @info "No destroy list specified, defaulting to all"
         end
-
         if haskey(search_strategy["destroy"], "destroy_list") && search_strategy["destroy"]["destroy_list"] == "all"
             destroy_list = [random_station_destroy!, random_subtree_destroy!, random_model_destroy!, random_station_model_destroy!, random_model_subtree_destroy!, random_station_subtree_destroy!, peak_station_destroy!]
         elseif haskey(search_strategy["destroy"], "destroy_list") && search_strategy["destroy"]["destroy_list"] == "enhanced_random"
@@ -195,7 +207,10 @@ function configure_destroy(search_strategy::Dict; model_dependent::Bool=false)
         elseif haskey(search_strategy["destroy"], "destroy_list") && search_strategy["destroy"]["destroy_list"] == "basic_random"
             destroy_list = [random_station_destroy!, random_subtree_destroy!, random_model_destroy!]
         elseif haskey(search_strategy["destroy"], "destroy_list") && search_strategy["destroy"]["destroy_list"] == "mixed_random"
-            destroy_list = [random_station_model_destroy!, random_model_subtree_destroy!, random_station_subtree_destroy!]  
+            destroy_list = [random_station_model_destroy!, random_model_subtree_destroy!, random_station_subtree_destroy!]
+        #If they pass an actual list of destroy operators, we will have to parse it
+        elseif haskey(search_strategy["destroy"], "destroy_list") && typeof(search_strategy["destroy"]["destroy_list"]) == Vector{String} 
+            destroy_list = parse_destroy_list(search_strategy["destroy"]["destroy_list"])
         else
             destroy_list = [random_station_destroy!, random_subtree_destroy!, random_model_destroy!]
         end
@@ -234,7 +249,10 @@ function configure_destroy(search_strategy::Dict; model_dependent::Bool=false)
                 @info "No destroy decay specified, defaulting to 0.9"
                 destroy_kwargs["des_decay"] = 0.9
             end
-            
+            if !haskey(destroy_kwargs, "fix_steps")
+                @info "No fix steps specified, defaulting to 1"
+                destroy_kwargs["fix_steps"] = 1
+            end
 
         end
         if !haskey(search_strategy["destroy"], "destroy_weights")
@@ -371,12 +389,12 @@ end
 function set_destroy_size!(des::DestroyOp, instance::MALBP_W_instance)
     mixed_random_list = [random_station_model_destroy!, random_model_subtree_destroy!, random_station_subtree_destroy!]
     if !haskey(des.kwargs, :percent_destroy) && length([i for i in des.destroy_list for j in mixed_random_list if i == j]) == 0
-        percent_destroy = min( 1/instance.equipment.no_stations, 1/instance.models.no_models )
+        percent_destroy = min( 1/instance.equipment.n_stations, 1/instance.models.n_models )
          @info "No percent destroy specified, defaulting to the smallest amount that can change an operator: $percent_destroy"
          des.kwargs[:percent_destroy] = percent_destroy
          des.old_kwargs[:percent_destroy] = percent_destroy
     elseif !haskey(des.kwargs, :percent_destroy)
-        percent_destroy = 1/ (instance.equipment.no_stations * instance.models.no_models)
+        percent_destroy = 1/ (instance.equipment.n_stations * instance.models.n_models)
          @info "No percent destroy specified, defaulting to the smallest amount that can change an operator: $percent_destroy"
          des.kwargs[:percent_destroy] = percent_destroy
          des.old_kwargs[:percent_destroy] = percent_destroy

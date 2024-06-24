@@ -52,7 +52,7 @@ function create_precedence_matrix(model_instance::ModelInstance; order_function:
         task_to_index[task] = i
         index_to_task[i] = task
     end
-    precedence_matrix = zeros(Int, model_instance.no_tasks+1, model_instance.no_tasks)
+    precedence_matrix = zeros(Int, model_instance.n_tasks+1, model_instance.n_tasks)
     for (pred, suc) in model_instance.precendence_relations
         pred_index = task_to_index[pred]
         suc_index = task_to_index[suc]
@@ -70,8 +70,8 @@ function create_precedence_matrices(instance::MALBP_W_instance; order_function::
         precedence_matrix, task_to_index, index_to_task = create_precedence_matrix(model, order_function= order_function)
         # println("precedence matrix: ", model_name)
         # #prints each row of the precedence matrix
-        # for i in 1:(model.no_tasks + 1)
-        #     if i <= model.no_tasks
+        # for i in 1:(model.n_tasks + 1)
+        #     if i <= model.n_tasks
         #         println(index_to_task[i], precedence_matrix[i, :])
         #     else
         #     println(precedence_matrix[i, :])
@@ -86,17 +86,17 @@ function create_precedence_matrices(instance::MALBP_W_instance; order_function::
     return matrix_dict
 end
 
-function calculate_new_cycle_time(model::ModelInstance, no_stations::Int, cycle_time::Int)
+function calculate_new_cycle_time(model::ModelInstance, n_stations::Int, cycle_time::Int)
     #calculates the new cycle time based on the heuristic
-    new_cycle_time = sum([time for (task, time) in model.task_times[1]]) / no_stations
+    new_cycle_time = sum([time for (task, time) in model.task_times[1]]) / n_stations
     return max(cycle_time, new_cycle_time)
 end
 
 function ehsans_task_assign(instance::MALBP_W_instance, model::ModelInstance, precedence_matrix::Array{Int,2}, index_to_task::Dict{Int, String})
-    new_cycle_time = calculate_new_cycle_time(model, instance.equipment.no_stations, instance.models.cycle_time)
+    new_cycle_time = calculate_new_cycle_time(model, instance.equipment.n_stations, instance.models.cycle_time)
     #creates a vector of remaining time left in the station. The length is the number of stations, and the value is the cycle time
-    remaining_time = fill(new_cycle_time, instance.equipment.no_stations)
-    x_so = zeros(Int, instance.equipment.no_stations, instance.equipment.no_tasks)
+    remaining_time = fill(new_cycle_time, instance.equipment.n_stations)
+    x_so = zeros(Int, instance.equipment.n_stations, instance.equipment.n_tasks)
     while any(precedence_matrix[end, :] .>= 0)
         #get the first zero element in the last row
         first_zero = findfirst(precedence_matrix[end, :] .== 0)
@@ -117,7 +117,7 @@ end
 function ehsans_heuristic(instance::MALBP_W_instance; order_function::Function = positional_weight_order, order_kwargs...)
     model_indexes = [i for (i, model_dict) in instance.models.models]
     precedence_matrices = create_precedence_matrices(instance; order_function= order_function)
-    x_soi = zeros(Int, instance.equipment.no_stations, instance.equipment.no_tasks, instance.models.no_models)
+    x_soi = zeros(Int, instance.equipment.n_stations, instance.equipment.n_tasks, instance.models.n_models)
     for (model_name, model) in instance.models.models
         i = findfirst( ==(model_name), model_indexes)
         precedence_matrix = precedence_matrices[model_name]["precedence_matrix"]
@@ -144,11 +144,11 @@ end
 
 function base_worker_assign_func(instance::MALBP_W_instance, x_soi::Array{Int64,3}; productivity_per_worker::Array{Float64}= [1., 1., 1., 1.])
     model_index = [i for (i, model_dict) in instance.models.models]
-    assign_matrix = zeros(Int, instance.no_scenarios, instance.no_cycles, instance.equipment.no_stations )
-    for (w,scenario) in enumerate(eachrow(instance.scenarios))
+    assign_matrix = zeros(Int, instance.sequences.n_scenarios, instance.num_cycles, instance.equipment.n_stations )
+    for (w,scenario) in enumerate(eachrow(instance.sequences.sequences))
         for (j, model) in enumerate(scenario.sequence)
             i = findfirst( ==(model), model_index)
-            for s in 1:instance.equipment.no_stations
+            for s in 1:instance.equipment.n_stations
                 t = j + s - 1
                 #gets the minimum number of workers needed to complete the tasks
                 tasks = findall(x->x>0, x_soi[s,:,i])
@@ -165,11 +165,11 @@ end
 
 function worker_assignment_heuristic(instance::MALBP_W_instance, x_soi::Array{Int,3}; productivity_per_worker::Array{Float64}= [1., 1., 1., 1.])
     y_wts = base_worker_assign_func(instance, x_soi, productivity_per_worker = productivity_per_worker)
-    y_w = zeros(Int, instance.no_scenarios)
+    y_w = zeros(Int, instance.sequences.n_scenarios)
     y = 0
     peak_wts = (0,0, 0)
-    for (w, scenario) in enumerate(eachrow(instance.scenarios))
-        for t in 1:instance.no_cycles
+    for (w, scenario) in enumerate(eachrow(instance.sequences.sequences))
+        for t in 1:instance.num_cycles
             y_current = 0
             peak_current =0
             station_index = (0,0,0)
@@ -193,7 +193,7 @@ end
 function greedy_set_cover(tasks_to_assign::Vector{Int}, instance::MALBP_W_instance, station::Int)
     #if no tasks to assign, return empty list
     if length(tasks_to_assign) == 0
-        return [], zeros(Int, instance.equipment.no_tasks)
+        return [], zeros(Int, instance.equipment.n_tasks)
     end
     #assigns the equipment to the stations
     equipment_costs = instance.equipment.c_se[station,:][1]
@@ -201,7 +201,7 @@ function greedy_set_cover(tasks_to_assign::Vector{Int}, instance::MALBP_W_instan
     equipment_costs = sort(collect(enumerate(equipment_costs)), by=x->x[2])
     equipment_assignments = Vector{Int64}()
     tasks = copy(tasks_to_assign)
-    capabilities = zeros(Int, instance.equipment.no_tasks)
+    capabilities = zeros(Int, instance.equipment.n_tasks)
     #converts r_oe vector of vectors to a matrix
     r_oe = transpose(stack(instance.equipment.r_oe))
     #First pass: use the cheapest equipment to cover remaining tasks until all tasks are covered
@@ -245,7 +245,7 @@ function greedy_equipment_assignment_heuristic(instance::MALBP_W_instance, x_soi
     #assigns the equipment to the stations
     equipment_assignments = Dict{Int, Vector{Int64}}()
     
-    for station in 1:instance.equipment.no_stations
+    for station in 1:instance.equipment.n_stations
         x_soi_station = x_soi[station, :, :]
         assigned_tasks = sum(x_soi_station, dims=2)
         assigned_tasks = dropdims(assigned_tasks, dims=2)
@@ -279,7 +279,7 @@ function two_step_ehsans(instance::MALBP_W_instance; order_function::Function = 
     models = sort(models, by=x->x.probability, rev=true)
     model1 = popfirst!(models)
     precedence_matrix, task_to_index, index_to_task = create_precedence_matrix(model1; order_function= order_function)
-    x_soi = zeros(Int, instance.equipment.no_stations, instance.equipment.no_tasks, instance.models.no_models)
+    x_soi = zeros(Int, instance.equipment.n_stations, instance.equipment.n_tasks, instance.models.n_models)
     x_so = ehsans_task_assign(instance, model1, precedence_matrix, index_to_task)
     i = findfirst( ==(model1.name), model_indexes)
     x_soi[:,:,i] = x_so
@@ -314,7 +314,7 @@ function calculate_worker_cost(y::Int,y_w::Array{Int,1}, instance::MALBP_W_insta
     #calculates the total cost of the workers
     main_worker_cost = y * instance.worker_cost
     recourse_cost = 0
-    for (w,scenario) in enumerate(eachrow(instance.scenarios))
+    for (w,scenario) in enumerate(eachrow(instance.sequences.sequences))
         probability = scenario.probability
         recourse_cost += y_w[w] * instance.recourse_cost * probability
     end
@@ -323,12 +323,12 @@ end
 
 # function search_w_equip(instance::MALBP_W_instance, equipment_assignments::Dict{Int, Vector{Int64}}, model::ModelInstance, precedence_matrix::Array{Int,2}, index_to_task::Dict{Int, String})
 #     #assigns the equipment to the stations
-#     new_cycle_time = calculate_new_cycle_time(model, instance.equipment.no_stations, instance.models.cycle_time)
+#     new_cycle_time = calculate_new_cycle_time(model, instance.equipment.n_stations, instance.models.cycle_time)
 #     #creates a vector of remaining time left in the station. The length is the number of stations, and the value is the cycle time
-#     remaining_time = fill(new_cycle_time, instance.equipment.no_stations)
+#     remaining_time = fill(new_cycle_time, instance.equipment.n_stations)
 #     station_assign = Dict{Int, Array{String,1}}()
-#     capabilities_so = zeros(Int, instance.equipment.no_stations, instance.equipment.no_tasks)
-#     for station in 1:instance.equipment.no_stations
+#     capabilities_so = zeros(Int, instance.equipment.n_stations, instance.equipment.n_tasks)
+#     for station in 1:instance.equipment.n_stations
 #         station_assign[station] = []
 #     end
 #     station_no = 1
@@ -381,11 +381,11 @@ end
 
 function calculate_c_time_si(instance::MALBP_W_instance)
     model_indexes = [i for (i, model_dict) in instance.models.models]
-    c_time_si = zeros(Float64, instance.equipment.no_stations, instance.models.no_models)
-    for station in 1:instance.equipment.no_stations
+    c_time_si = zeros(Float64, instance.equipment.n_stations, instance.models.n_models)
+    for station in 1:instance.equipment.n_stations
         for (model_name, model) in instance.models.models
             i = findfirst( ==(model_name), model_indexes)
-            c_time_si[station, i] = calculate_new_cycle_time(model, instance.equipment.no_stations, instance.models.cycle_time)
+            c_time_si[station, i] = calculate_new_cycle_time(model, instance.equipment.n_stations, instance.models.cycle_time)
         end
     end
     return c_time_si
@@ -461,12 +461,12 @@ function task_equip_heuristic(instance::MALBP_W_instance; order_function::Functi
     #we need to sort the tasks by the order function so that it is respected in the assignment
     remaining_tasks = [ [task for (_, task) in order_function(model)] for (model,_) in models]
     models = sort(models, by=x->x[1].probability, rev=true)
-    capabilities_so = zeros(Int, instance.equipment.no_stations, instance.equipment.no_tasks)
+    capabilities_so = zeros(Int, instance.equipment.n_stations, instance.equipment.n_tasks)
     c_time_si = calculate_c_time_si(instance)
-    x_soi = zeros(Int, instance.equipment.no_stations, instance.equipment.no_tasks, instance.models.no_models)
+    x_soi = zeros(Int, instance.equipment.n_stations, instance.equipment.n_tasks, instance.models.n_models)
     equipment_assignments = Dict{Int, Vector{Int64}}()
     #Gets all of the remaining tasks for the two models
-    for station in 1:instance.equipment.no_stations
+    for station in 1:instance.equipment.n_stations
         fill_station!(instance, remaining_tasks, station, models, c_time_si, x_soi, equipment_assignments, capabilities_so,  precedence_matrices)
     end
     y, y_w, y_wts, _ = worker_assignment_heuristic(instance, x_soi)
@@ -479,7 +479,7 @@ function x_soi_to_dict(instance::MALBP_W_instance, x_soi::Array{Int,3})
     for (i,(model_name, model)) in enumerate(instance.models.models)
         model_task_assignments_so[model_name] = Dict{Int, Vector{String}}()
         model_task_assignments_os[model_name] = Dict{String, Int}()
-        for station in 1:instance.equipment.no_stations
+        for station in 1:instance.equipment.n_stations
             model_task_assignments_so[model_name][station] = []
             for (task, _) in instance.models.models[model_name].task_times[1]
                 if x_soi[station, parse(Int, task), i] == 1
@@ -610,7 +610,7 @@ function task_1opt(instance::MALBP_W_instance, x_soi::Array{Int,3},; n_iteration
                 if improvement
                     continue
                 end
-                right = calculate_right(x_os, task1, model_name, successors, max_stations = instance.equipment.no_stations)
+                right = calculate_right(x_os, task1, model_name, successors, max_stations = instance.equipment.n_stations)
                 improvement = opt1_insertion!(x_soi, station, station+1, right, task1, model_name, i, instance, x_os, x_so)
             end
         end
@@ -679,13 +679,13 @@ function opt2_insertion!(x_soi::Array{Int,3},
             new_y_sprime = necessary_workers_w_block([removed_2; task], instance.models.cycle_time, instance.models.models[model])
             #Swaps are invalid if they violate worker or precedence constraints
             
-            # if check_bounds(left, right, station, x_os, task2, model, comp_dict, max_stations = instance.equipment.no_stations)
+            # if check_bounds(left, right, station, x_os, task2, model, comp_dict, max_stations = instance.equipment.n_stations)
             #     println("task2: ", task2, " sprime ", s_prime, " task1: ", task,  " station ", station, " left ", left, " right ", right,)
             #     println( " x_o2s ", x_os[model][task2], " station ", station, " x_o1s ", x_os[model][task], " comp_dict ", comp_dict[model][task2])
             # end
   
 
-            if isnothing(new_y_s) || isnothing(new_y_sprime) || !check_bounds(left, right, station, x_os, task2, model, comp_dict, max_stations = instance.equipment.no_stations)
+            if isnothing(new_y_s) || isnothing(new_y_sprime) || !check_bounds(left, right, station, x_os, task2, model, comp_dict, max_stations = instance.equipment.n_stations)
                 continue
             end
             new_workers = new_y_s + new_y_sprime
@@ -735,7 +735,7 @@ function task_2opt(instance::MALBP_W_instance, x_soi::Array{Int,3},; n_iteration
                 if improvement
                     continue
                 end
-                right = calculate_right(x_os, task1, model_name, successors, max_stations = instance.equipment.no_stations)
+                right = calculate_right(x_os, task1, model_name, successors, max_stations = instance.equipment.n_stations)
                 #println("RIGHT: ", right)
                 improvement = opt2_insertion!(x_soi, counter, station, station+1, right, task1, model_name, i, instance, predecessors, x_os, x_so)
             end

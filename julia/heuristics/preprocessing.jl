@@ -20,7 +20,7 @@ end
 
 function generate_precedence_graph(model::ModelInstance, task_to_index::Dict{String, Int})
     #generates a directed graph that represents the precedence relations of the tasks in the model
-    g = SimpleDiGraph{}(model.no_tasks)
+    g = SimpleDiGraph{}(model.n_tasks)
     for (pred, suc) in model.precendence_relations
         predecessor_index = task_to_index[pred]
         successor_index = task_to_index[suc]
@@ -64,8 +64,8 @@ end
 
 function calculate_max_station_capacity(instance::MALBP_W_instance, productivity_per_worker::Dict{Int, Float64})
     #calculates the maximum number of workers that can be assigned to each station
-    max_station_cap = zeros(Int, instance.equipment.no_stations)
-    for station in 1:instance.equipment.no_stations
+    max_station_cap = zeros(Int, instance.equipment.n_stations)
+    for station in 1:instance.equipment.n_stations
         max_station_cap[station] = sum([instance.models.cycle_time * productivity for productivity in values(productivity_per_worker)])
     end
     return max_station_cap
@@ -93,9 +93,9 @@ end
 
 function get_station_bans(instance::MALBP_W_instance, depedency_time::Dict{String, Dict{T, Float64}}, max_station_cap::Vector{Int64}, reverse::Bool) where T
     if reverse
-        stations = 1:instance.equipment.no_stations
+        stations = 1:instance.equipment.n_stations
     else
-        stations = instance.equipment.no_stations:-1:1
+        stations = instance.equipment.n_stations:-1:1
     end
     model_task_bans = Dict{String, Dict{T, Array}}()
     for (model, orig_tasks) in depedency_time

@@ -13,11 +13,11 @@ total_tasks = sum([length(task_assignments["A"][station]) for station in keys(ta
 @test total_tasks == 20
 
 y_wts = base_worker_assign_func(instance, task_assignments)
-@test size(y_wts) == (2^5, instance.no_cycles, instance.equipment.no_stations)
+@test size(y_wts) == (2^5, instance.num_cycles, instance.equipment.n_stations)
 
 instance = read_MALBP_W_instances(config_filepath)[1]
 model = instance.models.models["A"]
-new_cycle_time = calculate_new_cycle_time(model, instance.equipment.no_stations, instance.models.cycle_time)
+new_cycle_time = calculate_new_cycle_time(model, instance.equipment.n_stations, instance.models.cycle_time)
 @test new_cycle_time == 208.75
 
 

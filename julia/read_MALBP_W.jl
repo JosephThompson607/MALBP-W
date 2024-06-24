@@ -4,10 +4,17 @@ using YAML
 using CSV
 using DataFrames
 
+struct ProdSequences
+    sequences::DataFrame
+    n_scenarios::Int
+    generator::String
+    sequence_length::Int
+end
+
 struct ModelInstance
     name::String
     probability::Real
-    no_tasks::Int
+    n_tasks::Int
     order_strength:: Real
     precendence_relations::Vector{Vector{String}}
     task_times::Dict{Int, Dict{String,Float64}}
@@ -16,7 +23,7 @@ end
 struct ModelsInstance
     filepath::String
     name::String
-    no_models::Int
+    n_models::Int
     cycle_time:: Int
     models::Dict{String, ModelInstance}
 end
@@ -24,9 +31,9 @@ end
 struct EquipmentInstance
     filepath::String
     name::String
-    no_stations::Int
-    no_equipment::Int
-    no_tasks::Int
+    n_stations::Int
+    n_equipment::Int
+    n_tasks::Int
     c_se :: Vector{Vector{Float64}}
     r_oe :: Vector{Vector{Int64}}
 end
@@ -38,15 +45,13 @@ struct MALBP_W_instance
     name::String
     config_name::String
     models::ModelsInstance
-    scenarios::DataFrame
-    no_scenarios::Int
+    sequences::ProdSequences
     equipment::EquipmentInstance
-    no_stations:: Int
+    n_stations:: Int
     max_workers:: Int
     worker_cost:: Int
     recourse_cost:: Int
-    sequence_length:: Int
-    no_cycles:: Int
+    num_cycles:: Int
     MILP_models::Array{String}
 end
 
@@ -57,10 +62,9 @@ function calculate_scenarios(scenarios::DataFrame)
     return nrow(scenarios)
 end
 
-function MALBP_W_instance(filepath::String,config_name::String, models::ModelsInstance, scenarios::DataFrame, equipment::EquipmentInstance, no_stations:: Int, max_workers:: Int, worker_cost:: Int, recourse_cost:: Int, sequence_length:: Int, no_cycles:: Int, MILP_models::Array{String})
-    no_scenarios = calculate_scenarios(scenarios)
+function MALBP_W_instance(filepath::String,config_name::String, models::ModelsInstance, sequences::ProdSequences, equipment::EquipmentInstance, n_stations:: Int, max_workers:: Int, worker_cost:: Int, recourse_cost:: Int, num_cycles:: Int, MILP_models::Array{String})
     name =  models.name  * "_" *equipment.name
-    return MALBP_W_instance(filepath,name,config_name, models, scenarios,no_scenarios, equipment, no_stations, max_workers, worker_cost, recourse_cost, sequence_length, no_cycles, MILP_models)
+    return MALBP_W_instance(filepath,name,config_name, models, sequences, equipment, n_stations, max_workers, worker_cost, recourse_cost,  num_cycles, MILP_models)
 end
 
 
@@ -75,17 +79,17 @@ function read_equipment_instance(file_name::String)
     equip_yaml  = YAML.load(open(file_name))
 
     name = equip_yaml["name"]
-    no_stations= equip_yaml["no_stations"]
-    no_equipment = equip_yaml["no_equipment"]
-    no_tasks = equip_yaml["no_tasks"]
+    n_stations= equip_yaml["no_stations"]
+    n_equipment = equip_yaml["no_equipment"]
+    n_tasks = equip_yaml["no_tasks"]
     c_se = equip_yaml["c_se"]
     r_oe = equip_yaml["r_oe"]
     equip_instance = EquipmentInstance(
         file_name,
         name,
-        no_stations,
-        no_equipment,
-        no_tasks,
+        n_stations,
+        n_equipment,
+        n_tasks,
         c_se,
         r_oe
     )
@@ -109,16 +113,16 @@ function read_models_instance(file_name :: String)
     for (key, value) in models_yaml["model_data"]
         name = key
         probability = value["probability"]
-        no_tasks  = value["num_tasks"]
-        order_strength  = value["order_strength"]
+        n_tasks  = value["num_tasks"]
+        order_strength  = models_yaml["order_strength"][key]
         precedence_relations = value["precedence_relations"]
         task_times  = value["task_times"]
         #println(task_times)
-        model_instance = ModelInstance(name, probability, no_tasks, order_strength, precedence_relations, task_times)
+        model_instance = ModelInstance(name, probability, n_tasks, order_strength, precedence_relations, task_times)
         models[name] = model_instance
     end
-    no_models = length(models)
-    models_instance = ModelsInstance(file_name,instance_name, no_models, cycle_time, models)
+    n_models = length(models)
+    models_instance = ModelsInstance(file_name,instance_name, n_models, cycle_time, models)
     return models_instance
 end
 
@@ -134,13 +138,13 @@ end
 
 #checks the instance for consistency
 function check_instance(config_file, models_instance, equipment_instance)
-    if config_file["no_stations"] != equipment_instance.no_stations
+    if config_file["n_stations"] != equipment_instance.n_stations
         error("number of stations in the config file does not match the number of stations in the equipment instance")
     end
     #If the tasks in the models instance are not in the equipment instance, throw an error
     for (model, model_dict) in models_instance.models
         for task in model_dict.task_times
-            if task[1] > equipment_instance.no_tasks
+            if task[1] > equipment_instance.n_tasks
                 error("task $(task[1]) in model $(model) is not in the equipment instance")
             end
         end
@@ -156,18 +160,17 @@ function read_MALBP_W_instances(file_name::String)
             equipment_instance = read_equipment_instance(equip)
             check_instance(config_file,models_instance, equipment_instance)
             scenarios = read_scenario_tree(config_file["scenario"], get_model_mixture(models_instance))
-            no_cycles = config_file["scenario"]["sequence_length"] + config_file["no_stations"] - 1
+            num_cycles = config_file["scenario"]["sequence_length"] + config_file["n_stations"] - 1
             current_instance =MALBP_W_instance(file_name,
                         config_file["config_name"], 
                         models_instance, 
                         scenarios, 
                         equipment_instance, 
-                        config_file["no_stations"], 
+                        config_file["n_stations"], 
                         config_file["max_workers"], 
                         config_file["worker_cost"], 
                         config_file["recourse_cost"], 
-                        config_file["scenario"]["sequence_length"],
-                        no_cycles, 
+                        num_cycles, 
                         config_file["milp_models"])
             push!(instances, current_instance)
         end
@@ -175,24 +178,7 @@ function read_MALBP_W_instances(file_name::String)
     return instances
 end
 
-#reads the scenario tree from a csv file
-function read_scenario_csv(file_name::String)
-    scenarios = CSV.read(file_name, DataFrame)
-    #For each row in the scenario tree, the sequence is a vector of the sequence of models
-    #Makes a dataframe to add rows to
-    new_scenarios = []
-    for row in eachrow(scenarios)
-        #Removes everything outside of brackets in the sequence column
-        new_seq = split(row.sequence, "]")[1]
-        new_seq = split(new_seq, "[")[2]
-        new_seq = split(string(new_seq), ",")
-        new_seq = [replace(strip(x), "\"" => "") for x in new_seq]
-        push!(new_scenarios, (sequence=new_seq, probability=row.probability))
 
-    end
-    new_scenarios = DataFrame(new_scenarios)
-    return new_scenarios
-end
 
 #reads the instances from the results file of a model dependent run
 function read_md_results(file_name::String; sequence_csv_name::String="sequences.csv")
@@ -202,20 +188,20 @@ function read_md_results(file_name::String; sequence_csv_name::String="sequences
         models_instance = read_models_instance(row.model_fp)
         equip_instance = read_equipment_instance(row.equip_fp)
         config_file = get_instance_YAML(row.instance_fp)
+        config_file = overwrite_config_settings(row, config_file)
         scenarios_fp = row.output_folder * sequence_csv_name
         scenarios = read_scenario_csv(scenarios_fp)
-        no_cycles = config_file["scenario"]["sequence_length"] + config_file["no_stations"] - 1
+        num_cycles = config_file["scenario"]["sequence_length"] + config_file["n_stations"] - 1
         current_instance = MALBP_W_instance(row.instance_fp,
                         config_file["config_name"], 
                         models_instance, 
                         scenarios, 
                         equip_instance, 
-                        config_file["no_stations"], 
+                        config_file["n_stations"], 
                         config_file["max_workers"], 
                         config_file["worker_cost"], 
                         config_file["recourse_cost"], 
-                        config_file["scenario"]["sequence_length"],
-                        no_cycles, 
+                        num_cycles, 
                         config_file["milp_models"])
         push!(instances, (instance=current_instance, vars= row.output_folder, objective_value = row.objective_value))
 
@@ -223,36 +209,102 @@ function read_md_results(file_name::String; sequence_csv_name::String="sequences
     return instances
 end
 
+function overwrite_config_settings(row, config_file)
+    #If the row has n_stations, use the n_stations from the row
+    if row.n_stations != ""
+        @info "Using number of stations from csv file"
+        config_file["n_stations"] = row.n_stations
+    end
+    #If the row has max_workers, use the max_workers from the row
+    if row.max_workers != ""
+        @info "Using max workers from csv file"
+        config_file["max_workers"] = row.max_workers
+    end
+    #If the row has worker_cost, use the worker_cost from the row
+    if row.worker_cost != ""
+        @info "Using worker cost from csv file"
+        config_file["worker_cost"] = row.worker_cost
+    end
+    #If the row has recourse_cost, use the recourse_cost from the row
+    if row.recourse_cost != ""
+        @info "Using recourse cost from csv file"
+        config_file["recourse_cost"] = row.recourse_cost
+    end
+    #If the row has sequence_length, use the sequence_length from the row
+    if row.sequence_length != ""
+        @info "Using sequence length from csv file"
+        config_file["scenario"]["sequence_length"] = row.sequence_length
+    end
+    if row.n_scenarios != ""
+        @info "Using number of scenarios from csv file"
+        config_file["scenario"]["n_samples"] = row.n_scenarios
+    end
+    return config_file
+
+end
+
+
+
 #reads the instances from a csv file
-function read_slurm_csv(file_name::String)
+function read_slurm_csv(file_name::String, slurm_ind::Int)
+    results = CSV.read(file_name, DataFrame)
+    row = results[slurm_ind, :]
+    models_instance = read_models_instance(row.model_yaml)
+    equip_instance = read_equipment_instance(row.equipment_yaml)
+    config_file = get_instance_YAML(row.config_yaml)
+    config_file = overwrite_config_settings(row, config_file)
+    if row.scenario_tree_yaml != "" && row.scenario_tree_yaml != "No Tree"
+        scenarios = read_scenario_csv(row.scenario_tree_yaml)
+    else
+        println("THESE ARE THE SCENARIOS", config_file["scenario"])
+        scenarios = read_scenario_tree(config_file["scenario"], get_model_mixture(models_instance))
+    end
+    num_cycles = config_file["scenario"]["sequence_length"] + config_file["n_stations"] - 1
+    current_instance = MALBP_W_instance(row.config_yaml,
+                    config_file["config_name"], 
+                    models_instance, 
+                    scenarios, 
+                    equip_instance, 
+                    config_file["n_stations"], 
+                    config_file["max_workers"], 
+                    config_file["worker_cost"], 
+                    config_file["recourse_cost"], 
+                    num_cycles, 
+                    config_file["milp_models"])
+    return config_file, current_instance
+end
+
+#reads the instances from a csv file
+function read_csv(file_name::String)
     results = CSV.read(file_name, DataFrame)
     instances = []
     for row in eachrow(results)
         models_instance = read_models_instance(row.model_yaml)
         equip_instance = read_equipment_instance(row.equipment_yaml)
         config_file = get_instance_YAML(row.config_yaml)
+        config_file = overwrite_config_settings(row, config_file)
         if row.scenario_tree_yaml != "" && row.scenario_tree_yaml != "No Tree"
             scenarios = read_scenario_csv(row.scenario_tree_yaml)
         else
             scenarios = read_scenario_tree(config_file["scenario"], get_model_mixture(models_instance))
         end
-        no_cycles = config_file["scenario"]["sequence_length"] + config_file["no_stations"] - 1
+        num_cycles = config_file["scenario"]["sequence_length"] + config_file["n_stations"] - 1
         current_instance = MALBP_W_instance(row.config_yaml,
                         config_file["config_name"], 
                         models_instance, 
                         scenarios, 
                         equip_instance, 
-                        config_file["no_stations"], 
+                        config_file["n_stations"], 
                         config_file["max_workers"], 
                         config_file["worker_cost"], 
                         config_file["recourse_cost"], 
                         config_file["scenario"]["sequence_length"],
-                        no_cycles, 
+                        num_cycles, 
                         config_file["milp_models"])
         push!(instances, (current_instance, config_file))
 
     end
-    return instances
+    return instance
 end
 
 

@@ -1,7 +1,4 @@
-include("lns_config.jl")
-include("destroy_ops.jl")
-include("change_ops.jl")
-include("adapt_strategies.jl")
+
 
 
 
@@ -64,8 +61,7 @@ end
 
 
 
-function large_neighborhood_search!(m::Model, instance::MALBP_W_instance, search_strategy_fp::String; lns_res_fp::String="", md_obj_val::Union{Nothing, Float64}=nothing, run_time::Real=600.0, model_dependent=false )
-    lns_conf = read_search_strategy_YAML(search_strategy_fp, run_time, model_dependent=model_dependent)
+function large_neighborhood_search!(m::Model, instance::MALBP_W_instance, lns_conf::LNSConf; lns_res_fp::String="", md_obj_val::Union{Nothing, Float64}=nothing, run_time::Real=600.0)
     set_destroy_size!(lns_conf.des, instance)
     seed = lns_conf.seed
     #sets the time limit for the model

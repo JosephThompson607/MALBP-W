@@ -3,20 +3,20 @@ function get_u_se_values!(m::Model, instance::MALBP_W_instance; old_u_se::Union{
     u_se = m[:u_se]
     c_se = instance.equipment.c_se
     u_se_values = Dict{Int, Array}()
-    for s in 1:instance.equipment.no_stations
+    for s in 1:instance.equipment.n_stations
         if !isnothing(old_u_se)
             u_se_values[s] = old_u_se[s]
         else
             u_se_values[s] = []
         end
-        for e in 1:instance.equipment.no_equipment
+        for e in 1:instance.equipment.n_equipment
             if value(u_se[s, e]) > 0
                 push!(u_se_values[s], value(u_se[s, e]))
                 c_se[s][e] = 0
             end
         end
     end
-    equip_inst = EquipmentInstance(instance.equipment.filepath, instance.equipment.name, instance.equipment.no_stations, instance.equipment.no_equipment, instance.equipment.no_tasks, c_se, instance.equipment.r_oe)
+    equip_inst = EquipmentInstance(instance.equipment.filepath, instance.equipment.name, instance.equipment.n_stations, instance.equipment.n_equipment, instance.equipment.n_tasks, c_se, instance.equipment.r_oe)
     return u_se_values, equip_inst
 end
 
@@ -26,9 +26,9 @@ function get_task_assignments(m::Model, instance::MALBP_W_instance)
         #writes the solution to a file
         x = m[:x_soi]
         x_soi_solution = []
-        for s in 1:instance.equipment.no_stations
-            for o in 1:instance.equipment.no_tasks
-                for i in 1:instance.models.no_models
+        for s in 1:instance.equipment.n_stations
+            for o in 1:instance.equipment.n_tasks
+                for i in 1:instance.models.n_models
                     x_soi_dict = Dict("station"=>s, "task"=>o, "model"=>i, "value"=>value(x[s, o, i]))
                     push!(x_soi_solution, x_soi_dict)
                 end
@@ -46,7 +46,7 @@ function mixed_to_single(model::ModelInstance, instance::MALBP_W_instance; equip
                                 instance.models.cycle_time,
                                 model_dict
                                 )
-    scenario_df = DataFrame(sequence = [repeat([model.name], instance.sequence_length)], probability = [model.probability])
+    scenario_df = DataFrame(sequence = [repeat([model.name], instance.sequences.sequence_length)], probability = [model.probability])
     new_instance = MALBP_W_instance(instance.filepath, 
                                     instance.name,
                                     instance.config_name,
@@ -54,12 +54,12 @@ function mixed_to_single(model::ModelInstance, instance::MALBP_W_instance; equip
                                     scenario_df,
                                     1,
                                     equipment,
-                                    instance.no_stations,
+                                    instance.n_stations,
                                     instance.max_workers,
                                     instance.worker_cost,
                                     instance.recourse_cost,
-                                    instance.sequence_length,
-                                    instance.no_cycles,
+                                    instance.sequences.sequence_length,
+                                    instance.num_cycles,
                                     instance.MILP_models)
     return new_instance
 end

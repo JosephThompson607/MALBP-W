@@ -6,9 +6,9 @@ using Dates
 function write_x_so_solution(output_filepath::String, instance::MALBP_W_instance, x::Array, only_nonzero::Bool=false)
     #writes the solution to a file
     x_soi_solution = []
-    for s in 1:instance.equipment.no_stations
-        for o in 1:instance.equipment.no_tasks
-            for i in 1:instance.models.no_models
+    for s in 1:instance.equipment.n_stations
+        for o in 1:instance.equipment.n_tasks
+            for i in 1:instance.models.n_models
                 if only_nonzero && value(x[s, o]) == 0
                     continue
                 end
@@ -26,9 +26,9 @@ end
 function write_x_soi_solution(output_filepath::String, instance::MALBP_W_instance, x::Array, only_nonzero::Bool=false)
     #writes the solution to a file
     x_soi_solution = []
-    for s in 1:instance.equipment.no_stations
-        for o in 1:instance.equipment.no_tasks
-            for i in 1:instance.models.no_models
+    for s in 1:instance.equipment.n_stations
+        for o in 1:instance.equipment.n_tasks
+            for i in 1:instance.models.n_models
                 if only_nonzero && value(x[s, o, i]) == 0
                     continue
                 end
@@ -45,15 +45,15 @@ end
 function write_x_wsoj_solution(output_filepath::String, instance::MALBP_W_instance, x::Array, only_nonzero::Bool=false)
     #writes the solution to a file
     x_wsoj_solution = []
-    for w in 1:instance.no_scenarios
-        for s in 1:instance.equipment.no_stations
-            for o in 1:instance.equipment.no_tasks
-                for j in 1:instance.sequence_length
+    for w in 1:instance.sequences.n_scenarios
+        for s in 1:instance.equipment.n_stations
+            for o in 1:instance.equipment.n_tasks
+                for j in 1:instance.sequences.sequence_length
                     if only_nonzero && value(x[w, s, o, j]) == 0
                         continue
                     end
                     
-                    x_wsoj_dict = Dict("scenario"=>w, "station"=>s, "task"=>o, "item_idx"=>j, "item"=>instance.scenarios[w,"sequence"][j], "value"=>value(x[w, s, o, j]))
+                    x_wsoj_dict = Dict("scenario"=>w, "station"=>s, "task"=>o, "item_idx"=>j, "item"=>instance.sequences.sequences[w,"sequence"][j], "value"=>value(x[w, s, o, j]))
                     push!(x_wsoj_solution, x_wsoj_dict)
                 end
             end
@@ -67,8 +67,8 @@ end
 function write_u_se_solution(output_filepath::String, instance::MALBP_W_instance, u::Array, only_nonzero::Bool=false)
     #writes the solution to a file
     u_se_solution = []
-    for s in 1:instance.equipment.no_stations
-        for e in 1:instance.equipment.no_equipment
+    for s in 1:instance.equipment.n_stations
+        for e in 1:instance.equipment.n_equipment
             if only_nonzero && value(u[s, e]) == 0
                 continue
             end
@@ -84,9 +84,9 @@ end
 function write_y_wts_solution(output_filepath::String, instance::MALBP_W_instance, y_wts, only_nonzero::Bool=false)
     #writes the solution to a file
     y_wts_solution = []
-    for w in 1:instance.no_scenarios
-        for t in 1:instance.no_cycles
-            for s in 1:instance.equipment.no_stations
+    for w in 1:instance.sequences.n_scenarios
+        for t in 1:instance.num_cycles
+            for s in 1:instance.equipment.n_stations
                 if only_nonzero && value(y_wts[w, t, s]) == 0
                     continue
                 end
@@ -103,7 +103,7 @@ end
 function write_y_w_solution(output_filepath::String, instance::MALBP_W_instance, y_w, y; only_nonzero::Bool=false)
     #writes the solution to a file
     y_solution = []
-    for w in 1:instance.no_scenarios
+    for w in 1:instance.sequences.n_scenarios
         if only_nonzero && value(y_w[w]) == 0
             continue
         end
@@ -131,7 +131,7 @@ function write_MALBP_W_solution_md(output_filepath::String, instance::MALBP_W_in
         @info("Model is not solved or feasible, no solution written")
     end
     #writes the sequences to a file
-    CSV.write(output_filepath * "sequences.csv", instance.scenarios)
+    CSV.write(output_filepath * "sequences.csv", instance.sequences.sequences)
 end
 
 function write_MALBP_W_solution_fixed(output_filepath::String, instance::MALBP_W_instance, m::Model, only_nonzero::Bool=false)
@@ -148,7 +148,7 @@ function write_MALBP_W_solution_fixed(output_filepath::String, instance::MALBP_W
         @info("Model is not solved or feasible, no solution written")
     end
     #writes the sequences to a file
-    CSV.write(output_filepath * "sequences.csv", instance.scenarios)
+    CSV.write(output_filepath * "sequences.csv", instance.sequences.sequences)
 end
 
 
@@ -171,7 +171,7 @@ function write_MALBP_W_solution_dynamic(output_filepath::String, instance::MALBP
         @info("Model is not solved or feasible, no solution written")
     end
     #writes the sequences to a file
-    CSV.write(output_filepath * "sequences.csv", instance.scenarios)
+    CSV.write(output_filepath * "sequences.csv", instance.sequences.sequences)
 
     #writes the sequences to a yaml file
     
@@ -183,7 +183,16 @@ function save_results(output_filepath::String, m::Model, run_time::Real, instanc
     #copies the config files to the output folder
     cp(instance.equipment.filepath, var_fp * "equipment.yaml", force=true)
     cp(instance.models.filepath, var_fp * "models.yaml", force=true)
-    cp(instance.filepath, var_fp * "instance.yaml", force=true)
+    cp(instance.filepath, var_fp * "base_instance.yaml", force=true)
+
+    #writes the config to a yaml file
+    instance_dict = Dict("name"=>instance.name, 
+                            "sequence_length"=>instance.sequences.sequence_length, 
+                            "n_scenarios"=>instance.sequences.n_scenarios, 
+                            "max_workers"=>instance.max_workers, 
+                            "worker_cost"=>instance.worker_cost, 
+                            "recourse_cost"=>instance.recourse_cost)
+
     
     #saves the objective function, relative gap, run time, and instance_name to a file
     if is_solved_and_feasible(m)  || termination_status(m) == MOI.TIME_LIMIT
@@ -210,7 +219,14 @@ function save_results(output_filepath::String, m::Model, run_time::Real, instanc
                         equip_fp= instance.equipment.filepath,
                         model_fp= instance.models.filepath,
                         instance_fp= instance.filepath, 
-                        output_folder=var_fp)
+                        output_folder=var_fp,
+                        sequence_length=instance.sequences.sequence_length,
+                        n_scenarios=instance.sequences.n_scenarios,
+                        n_stations = instance.equipment.n_stations,
+                        max_workers = instance.max_workers,
+                        worker_cost = instance.worker_cost,
+                        recourse_cost = instance.recourse_cost,
+                        )
     else
         results = DataFrame(instance_name=instance.name, 
                         objective_value=obj_val, 
@@ -222,7 +238,13 @@ function save_results(output_filepath::String, m::Model, run_time::Real, instanc
                         equip_fp= instance.equipment.filepath,
                         model_fp= instance.models.filepath,
                         instance_fp= instance.filepath, 
-                        output_folder=var_fp)
+                        output_folder=var_fp,
+                        sequence_length=instance.sequences.sequence_length,
+                        n_stations = instance.equipment.n_stations,
+                        n_scenarios=instance.sequences.n_scenarios,
+                        max_workers = instance.max_workers,
+                        worker_cost = instance.worker_cost,
+                        recourse_cost = instance.recourse_cost,)
     end
     #If the file does not exist, create it
     if !isfile(output_filepath * output_csv)

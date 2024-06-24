@@ -5,11 +5,11 @@ include("constructive.jl")
  #Function for calculating the stating number of workers at each station
  function chunk_out_tasks(productivity_per_worker::Array{Float64}, instance::MALBP_W_instance, remaining_time::Real)
     #Here we assume tasks will be evenely distributed among stations.
-    workers_per_station = zeros(Int, instance.no_stations)
-    available_station_time = zeros(Float64, instance.no_stations)
+    workers_per_station = zeros(Int, instance.n_stations)
+    available_station_time = zeros(Float64, instance.n_stations)
     #assigns workers to stations, starting with the most productive workers (first workers)
     for (worker, productivity) in enumerate(productivity_per_worker)
-        for station in 1:instance.no_stations
+        for station in 1:instance.n_stations
             available_task_time = instance.models.cycle_time * productivity
             remaining_time -= available_task_time
             workers_per_station[station] += 1
@@ -52,14 +52,14 @@ function recursive_task_fill(instance::MALBP_W_instance, model::ModelInstance, m
     println("min workers: ", min_workers)
     available_station_time = copy(min_workers["available_station_time"])
     workers_per_station = copy(min_workers["workers_per_station"])
-    # x_soi = zeros(Int, instance.equipment.no_stations, instance.equipment.no_tasks, instance.models.no_models)
+    # x_soi = zeros(Int, instance.equipment.n_stations, instance.equipment.n_tasks, instance.models.n_models)
     station_assignments = Dict{Int, Vector{String}}()
     function station_fill!(station::Int, update_station::Int, remaining_task_time::Real)
         if remaining_task_time <= 0
             return
-        elseif station == instance.equipment.no_stations && remaining_task_time > sum(available_station_time[station])
+        elseif station == instance.equipment.n_stations && remaining_task_time > sum(available_station_time[station])
             #need to reset the tasks that will be unassigned and reassigned
-            for i in update_station:instance.equipment.no_stations
+            for i in update_station:instance.equipment.n_stations
                 available_station_time[i] += sum([ time for (task, time) in model.task_times[o] for o in station_assignments[i]])
                 remaining_task_time += sum([ time for (task, time) in model.task_times[o] for o in station_assignments[i]])
                 station_assignments[i] = []

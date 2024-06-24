@@ -1,6 +1,7 @@
 using Random
 using StatsBase
 
+
 function generate_scenario_tree(sequence_length::Int, model_mixtures::Dict{String, Float64} )
     #If the model mixtures do not sum to 1, throw an error
     if round(sum(values(model_mixtures)),digits = 6) != 1
@@ -105,12 +106,41 @@ function uniform_limit(sequence_length::Int, model_mixtures::Dict{String, Float6
     return final_sequences
 end
 
+
+#reads the scenario tree from a csv file
+function read_scenario_csv(file_name::String)
+    scenarios = CSV.read(file_name, DataFrame)
+    #For each row in the scenario tree, the sequence is a vector of the sequence of models
+    #Makes a dataframe to add rows to
+    new_scenarios = []
+    for row in eachrow(scenarios)
+        #Removes everything outside of brackets in the sequence column
+        new_seq = split(row.sequence, "]")[1]
+        new_seq = split(new_seq, "[")[2]
+        new_seq = split(string(new_seq), ",")
+        new_seq = [replace(strip(x), "\"" => "") for x in new_seq]
+        push!(new_scenarios, (sequence=new_seq, probability=row.probability))
+
+    end
+    new_scenarios = DataFrame(new_scenarios)
+    sequences = ProdSequences(new_scenarios, nrow(new_scenarios), "read_csv", length(new_scenarios[1].sequence))
+    return sequences
+end
+
 #reads scenario tree file from csv accepts a dictionary of scenario tree info and model mixtures(optional)
 function read_scenario_tree(scenario_info::Dict, model_mixtures::Dict{String, Float64} )
     if scenario_info["generator"] == "read_csv"
-        return CSV.read(scenario_info["filepath"], DataFrame)
+        return read_scenario_csv(scenario_info["file_name"])
     elseif scenario_info["generator"] == "full"
-        return generate_scenario_tree(scenario_info["sequence_length"], model_mixtures)
+        scenario_df= generate_scenario_tree(scenario_info["sequence_length"], model_mixtures)
+        n_scenarios = nrow(scenario_df)
+        scenario = ProdSequences(
+            scenario_df,
+            n_scenarios,
+            "full",
+            scenario_info["sequence_length"]
+        )
+        return scenario
     elseif scenario_info["generator"] == "monte_carlo_tree_limit" || scenario_info["generator"] == "monte_carlo_limit"
         if !haskey(scenario_info, "n_samples")
             error("n_samples is required for monte_carlo_tree_limit, please provide it in the config file")
@@ -118,7 +148,15 @@ function read_scenario_tree(scenario_info::Dict, model_mixtures::Dict{String, Fl
         if !haskey(scenario_info, "seed")
             scenario_info["seed"] = nothing
         end
-        return monte_carlo_tree_limit(scenario_info["sequence_length"], model_mixtures, scenario_info["n_samples"], seed=scenario_info["seed"])
+        scenario_df = monte_carlo_tree_limit(scenario_info["sequence_length"], model_mixtures, scenario_info["n_samples"], seed=scenario_info["seed"])
+        n_scenarios = nrow(scenario_df)
+        scenario = ProdSequences(
+            scenario_df,
+            n_scenarios,
+            "monte_carlo_tree_limit",
+            scenario_info["sequence_length"]
+        )
+        return scenario
     elseif scenario_info["generator"] == "uniform_limit"
         if !haskey(scenario_info, "n_samples")
             error("n_samples is required for uniform_limit, please provide it in the config file")
@@ -126,7 +164,15 @@ function read_scenario_tree(scenario_info::Dict, model_mixtures::Dict{String, Fl
         if !haskey(scenario_info, "seed")
             scenario_info["seed"] = nothing
         end
-        return uniform_limit(scenario_info["sequence_length"], model_mixtures, scenario_info["n_samples"], seed=scenario_info["seed"])
+        scenario_df = uniform_limit(scenario_info["sequence_length"], model_mixtures, scenario_info["n_samples"], seed=scenario_info["seed"])
+        n_scenarios = nrow(scenario_df)
+        scenario = ProdSequences(
+            scenario_df,
+            n_scenarios,
+            "uniform_limit",
+            scenario_info["sequence_length"]
+        )
+        return scenario
     else
         error("unrecognized generator, currently we only support read_csv, monte_carlo_tree_limit, uniform_limit, and full for scenario tree generation.")
     end
