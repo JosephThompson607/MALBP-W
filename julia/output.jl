@@ -183,16 +183,19 @@ function save_results(output_filepath::String, m::Model, run_time::Real, instanc
     #copies the config files to the output folder
     cp(instance.equipment.filepath, var_fp * "equipment.yaml", force=true)
     cp(instance.models.filepath, var_fp * "models.yaml", force=true)
-    cp(instance.filepath, var_fp * "base_instance.yaml", force=true)
+    #cp(instance.filepath, var_fp * "base_instance.yaml", force=true)
 
-    #writes the config to a yaml file
-    instance_dict = Dict("name"=>instance.name, 
-                            "sequence_length"=>instance.sequences.sequence_length, 
-                            "n_scenarios"=>instance.sequences.n_scenarios, 
-                            "max_workers"=>instance.max_workers, 
-                            "worker_cost"=>instance.worker_cost, 
-                            "recourse_cost"=>instance.recourse_cost)
-
+    #opens the instance file
+    orig_instance = get_instance_YAML(instance.filepath)
+    #overwrites parts of the instance file
+    orig_instance["max_workers"] = instance.max_workers
+    orig_instance["worker_cost"] = instance.worker_cost
+    orig_instance["recourse_cost"] = instance.recourse_cost
+    orig_instance["scenario"]["generator"] = instance.sequences.generator
+    orig_instance["scenario"]["sequence_length"] = instance.sequences.sequence_length
+    orig_instance["scenario"]["n_samples"] = instance.sequences.n_scenarios
+    #writes the instance file to the output folder
+    YAML.write_file(var_fp * "instance.yaml", orig_instance)
     
     #saves the objective function, relative gap, run time, and instance_name to a file
     if is_solved_and_feasible(m)  || termination_status(m) == MOI.TIME_LIMIT
