@@ -1,14 +1,14 @@
 #This file contains the adaptive strategies for the LNS algorithm
 
 #Does not adapt the LNS algorithm, useful for testing
-function no_adapt_lns!(iter_no_improve::Int, lns_obj::LNSConf, m::Model; _...)
+function no_adapt!(iter_no_improve::Int, lns_obj::LNSConf, m::Model; _...)
     return iter_no_improve, lns_obj, m
 end
 
 
 
 #adaptive lns for destroy operator selection
-function adapt_lns_des!(iter_no_improve::Int, lns_obj::LNSConf, m::Model; iteration::Int, iteration_time::Float64, des_weight_update::Function = no_weight_update, obj_val_delta::Float64=0., _...)
+function adapt_des!(iter_no_improve::Int, lns_obj::LNSConf, m::Model; iteration::Int, iteration_time::Float64, des_weight_update::Function = no_weight_update, obj_val_delta::Float64=0., _...)
     #retrieves the decay and change decay parameters
     decay = lns_obj.des.kwargs[:des_decay]
     #rewards the destroy and change operator if there has been an improvement

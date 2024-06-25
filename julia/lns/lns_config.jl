@@ -350,15 +350,15 @@ function get_search_strategy_config(search_strategy::Dict, config_filepath::Stri
     end
     if !haskey(search_strategy, "adaptation")
         @info "No LNS adaptation specified, defaulting to no_adapt_lns"
-        adaptation_technique = no_adapt_lns!
+        adaptation_technique = no_adapt!
     else
         @info "LNS adaptation specified: $(search_strategy["adaptation"])"
         if search_strategy["adaptation"] == "adapt_lns!"
             adaptation_technique = adapt_lns!
-        elseif search_strategy["adaptation"] == "adapt_lns_des!"
-            adaptation_technique = adapt_lns_des!
-        elseif search_strategy["adaptation"] == "no_adapt_lns!" || search_strategy["adaptation"] == "no_adapt_lns" || search_strategy["adaptation"] == "no_adapt"
-            adaptation_technique = no_adapt_lns!
+        elseif search_strategy["adaptation"] == "adapt_des!"
+            adaptation_technique = adapt_des!
+        elseif search_strategy["adaptation"] == "no_adapt!" || search_strategy["adaptation"] == "no_adapt_lns" || search_strategy["adaptation"] == "no_adapt"
+            adaptation_technique = no_adapt!
         else
             @error "LNS adaptation operator $(search_strategy["adaptation"]) not recognized"
         end

@@ -94,14 +94,21 @@ function parse_commandline()
     s = ArgParseSettings()
 
     @add_arg_table s begin
-        "--config_file", "-c"
-            help = "Filepath of main config file"
+        "irace_config_id"
+            help = "ID of the irace configuration"
             arg_type = String
-            required = true
+        "irace_instance_id"
+            help = "ID of the irace instance"
+            arg_type = String
+        "seed"
+            help = "Seed for the random number generator"
+            arg_type = Int
+        "config_file", 
+            help = "Filepath of main config file"
         "--run_time", "-t"
             help = "Maximum run time for the model"
             arg_type = Float64
-            default = 3600.0
+            default = 4200.0
         "--output_file", "-o"
             help = "Name of the experiment"
             arg_type = String
@@ -118,7 +125,7 @@ function parse_commandline()
         "--adaptive"
             help = "type of adaptive step to use"
             arg_type = String
-            default = "no_adapt_lns!"
+            default = "no_adapt!"
         "--percent_destroy"
             help = "percent of the solution to destroy"
             arg_type = Float64
@@ -130,7 +137,7 @@ function parse_commandline()
         "--weight_update"
             help = "how the destroy and change operator weights are adjusted"
             arg_type = String
-            default = "no_weight_update"
+            default = "basic_update"
         "--seed"
             help = "seed for the random number generator"
             arg_type = Int

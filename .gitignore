@@ -31,3 +31,4 @@ instance_gen.ipynb
 instance_data/
 *.mps
 my_model.mps
+*.txt
