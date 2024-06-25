@@ -151,6 +151,7 @@ end
 
 function parse_destroy_list(destroy_list::Array{String})
     #new destroy list is a vector of runner_functions
+    println(destroy_list)
     new_destroy_list = Vector{Function}()
     for i in destroy_list
         i = getfield(Main, Symbol(i))

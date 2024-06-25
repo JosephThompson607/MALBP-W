@@ -179,6 +179,32 @@ function read_MALBP_W_instances(file_name::String)
 end
 
 
+#reads the instances from the results file of a model dependent run
+function read_md_result(file_name::String, res_index::Int; sequence_csv_name::String="sequences.csv")
+    results = CSV.read(file_name, DataFrame)
+    row = results[res_index, :]
+    obj_val = row.objective_value
+    models_instance = read_models_instance(row.model_fp)
+    equip_instance = read_equipment_instance(row.equip_fp)
+    config_file = get_instance_YAML(row.instance_fp)
+    config_file = overwrite_config_settings(row, config_file)
+    scenarios_fp = row.output_folder * sequence_csv_name
+    scenarios = read_scenario_csv(scenarios_fp)
+    num_cycles = config_file["scenario"]["sequence_length"] + config_file["n_stations"] - 1
+    current_instance = MALBP_W_instance(row.instance_fp,
+                    config_file["config_name"], 
+                    models_instance, 
+                    scenarios, 
+                    equip_instance, 
+                    config_file["n_stations"], 
+                    config_file["max_workers"], 
+                    config_file["worker_cost"], 
+                    config_file["recourse_cost"], 
+                    num_cycles, 
+                    config_file["milp_models"])
+    return current_instance, row.output_folder, obj_val
+end
+
 
 #reads the instances from the results file of a model dependent run
 function read_md_results(file_name::String; sequence_csv_name::String="sequences.csv")
@@ -256,7 +282,6 @@ function read_slurm_csv(file_name::String, slurm_ind::Int)
     if row.scenario_tree_yaml != "" && row.scenario_tree_yaml != "No Tree"
         scenarios = read_scenario_csv(row.scenario_tree_yaml)
     else
-        println("THESE ARE THE SCENARIOS", config_file["scenario"])
         scenarios = read_scenario_tree(config_file["scenario"], get_model_mixture(models_instance))
     end
     num_cycles = config_file["scenario"]["sequence_length"] + config_file["n_stations"] - 1

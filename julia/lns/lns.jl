@@ -77,7 +77,7 @@ function large_neighborhood_search!(m::Model, instance::MALBP_W_instance, lns_co
     set_destroy_size!(lns_conf.des, instance)
     seed = lns_conf.seed
     #sets the time limit for the model
-    set_optimizer_attribute(m, "TimeLimit", lns_conf.rep.kwargs[:time_limit])
+    
     #write_to_file(m, "my_model.mps")
     start_time = time()
     obj_vals = []
@@ -94,6 +94,9 @@ function large_neighborhood_search!(m::Model, instance::MALBP_W_instance, lns_co
     #main loop of algorithm
     iter_no_improve = 0
     for i in 1: lns_conf.n_iterations
+        #For the last iteration, the time limit is the remaining time
+        last_iter_time = min(run_time - (time() - start_time), lns_conf.rep.kwargs[:time_limit])
+        set_optimizer_attribute(m, "TimeLimit", last_iter_time)
         println("mip repair kwargs: ", lns_conf.rep.kwargs)
         gap = max(1e-4, lns_conf.rep.kwargs[:mip_gap])
         set_optimizer_attribute(m, "MIPGap", gap)
@@ -159,6 +162,6 @@ function large_neighborhood_search!(m::Model, instance::MALBP_W_instance, lns_co
     println("conf_fp", lns_conf.conf_fp)
     save_lns_conf(lns_conf, lns_res_fp* "lns_conf.yaml")
     #cp(lns_conf.conf_fp, lns_res_fp* "lns_conf.yaml", force=true)
-    println("best obj val: ", incumbent_dict)
+    println("best obj val: ", incumbent)
     return incumbent_dict, incumbent
 end

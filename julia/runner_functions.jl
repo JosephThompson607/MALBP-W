@@ -331,23 +331,28 @@ end
 
 
 #irace run for dynamic model LNS
-function irace_LNS(md_vars_folder::String, md_vars_index::Int, lns_conf::LNSConf, output_filepath::String, run_time::Float64, ; xp_folder::String="model_runs", preprocessing::Bool=true)
-    #We are assuming each irace instance is a single instance
-    instance = read_md_results(md_vars_folder)[md_vars_index]
+function irace_LNS(md_results_fp::String, md_res_index::Int, lns_conf::LNSConf, output_filepath::String, run_time::Float64; xp_folder::String="model_runs", preprocessing::Bool=true)
+
     #adds the date and time to the output file path
     now = Dates.now()
     now = Dates.format(now, "yyyy-mm-dd")
-    lns_output = xp_folder * "/" * now * "_" * output_filepath 
-    @info "Running instance $(instance.name), from $(config_filepath). \n Output will be saved to $(output_filepath)"
+    output_filepath = xp_folder * "/"  * now * output_filepath * "/" * "$md_res_index" * "/"
+    if !isdir(output_filepath)
+        mkpath(output_filepath)
+    end
+        #We are assuming each irace instance is a single instance
+    instance, warmstart_vars_fp, md_obj_val = read_md_result(md_results_fp, md_res_index)
+    optimizer = optimizer_with_attributes(() -> Gurobi.Optimizer(GRB_ENV), "TimeLimit" => run_time)
+    @info "Running instance $(instance.name) \n Output will be saved to $(output_filepath)"
     m = Model(optimizer)
     set_optimizer_attribute(m, "LogFile", output_filepath * "gurobi.log")
     #defines the  dyanmic model parameters
-    define_dynamic_linear!(m, instance, warmstart_vars, preprocessing=preprocessing)
+    define_dynamic_linear!(m, instance, warmstart_vars_fp, preprocessing=preprocessing)
     #solves the model in a lns loop
     obj_dict, best_obj = large_neighborhood_search!(m, instance, lns_conf; lns_res_fp= output_filepath  , md_obj_val=md_obj_val, run_time=run_time)
     #saves the solution variables
-    write_MALBP_W_solution_dynamic(output_filepath, instance, m, false)
+    write_MALBP_W_solution_dynamic(output_filepath , instance, m, false)
     #saves the objective function, relative gap, run time, and instance_name to a file
-    save_results(original_filepath * "dynamic/", m, run_time, instance, output_filepath, "dynamic_problem_linear_labor_recourse.csv"; prev_obj_val=md_obj_val, best_obj_val = best_obj)
-    return objective_value(lns_m)
+    save_results(output_filepath, m, run_time, instance, output_filepath , "dynamic_problem_linear_labor_recourse.csv"; prev_obj_val=md_obj_val, best_obj_val = best_obj)
+    return best_obj
 end
