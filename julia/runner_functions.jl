@@ -111,7 +111,7 @@ function MMALBP_W_dynamic_ws( instance::MALBP_W_instance, optimizer::Gurobi.Math
     return m
 end
 
-function MMALBP_W_dynamic_lns( instance::MALBP_W_instance, optimizer::Gurobi.MathOptInterface.OptimizerWithAttributes, original_filepath::String, run_time::Real, search_strategy::String; 
+function MMALBP_W_dynamic_lns( instance::MALBP_W_instance, optimizer::Gurobi.MathOptInterface.OptimizerWithAttributes, original_filepath::String, run_time::Real, search_strategy_fp::String; 
                                 save_variables::Bool=true, save_lp::Bool=false, warmstart_vars::String="", md_obj_val::Real=0.0, slurm_array_ind::Union{Int, Nothing}=nothing, preprocessing::Bool=false)
     #if directory is not made yet, make it
     if !isnothing(slurm_array_ind)

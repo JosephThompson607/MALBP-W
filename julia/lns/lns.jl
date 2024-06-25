@@ -58,7 +58,19 @@ function unfix_vars!(m::Model , instance::MALBP_W_instance)
 
 end
 
-
+function save_lns_conf(lns_conf::LNSConf, output_fp::String)
+    open(output_fp, "w") do io
+        println(io, "#LNS Configuration")
+        println(io, "seed: ", lns_conf.seed)
+        println(io, "n_iterations: ", lns_conf.n_iterations)
+        println(io, "time_limit: ", lns_conf.time_limit)
+        println(io, "des: ", lns_conf.des.name)
+        println(io, "change: ", lns_conf.change.change!)
+        println(io, "rep: ", lns_conf.rep.kwargs)
+        println(io, "adaptation: ", lns_conf.adaptation!)
+        println(io, "conf_fp: ", lns_conf.conf_fp)
+    end
+end
 
 
 function large_neighborhood_search!(m::Model, instance::MALBP_W_instance, lns_conf::LNSConf; lns_res_fp::String="", md_obj_val::Union{Nothing, Float64}=nothing, run_time::Real=600.0)
@@ -113,6 +125,7 @@ function large_neighborhood_search!(m::Model, instance::MALBP_W_instance, lns_co
         else
             iter_no_improve += 1
         end
+        @info "The time is $(time() - start_time) and the iteration is $i, the incumbent is $incumbent, the obj_val_delta is $obj_val_delta, the iteration time is $iteration_time, the destroy size is $(lns_conf.des.kwargs[:percent_destroy])"
         if time() - start_time > lns_conf.time_limit
             @info "Time limit reached, stopping LNS at iteration $i"
             break
@@ -144,7 +157,8 @@ function large_neighborhood_search!(m::Model, instance::MALBP_W_instance, lns_co
     obj_df = DataFrame(obj_vals)
     CSV.write(lns_res_fp  * "lns_results.csv", obj_df)
     println("conf_fp", lns_conf.conf_fp)
-    cp(lns_conf.conf_fp, lns_res_fp* "lns_conf.yaml")
+    save_lns_conf(lns_conf, lns_res_fp* "lns_conf.yaml")
+    #cp(lns_conf.conf_fp, lns_res_fp* "lns_conf.yaml", force=true)
     println("best obj val: ", incumbent_dict)
     return incumbent_dict, incumbent
 end

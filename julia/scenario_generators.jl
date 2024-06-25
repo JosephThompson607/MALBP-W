@@ -113,6 +113,7 @@ function read_scenario_csv(file_name::String)
     #For each row in the scenario tree, the sequence is a vector of the sequence of models
     #Makes a dataframe to add rows to
     new_scenarios = []
+    len = 0
     for row in eachrow(scenarios)
         #Removes everything outside of brackets in the sequence column
         new_seq = split(row.sequence, "]")[1]
@@ -120,10 +121,11 @@ function read_scenario_csv(file_name::String)
         new_seq = split(string(new_seq), ",")
         new_seq = [replace(strip(x), "\"" => "") for x in new_seq]
         push!(new_scenarios, (sequence=new_seq, probability=row.probability))
+        len = length(new_seq)
 
     end
     new_scenarios = DataFrame(new_scenarios)
-    sequences = ProdSequences(new_scenarios, nrow(new_scenarios), "read_csv", length(new_scenarios[1].sequence))
+    sequences = ProdSequences(new_scenarios, nrow(new_scenarios), "read_csv", len)
     return sequences
 end
 
