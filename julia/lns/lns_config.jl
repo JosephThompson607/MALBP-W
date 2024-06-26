@@ -4,7 +4,6 @@ mutable struct RepairOp
 end
 
 mutable struct DestroyOp
-    name::String
     destroy_list::Vector{Function}
     destroy!::Function
     kwargs::Dict
@@ -37,15 +36,14 @@ function DestroyOp(destroy!::Function,  destroy_kwargs::Dict;
         weight_update::Function = no_weight_update,
         destroy_list::Array{Function} = [random_model_destroy!, random_station_destroy!, random_subtree_destroy!])
     old_destroy_kwargs = deepcopy(destroy_kwargs)
-    return DestroyOp(string(destroy!),destroy_list, destroy!, destroy_kwargs, old_destroy_kwargs, destroy_weights, weight_update)
+    return DestroyOp(destroy_list, destroy!, destroy_kwargs, old_destroy_kwargs, destroy_weights, weight_update)
 end
 
 function update_destroy_operator!(des::DestroyOp, new_destroy!::Function)
     des.destroy! = new_destroy!
-    des.name = string(new_destroy!)
 end
 
-function ChangeOp(change!::Function, change_kwargs::Dict; change_weights::Dict=Dict{String, Float64}("no_change!"=>1., "increase_destroy!"=>1., "decrement_y!"=>1., "change_destroy!"=>1.,  "increase_repair_time!"=>1.0), weight_update::Function = no_weight_update)
+function ChangeOp(change!::Function, change_kwargs::Dict; change_weights::Dict=Dict{String, Float64}("no_change!"=>1., "increase_size!"=>1., "decrement_y!"=>1., "change_destroy!"=>1.,  "increase_repair_time!"=>1.0), weight_update::Function = no_weight_update)
     return ChangeOp(change!, change_kwargs, change_weights, weight_update)
 end
 
@@ -76,7 +74,7 @@ function configure_change(search_strategy::Dict)
         destroy_change = no_change
         search_strategy["change"] = Dict("kwargs"=>Dict("change_freq"=>10), 
                                     "change_weights"=>Dict("no_change!"=>1.0, 
-                                                        "increase_destroy!"=>1.0, 
+                                                        "increase_size!"=>1.0, 
                                                             "decrement_y!"=>1.0, 
                                                             "change_destroy!"=>1.0, 
                                                             "increase_repair_time!"=>1.0))
@@ -96,9 +94,9 @@ function configure_change(search_strategy::Dict)
                 search_strategy["change"]["kwargs"]["change_freq"] = 3
             end
         end
-        if search_strategy["change"]["operator"] == "increase_destroy!" || search_strategy["change"]["operator"] == "increase_destroy"
+        if search_strategy["change"]["operator"] == "increase_size!" || search_strategy["change"]["operator"] == "increase_destroy"
             @info "Deconstructor change operator $(search_strategy["change"]["operator"]) recognized"
-            destroy_change = increase_destroy!
+            destroy_change = increase_size!
         elseif search_strategy["change"]["operator"] == "no_change!" || search_strategy["change"]["operator"] == "no_change"
             @info "Deconstructor change operator $(search_strategy["change"]["operator"]) recognized"
             destroy_change = no_change!
@@ -140,7 +138,7 @@ function configure_change(search_strategy::Dict)
         end
         if !haskey(search_strategy["change"], "change_weights")
             @info "no change reward specified, defaulting to 1 across all change operators"
-            search_strategy["change"]["change_weights"] = Dict("no_change!"=>1.0, "increase_destroy!"=>1.0, "decrement_y!"=>1.0, "change_destroy!"=>1.0, "increase_repair_time!"=>1.0)
+            search_strategy["change"]["change_weights"] = Dict("no_change!"=>1.0, "increase_size!"=>1.0, "decrement_y!"=>1.0, "change_destroy!"=>1.0, "increase_repair_time!"=>1.0)
         end
     end
     #converst change_op kwargs to symbols
@@ -151,10 +149,9 @@ end
 
 function parse_destroy_list(destroy_list::Array{String})
     #new destroy list is a vector of runner_functions
-    println(destroy_list)
     new_destroy_list = Vector{Function}()
     for i in destroy_list
-        i = getfield(Main, Symbol(i))
+        i = getfield(ModelRun, Symbol(i))
         push!(new_destroy_list, i)
     end
     return new_destroy_list

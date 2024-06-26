@@ -13,8 +13,8 @@ function adapt_des!(iter_no_improve::Int, lns_obj::LNSConf, m::Model; iteration:
     decay = lns_obj.des.kwargs[:des_decay]
     #rewards the destroy and change operator if there has been an improvement
     if iter_no_improve == 0
-        lns_obj.des.destroy_weights[lns_obj.des.name] = des_weight_update(iter_no_improve,
-        lns_obj.des.destroy_weights[lns_obj.des.name]; 
+        lns_obj.des.destroy_weights[string(lns_obj.des.destroy!)] = des_weight_update(iter_no_improve,
+        lns_obj.des.destroy_weights[string(lns_obj.des.destroy!)]; 
                                                                             obj_val_delta = obj_val_delta,
                                                                             iteration = iteration, 
                                                                             iteration_time = iteration_time, 
@@ -67,8 +67,9 @@ function adapt_lns!(iter_no_improve::Int, lns_obj::LNSConf, m::Model; iteration:
     #rewards the destroy and change operator if there has been an improvement
     println("WEIGHTS BEFORE", lns_obj.des.destroy_weights)
     println("WEIGHTS BEFORE", lns_obj.change.change_weights)
-    lns_obj.des.destroy_weights[lns_obj.des.name] = des_weight_update(iter_no_improve, 
-                                                                            lns_obj.des.destroy_weights[lns_obj.des.name];
+    des_name = string(lns_obj.des.destroy!)
+    lns_obj.des.destroy_weights[des_name] = des_weight_update(iter_no_improve, 
+                                                                            lns_obj.des.destroy_weights[des_name];
                                                                             obj_val_delta = obj_val_delta, 
                                                                             iteration = iteration, 
                                                                             iteration_time = iteration_time, 
@@ -96,7 +97,7 @@ function adapt_lns!(iter_no_improve::Int, lns_obj::LNSConf, m::Model; iteration:
             change_dict = lns_obj.change.change_weights
             change_names = collect(keys(change_dict))
             change_rewards = collect(values(change_dict))
-            change_list = [no_change!, increase_destroy!, decrement_y!, change_destroy!, increase_repair_time!]
+            change_list = [no_change!, increase_size!, decrement_y!, change_destroy!, increase_repair_time!]
             change_name = sample(change_names, Weights(change_rewards))
             change! = change_list[findfirst(x -> string(x) == change_name, change_list)]
             @info "change operator changed to: $change! at iteration $iteration"

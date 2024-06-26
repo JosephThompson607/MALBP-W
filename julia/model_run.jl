@@ -1,3 +1,4 @@
+module ModelRun
 using ArgParse
 using JuMP
 using YAML
@@ -7,7 +8,15 @@ using Gurobi
 using Dates
 using Random
 using StatsBase
-const GRB_ENV = Gurobi.Env()
+const GRB_ENV_REF = Ref{Gurobi.Env}()
+
+function __init__()
+    global GRB_ENV_REF
+    @suppress begin
+    GRB_ENV_REF[] = Gurobi.Env()
+    end
+    return
+end
 #user defined modules
 include("scenario_generators.jl")
 include("read_MALBP_W.jl") 
@@ -113,5 +122,9 @@ function main()
         error("Invalid xp_type")
     end
 end
-main()
 
+export main
+end
+
+using .ModelRun
+main()

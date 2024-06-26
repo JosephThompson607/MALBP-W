@@ -1,3 +1,5 @@
+module ModelRun
+using Suppressor
 using ArgParse
 using JuMP
 using YAML
@@ -7,7 +9,6 @@ using Gurobi
 using Dates
 using Random
 using StatsBase
-const GRB_ENV = Gurobi.Env()
 #user defined modules
 include("scenario_generators.jl")
 include("read_MALBP_W.jl") 
@@ -24,9 +25,28 @@ include("heuristics/preprocessing.jl")
 include("heuristics/constructive.jl")
 include("heuristics/md_warmstart.jl")
 include("runner_functions.jl")
+const GRB_ENV_REF = Ref{Gurobi.Env}()
 
+function __init__()
+    @suppress begin
+    const GRB_ENV_REF[] = Gurobi.Env()
+    end
+    return
+end
 
-function irace_lns_config(;time_limit::Float64, name::String, destroy_list::Vector{String}, destroy::String, adaptive::String, percent_destroy::Float64, change_operator::String,  weight_update::String, destroy_weights::Union{Nothing, Dict{String, Float64}}=nothing, repair_time::Float64, seed::Union{Nothing, Int}=nothing)
+function irace_lns_config(;time_limit::Float64, 
+                            name::String, 
+                            destroy_list::Vector{String}, 
+                            destroy::String, 
+                            adaptive::String, 
+                            percent_destroy::Float64, 
+                            change_operator::String,  
+                            weight_update::String, 
+                            destroy_weights::Union{Nothing, 
+                            Dict{String, Float64}}=nothing, 
+                            repair_time::Float64, 
+                            seed::Union{Nothing, Int}=nothing,
+                            size_period::Int=1)
     
     #Destroy op config
     if isnothing(destroy_weights)
@@ -41,23 +61,28 @@ function irace_lns_config(;time_limit::Float64, name::String, destroy_list::Vect
     if destroy == "random_destroy" || destroy == "random"
         destroy = rand(destroy_list)
     else
-        destroy = getfield(Main, Symbol(destroy))
+        destroy = getfield(ModelRun, Symbol(destroy))
     end
-    weight_update = getfield(Main, Symbol(weight_update))
-    destroy_op = DestroyOp(name,
-                            destroy_list,
+    weight_update = getfield(ModelRun, Symbol(weight_update))
+    destroy_kwargs = Dict(:percent_destroy => percent_destroy,
+                         :des_decay => 0.9
+                         )
+    destroy_op = DestroyOp(destroy_list,
                             destroy,
-                            Dict(:percent_destroy => percent_destroy),
-                            Dict(:percent_destroy => percent_destroy),
+                            destroy_kwargs,
+                            destroy_kwargs,
                             destroy_weights,
                             weight_update)
     
     #Change op config
-    change_operator = getfield(Main, Symbol(change_operator))
-    change_kwargs = Dict(:change_freq => 1, :filter_out_current => false)
-    weight_update = getfield(Main, Symbol(weight_update))
+    change_operator = getfield(ModelRun, Symbol(change_operator))
+    change_kwargs = Dict(:change_freq => 1, 
+                        :filter_out_current => false,
+                        :change_decay => 0.9,
+                        :size_period => size_period)
+    weight_update = getfield(ModelRun, Symbol(weight_update))
     change_weights =  Dict("no_change!"=>1.0, 
-    "increase_destroy!"=>1.0, 
+    "increase_size!"=>1.0, 
         "decrement_y!"=>1.0, 
         "change_destroy!"=>1.0, 
         "increase_repair_time!"=>1.0)
@@ -74,7 +99,7 @@ function irace_lns_config(;time_limit::Float64, name::String, destroy_list::Vect
     repair_op = RepairOp(repair_operator, repair_kwargs)
 
     #LNS config
-    adaptive = getfield(Main, Symbol(adaptive))
+    adaptive = getfield(ModelRun, Symbol(adaptive))
     lns_conf = LNSConf(name,
                         2000,
                         100,
@@ -103,8 +128,9 @@ function parse_commandline()
         "seed"
             help = "Seed for the random number generator"
             arg_type = Int
-        "config_file", 
+        "config_file" 
             help = "Filepath of main config file"
+            arg_type = String
         "--run_time", "-t"
             help = "Maximum run time for the model"
             arg_type = Float64
@@ -154,6 +180,10 @@ function parse_commandline()
             help = "index of the slurm array job"
             arg_type = Int
             required = true
+        "--size_period"
+            help = "period between increase of the size of the destroy block"
+            arg_type = Int
+            default = 1
     end
 
     return parse_args(s)
@@ -171,12 +201,32 @@ function main()
         change_operator = args["change_operator"],
         weight_update = args["weight_update"],
         repair_time = args["repair_time_limit"],
-        seed = args["seed"]
+        seed = args["seed"],
+        size_period = args["size_period"]
     )
-   result = irace_LNS(args["config_file"], args["index"], lns_conf, args["output_file"], args["run_time"]; preprocessing= args["preprocessing"])
+    result = Inf
+    output = ""
+    #Irace gets cranky if anything besides the obj value escapes
+    err = @capture_err begin
+    output = @capture_out begin
+    result = irace_LNS(args["config_file"], args["index"], lns_conf, args["output_file"], args["run_time"]; preprocessing= args["preprocessing"])
+    end
+    end
+    #writes output to file
+    open("output.txt", "w") do io
+        println(io, output)
+    end
+    #writes error to file
+    open("error.txt", "w") do io
+        println(io, err)
+    end
+    #Irace is too cool for return statements
+    println(result)
     return result
-
-        
-
 end
+
+export main
+end
+
+using .ModelRun
 main()

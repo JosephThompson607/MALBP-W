@@ -16,11 +16,11 @@ function decrement_y!(iter_no_improve::Int, lns_obj::LNSConf, m::Model; _...)
     return iter_no_improve, lns_obj, m
 end
 
-function increase_destroy!(iter_no_improve::Int, lns_obj::LNSConf, m::Model; _...)
+function increase_size!(iter_no_improve::Int, lns_obj::LNSConf, m::Model; _...)
     if lns_obj.des.kwargs[:percent_destroy] >= 1.0
         lns_obj.des.kwargs[:percent_destroy] = lns_obj.des.old_kwargs[:percent_destroy]
     end 
-    if iter_no_improve > 0 &&  iter_no_improve % lns_obj.change.kwargs[:change_freq] == 0 
+    if iter_no_improve > 0 &&  iter_no_improve % lns_obj.change.kwargs[:size_period] == 0 
         #increase the size of the destroy block only so much as to have an impact on one of the operators
         lns_obj.des.kwargs[:percent_destroy] += lns_obj.des.old_kwargs[:percent_destroy]
     end
@@ -51,7 +51,7 @@ function select_destroy!(lns_obj::LNSConf; filter_out_current=false)
     #filters out the current operator
     if filter_out_current
         operator_list = filter(x -> x != lns_obj.des.destroy!, operator_list)
-        delete!(destroy_weights, lns_obj.des.name)
+        delete!(destroy_weights, string(lns_obj.des.destroy!))
     end
     weights = collect(values(destroy_weights))
     destroy_names = collect(keys(destroy_weights))

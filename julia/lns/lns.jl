@@ -64,7 +64,7 @@ function save_lns_conf(lns_conf::LNSConf, output_fp::String)
         println(io, "seed: ", lns_conf.seed)
         println(io, "n_iterations: ", lns_conf.n_iterations)
         println(io, "time_limit: ", lns_conf.time_limit)
-        println(io, "des: ", lns_conf.des.name)
+        println(io, "des: ", string(lns_conf.des.destroy!))
         println(io, "change: ", lns_conf.change.change!)
         println(io, "rep: ", lns_conf.rep.kwargs)
         println(io, "adaptation: ", lns_conf.adaptation!)
@@ -94,8 +94,8 @@ function large_neighborhood_search!(m::Model, instance::MALBP_W_instance, lns_co
     #main loop of algorithm
     iter_no_improve = 0
     for i in 1: lns_conf.n_iterations
-        #For the last iteration, the time limit is the remaining time
-        last_iter_time = min(run_time - (time() - start_time), lns_conf.rep.kwargs[:time_limit])
+        #For the last iteration, the time limit is the remaining time (if over time, we have 0 remaining time)
+        last_iter_time = min(max(0,run_time - (time() - start_time)), lns_conf.rep.kwargs[:time_limit])
         set_optimizer_attribute(m, "TimeLimit", last_iter_time)
         println("mip repair kwargs: ", lns_conf.rep.kwargs)
         gap = max(1e-4, lns_conf.rep.kwargs[:mip_gap])
@@ -110,18 +110,26 @@ function large_neighborhood_search!(m::Model, instance::MALBP_W_instance, lns_co
         #saves the results
         iteration_time = time() - step_start
         old_incumbent = incumbent
-        obj_val_delta = incumbent - objective_value(m)
+        #Sometimes the solver does not return a feasible solution
+        if is_solved_and_feasible(m)
+            obj_val_delta = incumbent - objective_value(m)
+            obj_val = objective_value(m)
+        else
+            #if not feasible, we just keep the same solution
+            obj_val_delta = 0
+            obj_val = incumbent
+        end
         res_dict = Dict("instance"=> instance.config_name,
                         "iteration"=>i, 
-                        "obj_val"=>objective_value(m), 
+                        "obj_val"=>obj_val, 
                         "obj_val_delta"=>obj_val_delta,
                         "time"=>iteration_time, 
-                        "operator"=>lns_conf.des.name,
+                        "operator"=>string(lns_conf.des.destroy!),
                         "change_operator"=>string(lns_conf.change.change!),
                         "destroy_size"=>lns_conf.des.kwargs[:percent_destroy])
         push!(obj_vals, res_dict)
-        if objective_value(m) < incumbent
-            incumbent = objective_value(m)
+        if obj_val < incumbent
+            incumbent = obj_val
             incumbent_dict = res_dict
             #best_m = copy(m)
             iter_no_improve = 0
@@ -151,7 +159,7 @@ function large_neighborhood_search!(m::Model, instance::MALBP_W_instance, lns_co
                                     current_best = incumbent)
             #Don't change the shaking operator in the first few iterations
             lns_conf.change.change!(iter_no_improve, lns_conf, m; iteration=i, iteration_time=iteration_time, lns_conf.change.kwargs... )
-            @info "iter_no_improve: $iter_no_improve , iteration: $i, operator: $(lns_conf.des.name), change_operator: $(lns_conf.change.change!), 
+            @info "iter_no_improve: $iter_no_improve , iteration: $i, operator: $(lns_conf.des.destroy!), change_operator: $(lns_conf.change.change!), 
             destroy size $(lns_conf.des.kwargs)"
         end
 
