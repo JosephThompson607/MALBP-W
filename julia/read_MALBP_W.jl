@@ -79,9 +79,9 @@ function read_equipment_instance(file_name::String)
     equip_yaml  = YAML.load(open(file_name))
 
     name = equip_yaml["name"]
-    n_stations= equip_yaml["no_stations"]
-    n_equipment = equip_yaml["no_equipment"]
-    n_tasks = equip_yaml["no_tasks"]
+    n_stations= equip_yaml["n_stations"]
+    n_equipment = equip_yaml["n_equipment"]
+    n_tasks = equip_yaml["n_tasks"]
     c_se = equip_yaml["c_se"]
     r_oe = equip_yaml["r_oe"]
     equip_instance = EquipmentInstance(
@@ -116,8 +116,13 @@ function read_models_instance(file_name :: String)
         n_tasks  = value["num_tasks"]
         order_strength  = models_yaml["order_strength"][key]
         precedence_relations = value["precedence_relations"]
+        #converts precedence relations to string
+        precedence_relations = [string.(x) for x in precedence_relations]
         task_times  = value["task_times"]
-        #println(task_times)
+        #converts the keys of the task times to strings
+        for (key, value) in task_times
+            task_times[key] = Dict{String, Float64}(string.(keys(value)) .=> values(value))
+        end
         model_instance = ModelInstance(name, probability, n_tasks, order_strength, precedence_relations, task_times)
         models[name] = model_instance
     end

@@ -1,4 +1,5 @@
 module ModelRun
+using Suppressor
 using ArgParse
 using JuMP
 using YAML
