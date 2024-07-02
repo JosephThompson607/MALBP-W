@@ -4,14 +4,14 @@ using YAML
 using CSV
 using DataFrames
 
-struct ProdSequences
+mutable struct ProdSequences
     sequences::DataFrame
     n_scenarios::Int
     generator::String
     sequence_length::Int
 end
 
-struct ModelInstance
+mutable struct ModelInstance
     name::String
     probability::Real
     n_tasks::Int
@@ -20,7 +20,7 @@ struct ModelInstance
     task_times::Dict{Int, Dict{String,Float64}}
 end
 
-struct ModelsInstance
+mutable struct ModelsInstance
     filepath::String
     name::String
     n_models::Int
@@ -28,7 +28,7 @@ struct ModelsInstance
     models::Dict{String, ModelInstance}
 end
 
-struct EquipmentInstance
+mutable struct EquipmentInstance
     filepath::String
     name::String
     n_stations::Int
@@ -192,7 +192,7 @@ function read_md_result(file_name::String, res_index::Int; sequence_csv_name::St
     models_instance = read_models_instance(row.model_fp)
     equip_instance = read_equipment_instance(row.equip_fp)
     config_file = get_instance_YAML(row.instance_fp)
-    config_file = overwrite_config_settings(row, config_file)
+    config_file = overwrite_config_settings(row, config_file, models_instance, equip_instance)
     scenarios_fp = row.output_folder * sequence_csv_name
     scenarios = read_scenario_csv(scenarios_fp)
     num_cycles = config_file["scenario"]["sequence_length"] + config_file["n_stations"] - 1
@@ -219,7 +219,7 @@ function read_md_results(file_name::String; sequence_csv_name::String="sequences
         models_instance = read_models_instance(row.model_fp)
         equip_instance = read_equipment_instance(row.equip_fp)
         config_file = get_instance_YAML(row.instance_fp)
-        config_file = overwrite_config_settings(row, config_file)
+        config_file = overwrite_config_settings(row, config_file, models_instance, equip_instance)
         scenarios_fp = row.output_folder * sequence_csv_name
         scenarios = read_scenario_csv(scenarios_fp)
         num_cycles = config_file["scenario"]["sequence_length"] + config_file["n_stations"] - 1
@@ -240,35 +240,39 @@ function read_md_results(file_name::String; sequence_csv_name::String="sequences
     return instances
 end
 
-function overwrite_config_settings(row, config_file)
+function overwrite_config_settings(row, config_file, models_instance, equip_instance)
     #If the row has n_stations, use the n_stations from the row
-    if row.n_stations != ""
-        @info "Using number of stations from csv file"
+    if hasproperty(row, :n_stations) && row.n_stations != ""
+        @info "Using number of stations from csv file: $(row.n_stations)" 
         config_file["n_stations"] = row.n_stations
     end
     #If the row has max_workers, use the max_workers from the row
-    if row.max_workers != ""
-        @info "Using max workers from csv file"
+    if hasproperty(row, :max_workers) && row.max_workers != ""
+        @info "Using max workers from csv file : $(row.max_workers)"
         config_file["max_workers"] = row.max_workers
     end
     #If the row has worker_cost, use the worker_cost from the row
-    if row.worker_cost != ""
-        @info "Using worker cost from csv file"
+    if hasproperty(row, :worker_cost) && row.worker_cost != ""
+        @info "Using worker cost from csv file : $(row.worker_cost)"
         config_file["worker_cost"] = row.worker_cost
     end
     #If the row has recourse_cost, use the recourse_cost from the row
-    if row.recourse_cost != ""
-        @info "Using recourse cost from csv file"
+    if hasproperty(row, :recourse_cost) && row.recourse_cost != ""
+        @info "Using recourse cost from csv file : $(row.recourse_cost)"
         config_file["recourse_cost"] = row.recourse_cost
     end
     #If the row has sequence_length, use the sequence_length from the row
-    if row.sequence_length != ""
-        @info "Using sequence length from csv file"
+    if hasproperty(row, :sequence_length) && row.sequence_length != ""
+        @info "Using sequence length from csv file : $(row.sequence_length)"
         config_file["scenario"]["sequence_length"] = row.sequence_length
     end
-    if row.n_scenarios != ""
-        @info "Using number of scenarios from csv file"
+    if hasproperty(row, :n_scenarios) && row.n_scenarios != ""
+        @info "Using number of scenarios from csv file : $(row.n_scenarios)"
         config_file["scenario"]["n_samples"] = row.n_scenarios
+    end
+    if hasproperty(row, :cycle_time) && row.cycle_time !=""
+        @info "Using cycle time from csv file : $(row.cycle_time)"
+        models_instance.cycle_time = row.cycle_time
     end
     return config_file
 
@@ -283,8 +287,8 @@ function read_slurm_csv(file_name::String, slurm_ind::Int)
     models_instance = read_models_instance(row.model_yaml)
     equip_instance = read_equipment_instance(row.equipment_yaml)
     config_file = get_instance_YAML(row.config_yaml)
-    config_file = overwrite_config_settings(row, config_file)
-    if row.scenario_tree_yaml != "" && row.scenario_tree_yaml != "No Tree"
+    config_file = overwrite_config_settings(row, config_file, models_instance, equip_instance)
+    if hasproperty(row, :scenario_tree_yaml) && row.scenario_tree_yaml != "" && row.scenario_tree_yaml != "No Tree"
         scenarios = read_scenario_csv(row.scenario_tree_yaml)
     else
         scenarios = read_scenario_tree(config_file["scenario"], get_model_mixture(models_instance))
@@ -312,7 +316,7 @@ function read_csv(file_name::String)
         models_instance = read_models_instance(row.model_yaml)
         equip_instance = read_equipment_instance(row.equipment_yaml)
         config_file = get_instance_YAML(row.config_yaml)
-        config_file = overwrite_config_settings(row, config_file)
+        config_file = overwrite_config_settings(row, config_file, models_instance, equip_instance)
         if row.scenario_tree_yaml != "" && row.scenario_tree_yaml != "No Tree"
             scenarios = read_scenario_csv(row.scenario_tree_yaml)
         else

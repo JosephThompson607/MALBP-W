@@ -138,7 +138,7 @@ function necessary_workers(tasks::Vector{String}, cycle_time::Real, model::Model
             return worker
         end
     end
-    @warn("Not enough workers to complete the tasks for model $(model.name)")
+    @warn("Not enough workers to complete the tasks for model $(model.name): still have $(remaining_time) time left")
     return length(productivity_per_worker) 
 end
 

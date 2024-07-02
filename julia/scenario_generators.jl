@@ -38,10 +38,10 @@ function monte_carlo_tree_limit(sequence_length::Int, model_mixtures::Dict{Strin
     Random.seed!(seed)
     #If the model mixtures do not sum to 1, throw an error
     if round(sum(values(model_mixtures)),digits= 6) != 1
-        error("model mixtures do not sum to 1")
+        error("model mixtures do not sum to 1. They sum to: $(sum(values(model_mixtures)))")
     #if the sequence length is less than 1, throw an error
     elseif sequence_length < 1
-        error("sequence length must be at least 1")
+        error("sequence length must be at least 1, the sequence length is: $(sequence_length)")
     #If the model mixtures are not positive, throw an error
     elseif any(values(model_mixtures) .< 0)
         error("model mixtures must be positive")
