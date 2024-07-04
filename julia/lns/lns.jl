@@ -95,7 +95,7 @@ function large_neighborhood_search!(m::Model, instance::MALBP_W_instance, lns_co
     iter_no_improve = 0
     for i in 1: lns_conf.n_iterations
         #For the last iteration, the time limit is the remaining time (if over time, we have 0 remaining time)
-        last_iter_time = min(max(0,run_time - (time() - start_time)), lns_conf.rep.kwargs[:time_limit])
+        last_iter_time = min(max(0.0,run_time - (time() - start_time)), lns_conf.rep.kwargs[:time_limit])
         set_optimizer_attribute(m, "TimeLimit", last_iter_time)
         println("mip repair kwargs: ", lns_conf.rep.kwargs)
         gap = max(1e-4, lns_conf.rep.kwargs[:mip_gap])
@@ -116,7 +116,7 @@ function large_neighborhood_search!(m::Model, instance::MALBP_W_instance, lns_co
             obj_val = objective_value(m)
         else
             #if not feasible, we just keep the same solution
-            obj_val_delta = 0
+            obj_val_delta = 0.0
             obj_val = incumbent
         end
         res_dict = Dict("instance"=> instance.config_name,
