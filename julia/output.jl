@@ -198,7 +198,7 @@ function save_results(output_filepath::String, m::Model, run_time::Real, instanc
     YAML.write_file(var_fp * "instance.yaml", orig_instance)
     
     #saves the objective function, relative gap, run time, and instance_name to a file
-    if is_solved_and_feasible(m)  || termination_status(m) == MOI.TIME_LIMIT
+    if is_solved_and_feasible(m)  || (termination_status(m) == MOI.TIME_LIMIT && primal_status(m) == MOI.FEASIBLE_POINT)
         obj_val = objective_value(m)
         rel_gap = relative_gap(m)
         solution_time = solve_time(m)
