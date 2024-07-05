@@ -90,7 +90,8 @@ function large_neighborhood_search!(m::Model, instance::MALBP_W_instance, lns_co
         push!(obj_vals, res_dict)
         incumbent = md_obj_val
     end
-
+    #Save the last feasible solution
+    previous_vars = all_variables(m)
     #main loop of algorithm
     iter_no_improve = 0
     for i in 1: lns_conf.n_iterations
@@ -112,6 +113,7 @@ function large_neighborhood_search!(m::Model, instance::MALBP_W_instance, lns_co
         old_incumbent = incumbent
         #Sometimes the solver does not return a feasible solution
         if is_solved_and_feasible(m)
+            previous_vars = all_variables(m)
             obj_val_delta = incumbent - objective_value(m)
             obj_val = objective_value(m)
         else
@@ -145,8 +147,13 @@ function large_neighborhood_search!(m::Model, instance::MALBP_W_instance, lns_co
             break
         end
         if i < lns_conf.n_iterations
-            x = all_variables(m)
-            solution = value.(x)
+            if primal_status(m) == MOI.FEASIBLE_POINT
+                x = all_variables(m)
+                solution = value.(x)
+            else
+                x = previous_vars
+                solution = value.(x)
+            end
             unfix_vars!(m, instance)
             set_start_value.(x, solution)
             lns_conf.adaptation!(iter_no_improve, lns_conf, m; 
