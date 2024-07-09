@@ -111,7 +111,7 @@ function MMALBP_W_dynamic_ws( instance::MALBP_W_instance, optimizer::Gurobi.Math
     return m
 end
 
-function MMALBP_W_dynamic_lns( instance::MALBP_W_instance, optimizer::Gurobi.MathOptInterface.OptimizerWithAttributes, original_filepath::String, run_time::Real, search_strategy_fp::String; 
+function MMALBP_W_dynamic_lns( instance::MALBP_W_instance, optimizer::Gurobi.MathOptInterface.OptimizerWithAttributes, original_filepath::String, run_time::Real, search_strategy_fp::String; rng,
                                 save_variables::Bool=true, save_lp::Bool=false, warmstart_vars::String="", md_obj_val::Real=0.0, slurm_array_ind::Union{Int, Nothing}=nothing, preprocessing::Bool=false)
     #if directory is not made yet, make it
     if !isnothing(slurm_array_ind)
@@ -129,7 +129,7 @@ function MMALBP_W_dynamic_lns( instance::MALBP_W_instance, optimizer::Gurobi.Mat
     define_dynamic_linear!(m, instance, warmstart_vars, preprocessing=preprocessing)
     #solves the model in a lns loop
     lns_conf = read_search_strategy_YAML(search_strategy_fp, run_time, model_dependent=false)
-    obj_dict, best_obj = large_neighborhood_search!(m, instance, lns_conf; lns_res_fp= output_filepath  , md_obj_val=md_obj_val, run_time=run_time)
+    obj_dict, best_obj = large_neighborhood_search!(m, instance, lns_conf; lns_res_fp= output_filepath  , md_obj_val=md_obj_val, run_time=run_time, rng=rng)
     if save_variables
         write_MALBP_W_solution_dynamic(output_filepath, instance, m, false)
     end
@@ -174,8 +174,8 @@ end
 # return m
 # end
 
-function MMALBP_W_md_lns( instance::MALBP_W_instance, optimizer::Gurobi.MathOptInterface.OptimizerWithAttributes, original_filepath::String, run_time::Real, search_strategy::String; 
-                                save_variables::Bool=true, save_lp::Bool=false, slurm_array_ind::Union{Int, Nothing}=nothing, preprocessing::Bool=true)
+function MMALBP_W_md_lns( instance::MALBP_W_instance, optimizer::Gurobi.MathOptInterface.OptimizerWithAttributes, original_filepath::String, run_time::Real, search_strategy::String; rng, 
+                                save_variables::Bool=true, save_lp::Bool=false, slurm_array_ind::Union{Int, Nothing}=nothing, preprocessing::Bool=true, )
     #if directory is not made yet, make it
     if !isnothing(slurm_array_ind)
         output_filepath = original_filepath * "md/"* instance.name * "/slurm_" * string(slurm_array_ind) * "/"
@@ -192,7 +192,7 @@ function MMALBP_W_md_lns( instance::MALBP_W_instance, optimizer::Gurobi.MathOptI
     start_value = define_md_linear!(m, instance; preprocess=true)
     #solves the model in a lns loop
     lns_conf = read_search_strategy_YAML(search_strategy_fp, run_time, model_dependent=true)
-    obj_dict, best_obj = large_neighborhood_search!(m, instance, lns_conf; lns_res_fp= output_filepath  , md_obj_val=start_value, run_time=run_time)
+    obj_dict, best_obj = large_neighborhood_search!(m, instance, lns_conf; lns_res_fp= output_filepath  , md_obj_val=start_value, run_time=run_time, rng=rng)
     if save_variables
         write_MALBP_W_solution_md(output_filepath, instance, m, false)
     end
@@ -227,7 +227,7 @@ function MMALBP_from_yaml(config_filepath::String, output_filepath::String, run_
     end
 end
 
-function MMALBP_md_lns_from_yaml(config_filepath::String, output_filepath::String, run_time::Float64, save_variables::Bool, save_lp::Bool, search_strategy_fp::String; xp_folder::String="model_runs", preprocessing::Bool=false)
+function MMALBP_md_lns_from_yaml(config_filepath::String, output_filepath::String, run_time::Float64, save_variables::Bool, save_lp::Bool, search_strategy_fp::String; xp_folder::String="model_runs", preprocessing::Bool=false, rng=Xoshiro())
     config_file = get_instance_YAML(config_filepath)
     instances = read_MALBP_W_instances(config_filepath)
     optimizer = optimizer_with_attributes(() -> Gurobi.Optimizer(GRB_ENV_REF[]), "TimeLimit" => run_time)
@@ -237,12 +237,12 @@ function MMALBP_md_lns_from_yaml(config_filepath::String, output_filepath::Strin
     output_filepath = xp_folder * "/" * now * "_" * output_filepath 
     for instance in instances
         @info "Running instance $(instance.name), \n Output will be saved to $(output_filepath)"
-        m = MMALBP_W_md_lns(instance, optimizer, output_filepath, run_time, search_strategy_fp; save_variables= save_variables, save_lp=save_lp, preprocessing=preprocessing)
+        m = MMALBP_W_md_lns(instance, optimizer, output_filepath, run_time, search_strategy_fp; save_variables= save_variables, save_lp=save_lp, preprocessing=preprocessing, rng=rng)
 
     end
 end
 
-function MMALBP_md_lns_from_slurm(config_filepath::String, output_filepath::String, run_time::Float64, save_variables::Bool, save_lp::Bool, search_strategy_fp::String, slurm_array_ind::Int; xp_folder::String="model_runs", preprocessing::Bool=false)
+function MMALBP_md_lns_from_slurm(config_filepath::String, output_filepath::String, run_time::Float64, save_variables::Bool, save_lp::Bool, search_strategy_fp::String, slurm_array_ind::Int; xp_folder::String="model_runs", preprocessing::Bool=false, rng=Xoshiro())
     config_file = get_instance_YAML(config_filepath)
     instance, config_file = read_slurm_csv(config_filepath,slurm_array_ind)
     optimizer = optimizer_with_attributes(() -> Gurobi.Optimizer(GRB_ENV_REF[]), "TimeLimit" => run_time)
@@ -251,11 +251,11 @@ function MMALBP_md_lns_from_slurm(config_filepath::String, output_filepath::Stri
     now = Dates.format(now, "yyyy-mm-dd")
     output_filepath = xp_folder * "/" * now * "_" * output_filepath 
     @info "Running instance $(instance.name), \n Output will be saved to $(output_filepath), on slurm array index $(slurm_array_ind)"
-    m = MMALBP_W_md_lns(instance, optimizer, output_filepath, run_time, search_strategy_fp; save_variables= save_variables, save_lp=save_lp, preprocessing=preprocessing, slurm_array_ind=slurm_array_ind)
+    m = MMALBP_W_md_lns(instance, optimizer, output_filepath, run_time, search_strategy_fp; save_variables= save_variables, save_lp=save_lp, preprocessing=preprocessing, slurm_array_ind=slurm_array_ind, rng=rng)
 
 end
 
-function MMALBP_from_csv_slurm(config_filepath::String, output_filepath::String, run_time::Float64, save_variables::Bool, save_lp::Bool, slurm_array_ind::Int ; xp_folder::String="model_runs", preprocessing::Bool=false)
+function MMALBP_from_csv_slurm(config_filepath::String, output_filepath::String, run_time::Float64, save_variables::Bool, save_lp::Bool, slurm_array_ind::Int ; xp_folder::String="model_runs", preprocessing::Bool=false, rng=Xoshiro())
     
     config_file, instance = read_slurm_csv(config_filepath, slurm_array_ind)
     optimizer = optimizer_with_attributes(() -> Gurobi.Optimizer(GRB_ENV_REF[]), "TimeLimit" => run_time)
@@ -301,7 +301,7 @@ function warmstart_dynamic_slurm(config_filepath::String, output_filepath::Strin
    
 end
 
-function MMALBP_W_LNS(config_filepath::String, output_filepath::String, run_time::Float64, save_variables::Bool, save_lp::Bool, search_strategy_fp::String; xp_folder::String="model_runs", preprocessing::Bool=false)
+function MMALBP_W_LNS(config_filepath::String, output_filepath::String, run_time::Float64, save_variables::Bool, save_lp::Bool, search_strategy_fp::String; xp_folder::String="model_runs", preprocessing::Bool=false, rng=Xoshiro())
     instances = read_md_results(config_filepath)
     optimizer = optimizer_with_attributes(() -> Gurobi.Optimizer(GRB_ENV_REF[]), "TimeLimit" => run_time)
     #adds the date and time to the output file path
@@ -310,12 +310,12 @@ function MMALBP_W_LNS(config_filepath::String, output_filepath::String, run_time
     output_filepath = xp_folder * "/" * now * "_" * output_filepath 
     for (instance, var_folder, md_obj_val) in instances
         @info "Running instance $(instance.name), from $(config_filepath). \n Output will be saved to $(output_filepath)"
-        MMALBP_W_dynamic_lns(instance, optimizer, output_filepath, run_time,  search_strategy_fp; save_variables= save_variables, save_lp=save_lp, warmstart_vars= var_folder, md_obj_val= md_obj_val, preprocessing=false)
+        MMALBP_W_dynamic_lns(instance, optimizer, output_filepath, run_time,  search_strategy_fp; save_variables= save_variables, save_lp=save_lp, warmstart_vars= var_folder, md_obj_val= md_obj_val, preprocessing=false, rng=rng)
     end
 end
 
 #Runs the LNS model on a list of instances using a slurm array index
-function MMALBP_W_LNS(config_filepath::String, output_filepath::String, run_time::Float64, save_variables::Bool, save_lp::Bool, search_strategy_fp::String, slurm_array_ind::Int; xp_folder::String="model_runs", preprocessing::Bool=false)
+function MMALBP_W_LNS(config_filepath::String, output_filepath::String, run_time::Float64, save_variables::Bool, save_lp::Bool, search_strategy_fp::String, slurm_array_ind::Int; xp_folder::String="model_runs", preprocessing::Bool=false, rng=Xoshiro())
     instances = read_md_results(config_filepath)
     optimizer = optimizer_with_attributes(() -> Gurobi.Optimizer(GRB_ENV_REF[]), "TimeLimit" => run_time)
     #adds the date and time to the output file path
@@ -324,13 +324,14 @@ function MMALBP_W_LNS(config_filepath::String, output_filepath::String, run_time
     output_filepath = xp_folder * "/" * now * "_" * output_filepath 
     instance, var_folder, md_obj_val = instances[slurm_array_ind]
     @info "Running instance $(instance.name), from $(config_filepath). \n Output will be saved to $(output_filepath)"
-    MMALBP_W_dynamic_lns(instance, optimizer, output_filepath, run_time,  search_strategy_fp; save_variables= save_variables, save_lp=save_lp, warmstart_vars= var_folder, md_obj_val= md_obj_val, slurm_array_ind=slurm_array_ind, preprocessing=preprocessing)
+    MMALBP_W_dynamic_lns(instance, optimizer, output_filepath, run_time,  search_strategy_fp; save_variables= save_variables, save_lp=save_lp, warmstart_vars= var_folder, md_obj_val= md_obj_val, slurm_array_ind=slurm_array_ind, preprocessing=preprocessing, rng=rng)
 end
 
 
 
 #irace run for dynamic model LNS
-function irace_LNS(md_results_fp::String, md_res_index::Int, lns_conf::LNSConf, output_filepath::String, run_time::Float64; xp_folder::String="model_runs", preprocessing::Bool=true, rng=Xoshiro())
+function irace_LNS(md_results_fp::String, md_res_index::Int, lns_conf::LNSConf, output_filepath::String, run_time::Float64; 
+                    xp_folder::String="model_runs", preprocessing::Bool=true, rng=Xoshiro())
 
     #adds the date and time to the output file path
     now = Dates.now()

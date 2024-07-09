@@ -114,7 +114,12 @@ function read_models_instance(file_name :: String)
         name = key
         probability = value["probability"]
         n_tasks  = value["num_tasks"]
-        order_strength  = models_yaml["order_strength"][key]
+        #if it has a order order_strength, read it
+        if haskey(models_yaml, "order_strength")
+            order_strength = models_yaml["order_strength"][key]
+        else
+            order_strength = 0
+        end
         precedence_relations = value["precedence_relations"]
         #converts precedence relations to string
         precedence_relations = [string.(x) for x in precedence_relations]
