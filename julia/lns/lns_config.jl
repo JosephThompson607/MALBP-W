@@ -94,7 +94,7 @@ function configure_change(search_strategy::Dict)
                 search_strategy["change"]["kwargs"]["change_freq"] = 3
             end
         end
-        if search_strategy["change"]["operator"] == "increase_size!" || search_strategy["change"]["operator"] == "increase_destroy"
+        if search_strategy["change"]["operator"] == "increase_size!" || search_strategy["change"]["operator"] == "increase_destroy!"
             @info "Deconstructor change operator $(search_strategy["change"]["operator"]) recognized"
             destroy_change = increase_size!
         elseif search_strategy["change"]["operator"] == "no_change!" || search_strategy["change"]["operator"] == "no_change"

@@ -330,7 +330,7 @@ end
 
 
 #irace run for dynamic model LNS
-function irace_LNS(md_results_fp::String, md_res_index::Int, lns_conf::LNSConf, output_filepath::String, run_time::Float64; xp_folder::String="model_runs", preprocessing::Bool=true)
+function irace_LNS(md_results_fp::String, md_res_index::Int, lns_conf::LNSConf, output_filepath::String, run_time::Float64; xp_folder::String="model_runs", preprocessing::Bool=true, rng=Xoshiro())
 
     #adds the date and time to the output file path
     now = Dates.now()
@@ -348,7 +348,7 @@ function irace_LNS(md_results_fp::String, md_res_index::Int, lns_conf::LNSConf, 
     #defines the  dyanmic model parameters
     define_dynamic_linear!(m, instance, warmstart_vars_fp, preprocessing=preprocessing)
     #solves the model in a lns loop
-    obj_dict, best_obj = large_neighborhood_search!(m, instance, lns_conf; lns_res_fp= output_filepath  , md_obj_val=md_obj_val, run_time=run_time)
+    obj_dict, best_obj = large_neighborhood_search!(m, instance, lns_conf; lns_res_fp= output_filepath  , md_obj_val=md_obj_val, run_time=run_time, rng=rng)
     #saves the solution variables
     write_MALBP_W_solution_dynamic(output_filepath , instance, m, false)
     #saves the objective function, relative gap, run time, and instance_name to a file

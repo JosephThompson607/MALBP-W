@@ -206,10 +206,11 @@ function main()
     )
     result = Inf
     output = ""
+    rng=Xoshiro(args["seed"])
     #Irace gets cranky if anything besides the obj value escapes
     err = @capture_err begin
     output = @capture_out begin
-    result = irace_LNS(args["config_file"], args["index"], lns_conf, args["output_file"], args["run_time"]; preprocessing= args["preprocessing"])
+    result = irace_LNS(args["config_file"], args["index"], lns_conf, args["output_file"], args["run_time"]; preprocessing= args["preprocessing"], rng=rng)
     end
     end
     #writes output to file

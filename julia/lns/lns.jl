@@ -73,7 +73,7 @@ function save_lns_conf(lns_conf::LNSConf, output_fp::String)
 end
 
 
-function large_neighborhood_search!(m::Model, instance::MALBP_W_instance, lns_conf::LNSConf; lns_res_fp::String="", md_obj_val::Union{Nothing, Float64}=nothing, run_time::Real=600.0)
+function large_neighborhood_search!(m::Model, instance::MALBP_W_instance, lns_conf::LNSConf; lns_res_fp::String="", md_obj_val::Union{Nothing, Float64}=nothing, run_time::Real=600.0, rng=Xoshiro())
     set_destroy_size!(lns_conf.des, instance)
     seed = lns_conf.seed
     #sets the time limit for the model
@@ -163,9 +163,10 @@ function large_neighborhood_search!(m::Model, instance::MALBP_W_instance, lns_co
                                     des_weight_update = lns_conf.des.weight_update,
                                     change_weight_update = lns_conf.change.weight_update,
                                     prev_best = old_incumbent,
-                                    current_best = incumbent)
+                                    current_best = incumbent,
+                                    )
             #Don't change the shaking operator in the first few iterations
-            lns_conf.change.change!(iter_no_improve, lns_conf, m; iteration=i, iteration_time=iteration_time, lns_conf.change.kwargs... )
+            lns_conf.change.change!(iter_no_improve, lns_conf, m; iteration=i, iteration_time=iteration_time, rng=rng, lns_conf.change.kwargs... )
             @info "iter_no_improve: $iter_no_improve , iteration: $i, operator: $(lns_conf.des.destroy!), change_operator: $(lns_conf.change.change!), 
             destroy size $(lns_conf.des.kwargs)"
         end

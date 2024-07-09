@@ -1,8 +1,5 @@
-function random_model_destroy!(m::Model, instance::MALBP_W_instance; seed:: Union{Nothing, Int}=nothing, percent_destroy::Float64 = 0.25,_...)
+function random_model_destroy!(m::Model, instance::MALBP_W_instance; rng = Xoshiro(), percent_destroy::Float64 = 0.25,_...)
     n_destroy = max(1,round(Int, instance.models.n_models * percent_destroy))
-    if !isnothing(seed)
-        Random.seed!(seed)
-    end
     if n_destroy >= instance.models.n_models
         if percent_destroy >= 1.0
         @info "n_destroy is greater than the number of models, setting n_destroy to the number of models"
@@ -12,7 +9,7 @@ function random_model_destroy!(m::Model, instance::MALBP_W_instance; seed:: Unio
             n_destroy = instance.models.n_models - 1
         end
     end
-    models = sample(collect(keys(instance.models.models)), n_destroy)
+    models = sample(rng,collect(keys(instance.models.models)), n_destroy)
     x_wsoj = m[:x_wsoj]
     y_wts = m[:y_wts]
     #fixes the task assignment, equipment, and worker assignment for the models that are not in the models list
@@ -35,42 +32,39 @@ function random_model_destroy!(m::Model, instance::MALBP_W_instance; seed:: Unio
 end
 
 #calls the random station destroy and the random model destroy functions, good for larger instances
-function random_station_model_destroy!(m::Model, instance::MALBP_W_instance; seed::Union{Nothing, Int}=nothing, percent_destroy::Float64 = 0.25, _...)
+function random_station_model_destroy!(m::Model, instance::MALBP_W_instance; rng = Xoshiro(), percent_destroy::Float64 = 0.25, _...)
     #chooses randomly between splitting the percent destroy between the two destroy functions or using the percent destroy for one and set the other to 1
-    percent_station, percent_model = rand([(percent_destroy, 1.00), (1.00,percent_destroy), (sqrt(percent_destroy), sqrt(percent_destroy))])
-    random_model_destroy!(m, instance; seed=seed, percent_destroy=percent_model)
-    random_station_destroy!(m, instance; seed=seed, percent_destroy=percent_station)
+    percent_station, percent_model = rand(rng,[(percent_destroy, 1.00), (1.00,percent_destroy), (sqrt(percent_destroy), sqrt(percent_destroy))])
+    random_model_destroy!(m, instance; rng = rng, percent_destroy=percent_model)
+    random_station_destroy!(m, instance; rng = rng, percent_destroy=percent_station)
 end
 
 #calls the random station destroy and the random subtree destroy functions
-function random_station_subtree_destroy!(m::Model, instance::MALBP_W_instance; seed::Union{Nothing, Int}=nothing, percent_destroy::Float64 = 0.25, depth::Int=1, _...)
+function random_station_subtree_destroy!(m::Model, instance::MALBP_W_instance; rng = Xoshiro(), percent_destroy::Float64 = 0.25, depth::Int=1, _...)
     #chooses randomly between splitting the percent destroy between the two destroy functions or using the percent destroy for one and set the other to 1
-    percent_subtree, percent_station = rand([(percent_destroy, 1.00), (1.00,percent_destroy), (sqrt(percent_destroy), sqrt(percent_destroy))])
-    random_subtree_destroy!(m, instance; seed=seed, percent_destroy=percent_subtree, depth=depth)
-    random_station_destroy!(m, instance; seed=seed, percent_destroy=percent_station)
+    percent_subtree, percent_station = rand(rng,[(percent_destroy, 1.00), (1.00,percent_destroy), (sqrt(percent_destroy), sqrt(percent_destroy))])
+    random_subtree_destroy!(m, instance; rng = rng, percent_destroy=percent_subtree, depth=depth)
+    random_station_destroy!(m, instance; rng = rng, percent_destroy=percent_station)
 end
 
 #calls the random model and the random subtree destroy functions
-function random_model_subtree_destroy!(m::Model, instance::MALBP_W_instance; seed::Union{Nothing, Int}=nothing, percent_destroy::Float64 = 0.25, depth::Int=1, _...)
+function random_model_subtree_destroy!(m::Model, instance::MALBP_W_instance; rng = Xoshiro(), percent_destroy::Float64 = 0.25, depth::Int=1, _...)
     #chooses randomly between splitting the percent destroy between the two destroy functions or using the percent destroy for one and set the other to 1
     percent_subtree, percent_model = rand([(percent_destroy, 1.00), (1.00,percent_destroy), (sqrt(percent_destroy), sqrt(percent_destroy))])
-    random_subtree_destroy!(m, instance; seed=seed, percent_destroy=percent_subtree, depth=depth)
-    random_model_destroy!(m, instance; seed=seed, percent_destroy=percent_model)
+    random_subtree_destroy!(m, instance; rng = rng, percent_destroy=percent_subtree, depth=depth)
+    random_model_destroy!(m, instance; rng = rng, percent_destroy=percent_model)
 end
 
 #calls the random station destroy and the random model destroy functions for the model dependent formulation, good for larger instances
-function random_station_model_destroy_md!(m::Model, instance::MALBP_W_instance; seed::Union{Nothing, Int}=nothing, percent_destroy::Float64 = 0.25, _...)
-    random_model_destroy_md!(m, instance; seed=seed, percent_destroy=percent_destroy)
-    random_station_destroy_md!(m, instance; seed=seed, percent_destroy=percent_destroy)
+function random_station_model_destroy_md!(m::Model, instance::MALBP_W_instance; rng = Xoshiro(), percent_destroy::Float64 = 0.25, _...)
+    random_model_destroy_md!(m, instance; rng = rng, percent_destroy=percent_destroy)
+    random_station_destroy_md!(m, instance; rng = rng, percent_destroy=percent_destroy)
 end
 
 
 #randomly destroys models for the md formulation
-function random_model_destroy_md!(m::Model, instance::MALBP_W_instance; seed:: Union{Nothing, Int}=nothing, percent_destroy::Float64 = 0.25,_...)
+function random_model_destroy_md!(m::Model, instance::MALBP_W_instance; rng = Xoshiro(), percent_destroy::Float64 = 0.25,_...)
     n_destroy = max(1,round(Int, instance.models.n_models * percent_destroy))
-    if !isnothing(seed)
-        Random.seed!(seed)
-    end
     if n_destroy >= instance.models.n_models
         if percent_destroy >= 1.0
         @info "n_destroy is greater than the number of models, setting n_destroy to the number of models"
@@ -80,7 +74,7 @@ function random_model_destroy_md!(m::Model, instance::MALBP_W_instance; seed:: U
             n_destroy = instance.models.n_models - 1
         end
     end
-    models = sample(collect(keys(instance.models.models)), n_destroy)
+    models = sample(rng, collect(keys(instance.models.models)), n_destroy)
     
     x_soi = m[:x_soi]
     #fixes the task assignment, equipment, and worker assignment for the models that are not in the models list
@@ -96,12 +90,8 @@ function random_model_destroy_md!(m::Model, instance::MALBP_W_instance; seed:: U
     end
 end
 
-function random_station_destroy!(m::Model, instance::MALBP_W_instance; seed::Union{Nothing, Int}=nothing, percent_destroy::Float64 = 0.25, _...)
+function random_station_destroy!(m::Model, instance::MALBP_W_instance; rng = Xoshiro(), percent_destroy::Float64 = 0.25, _...)
     n_destroy = max(1,round(Int, instance.equipment.n_stations * percent_destroy))
-    #if the seed is not none, set the seed
-    if !isnothing(seed)
-        Random.seed!(seed)
-    end
 
     if n_destroy >= instance.equipment.n_stations
         if percent_destroy >= 1.0
@@ -112,7 +102,7 @@ function random_station_destroy!(m::Model, instance::MALBP_W_instance; seed::Uni
             n_destroy = instance.equipment.n_stations - 1
         end
     end
-    station = rand(1:(instance.equipment.n_stations - n_destroy+1) )
+    station = rand(rng, 1:(instance.equipment.n_stations - n_destroy+1) )
     stations = [station:station + n_destroy-1;]
     println("stations: ", stations)
     x_wsoj = m[:x_wsoj]
@@ -131,12 +121,8 @@ function random_station_destroy!(m::Model, instance::MALBP_W_instance; seed::Uni
 end
 
 #Randomly destroys stations for the md formulation
-function random_station_destroy_md!(m::Model, instance::MALBP_W_instance; seed::Union{Nothing, Int}=nothing, percent_destroy::Float64 = 0.25, _...)
+function random_station_destroy_md!(m::Model, instance::MALBP_W_instance; rng = Xoshiro(), percent_destroy::Float64 = 0.25, _...)
     n_destroy = max(1,round(Int, instance.equipment.n_stations * percent_destroy))
-    #if the seed is not none, set the seed
-    if !isnothing(seed)
-        Random.seed!(seed)
-    end
     if n_destroy >= instance.equipment.n_stations
         if percent_destroy >= 1.0
             @info "n_destroy is greater than the number of stations, setting n_destroy to the number of stations"
@@ -147,7 +133,7 @@ function random_station_destroy_md!(m::Model, instance::MALBP_W_instance; seed::
         end
 
     end
-    station = rand(1:(instance.equipment.n_stations - n_destroy+1) )
+    station = rand(rng, 1:(instance.equipment.n_stations - n_destroy+1) )
     stations = [station:station + n_destroy-1;]
 
     x_soi = m[:x_soi]
@@ -165,7 +151,7 @@ function random_station_destroy_md!(m::Model, instance::MALBP_W_instance; seed::
     end
 end
 
-function random_subtree_destroy!(m::Model, instance::MALBP_W_instance; seed::Union{Nothing, Int}=nothing, percent_destroy::Float64=0.25, depth::Int=1, _...)
+function random_subtree_destroy!(m::Model, instance::MALBP_W_instance; rng = Xoshiro(), percent_destroy::Float64=0.25, depth::Int=1, _...)
     n_destroy = max(1, round(Int, instance.models.n_models ^ depth * percent_destroy))
 
     if percent_destroy >= 1.0
@@ -176,14 +162,10 @@ function random_subtree_destroy!(m::Model, instance::MALBP_W_instance; seed::Uni
         @info "percent destroy is not at 100% yet, will set 1 below the number of models"
         n_destroy = instance.models.n_models ^ depth - 1
     end
-    #if the seed is not none, set the seed
-    if !isnothing(seed)
-        Random.seed!(seed)
-    end
     #randomly selects n_destroy sequences of tasks to remove
     x_wsoj = m[:x_wsoj]
     y_wts = m[:y_wts]
-    prod_sequences = instance.sequences.sequences[rand(1:instance.sequences.n_scenarios, n_destroy), :]
+    prod_sequences = instance.sequences.sequences[rand(rng, 1:instance.sequences.n_scenarios, n_destroy), :]
     for w in 1:instance.sequences.n_scenarios
         shared_scenario = false
         for to_remove in eachrow(prod_sequences)
@@ -200,12 +182,8 @@ function random_subtree_destroy!(m::Model, instance::MALBP_W_instance; seed::Uni
     end
 end
 
-function peak_station_destroy!(m::Model, instance::MALBP_W_instance; seed::Union{Nothing, Int}=nothing, percent_destroy::Float64, _...)
+function peak_station_destroy!(m::Model, instance::MALBP_W_instance; rng = Xoshiro(), percent_destroy::Float64, _...)
     n_destroy = max(1,round(Int, instance.equipment.n_stations * percent_destroy))
-    #if the seed is not none, set the seed
-    if !isnothing(seed)
-        Random.seed!(seed)
-    end
     y_wts = m[:y_wts]
 
     station_workers = []
@@ -245,12 +223,8 @@ function peak_station_destroy!(m::Model, instance::MALBP_W_instance; seed::Union
     end
 end
 
-function peak_station_destroy_md!(m::Model, instance::MALBP_W_instance; seed::Union{Nothing, Int}=nothing, percent_destroy::Float64=0.25, _...)
+function peak_station_destroy_md!(m::Model, instance::MALBP_W_instance; rng = Xoshiro(), percent_destroy::Float64=0.25, _...)
     n_destroy = max(1,round(Int, instance.equipment.n_stations * percent_destroy))
-    #if the seed is not none, set the seed
-    if !isnothing(seed)
-        Random.seed!(seed)
-    end
     y_wts = m[:y_wts]
 
     station_workers = []
