@@ -331,7 +331,6 @@ end
 #irace run for dynamic model LNS
 function irace_LNS(md_results_fp::String, md_res_index::Int, lns_conf::LNSConf, output_filepath::String, run_time::Float64; 
                     xp_folder::String="model_runs", preprocessing::Bool=true, rng=Xoshiro())
-
     #adds the date and time to the output file path
     now = Dates.now()
     now = Dates.format(now, "yyyy-mm-dd")
