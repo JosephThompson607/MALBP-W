@@ -90,7 +90,10 @@ function main()
     #If it has a seed, set the seed,
     if !isnothing(parsed_args["seed"])
         rng = Xoshiro(parsed_args["seed"])
+    else
+        rng = Xoshiro()
     end
+    
     output_file =  parsed_args["output_file"] * "/"
     if parsed_args["xp_type"] == "config_yaml"
         MMALBP_from_yaml(parsed_args["config_file"], output_file,parsed_args["run_time"], parsed_args["save_variables"], parsed_args["save_lp"]; preprocessing=parsed_args["preprocessing"])
@@ -126,7 +129,7 @@ function main()
         elseif isnothing(parsed_args["slurm_array_ind"])
             error("Slurm array index is required for slurm LNS experiments")
         end
-        MMALBP_W_LNS(parsed_args["config_file"], output_file,parsed_args["run_time"], parsed_args["save_variables"], parsed_args["save_lp"], parsed_args["LNS_config"], parsed_args["slurm_array_ind"], rng=rng )
+        MMALBP_W_LNS_slurm(parsed_args["config_file"], output_file,parsed_args["run_time"], parsed_args["save_variables"], parsed_args["save_lp"], parsed_args["LNS_config"], parsed_args["slurm_array_ind"], rng=rng )
     else
         error("Invalid xp_type")
     end

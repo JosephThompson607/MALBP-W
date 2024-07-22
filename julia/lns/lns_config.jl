@@ -198,19 +198,21 @@ function configure_destroy(search_strategy::Dict; model_dependent::Bool=false)
         else
             @info "No destroy list specified, defaulting to all"
         end
-        if haskey(search_strategy["destroy"], "destroy_list") && search_strategy["destroy"]["destroy_list"] == "all"
-            destroy_list = [random_station_destroy!, random_subtree_destroy!, random_model_destroy!, random_station_model_destroy!, random_model_subtree_destroy!, random_station_subtree_destroy!, peak_station_destroy!]
-        elseif haskey(search_strategy["destroy"], "destroy_list") && search_strategy["destroy"]["destroy_list"] == "enhanced_random"
-            destroy_list = [random_station_destroy!, random_subtree_destroy!, random_model_destroy!, random_station_model_destroy!, random_model_subtree_destroy!, random_station_subtree_destroy!,]
-        elseif haskey(search_strategy["destroy"], "destroy_list") && search_strategy["destroy"]["destroy_list"] == "basic_random"
-            destroy_list = [random_station_destroy!, random_subtree_destroy!, random_model_destroy!]
-        elseif haskey(search_strategy["destroy"], "destroy_list") && search_strategy["destroy"]["destroy_list"] == "mixed_random"
-            destroy_list = [random_station_model_destroy!, random_model_subtree_destroy!, random_station_subtree_destroy!]
-        #If they pass an actual list of destroy operators, we will have to parse it
-        elseif haskey(search_strategy["destroy"], "destroy_list") && typeof(search_strategy["destroy"]["destroy_list"]) == Vector{String} 
-            destroy_list = parse_destroy_list(search_strategy["destroy"]["destroy_list"])
-        else
-            destroy_list = [random_station_destroy!, random_subtree_destroy!, random_model_destroy!]
+        if haskey(search_strategy["destroy"], "destroy_list") 
+            if haskey(search_strategy["destroy"], "destroy_list") && search_strategy["destroy"]["destroy_list"] == "all"
+                destroy_list = [random_station_destroy!, random_subtree_destroy!, random_model_destroy!, random_station_model_destroy!, random_model_subtree_destroy!, random_station_subtree_destroy!, peak_station_destroy!]
+            elseif haskey(search_strategy["destroy"], "destroy_list") && search_strategy["destroy"]["destroy_list"] == "enhanced_random"
+                destroy_list = [random_station_destroy!, random_subtree_destroy!, random_model_destroy!, random_station_model_destroy!, random_model_subtree_destroy!, random_station_subtree_destroy!,]
+            elseif haskey(search_strategy["destroy"], "destroy_list") && search_strategy["destroy"]["destroy_list"] == "basic_random"
+                destroy_list = [random_station_destroy!, random_subtree_destroy!, random_model_destroy!]
+            elseif haskey(search_strategy["destroy"], "destroy_list") && search_strategy["destroy"]["destroy_list"] == "mixed_random"
+                destroy_list = [random_station_model_destroy!, random_model_subtree_destroy!, random_station_subtree_destroy!]
+            #If they pass an actual list of destroy operators, we will have to parse it
+            elseif haskey(search_strategy["destroy"], "destroy_list") && typeof(search_strategy["destroy"]["destroy_list"]) == Vector{String} 
+                destroy_list = parse_destroy_list(search_strategy["destroy"]["destroy_list"])
+            else
+                destroy_list = [random_station_destroy!, random_subtree_destroy!, random_model_destroy!]
+            end
         end
         @info "Destroy list: $destroy_list"
 
@@ -279,8 +281,14 @@ function configure_destroy(search_strategy::Dict; model_dependent::Bool=false)
             end
         end
     end 
+
     #converts the keys to symbols
     destroy_kwargs = Dict(Symbol(k) => v for (k, v) in destroy_kwargs)
+    println("destroy op: ", destroy_op, "type: ", typeof(destroy_op))
+    # DestroyOp(destroy!::Function,  destroy_kwargs::Dict; 
+    #     destroy_weights::Dict=Dict{String, Float64}("random_model_destroy!"=>1., "random_station_destroy!"=>1., "random_subtree_destroy!"=>1.),
+    #     weight_update::Function = no_weight_update,
+    #     destroy_list::Array{Function} = [random_model_destroy!, random_station_destroy!, random_subtree_destroy!])
     destroy_operator = DestroyOp(destroy_op, 
                         destroy_kwargs; 
                         destroy_weights=search_strategy["destroy"]["destroy_weights"], 
