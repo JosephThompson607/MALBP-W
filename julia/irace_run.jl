@@ -176,6 +176,18 @@ function parse_commandline()
             help = "destroy operator"
             arg_type = String
             default = "random_destroy"
+        "--des_station_prob"
+            help = "probability of destroy operator station"
+            arg_type = Float64
+            default = 1/3
+        "--des_subtree_prob"
+            help = "probability of destroy operator subtree"
+            arg_type = Float64
+            default = 1/3
+        # "--des_model_prob", "-r"
+        #     help = "probability of destroy operator model"
+        #     arg_type = Float64
+        #     default = 1/3
         "--index", "-i"
             help = "index of the slurm array job"
             arg_type = Int
@@ -191,6 +203,8 @@ end
 
 function main()
     args = parse_commandline()
+    des_model_prob =  max(0, 1 - args["des_station_prob"] - args["des_subtree_prob"])
+    destroy_weights = Dict{String, Float64}("random_station_destroy!" => args["des_station_prob"], "random_subtree_destroy!" => args["des_subtree_prob"] , "random_model_destroy" =>des_model_prob )
     lns_conf = irace_lns_config(
         time_limit = args["run_time"],
         name = args["output_file"],
@@ -204,6 +218,7 @@ function main()
         seed = args["seed"],
         size_period = args["size_period"]
     )
+    
     result = Inf
     output = ""
     rng=Xoshiro(args["seed"])
