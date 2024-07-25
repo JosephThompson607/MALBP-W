@@ -113,6 +113,9 @@ function configure_change(search_strategy::Dict)
         elseif search_strategy["change"]["operator"] == "change_destroy_increase_size!"
             @info "Deconstructor change operator $(search_strategy["change"]["operator"]) recognized"
             destroy_change = change_destroy_increase_size!
+        elseif search_strategy["change"]["operator"] == "change_destroy_increase_size_reset_improve!"
+            @info "Deconstructor change operator $(search_strategy["change"]["operator"]) recognized"
+            destroy_change = change_destroy_increase_size_reset_improve!
         elseif search_strategy["change"]["operator"] == "adapt_lns!"
             @info "Deconstructor change operator $(search_strategy["change"]["operator"]) recognized"
             destroy_change = adapt_lns!
