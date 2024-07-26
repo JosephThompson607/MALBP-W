@@ -49,6 +49,7 @@ struct MALBP_W_instance
     equipment::EquipmentInstance
     n_stations:: Int
     max_workers:: Int
+    productivity_per_worker:: Dict{Int64, Float64}
     worker_cost:: Int
     recourse_cost:: Int
     num_cycles:: Int
@@ -62,9 +63,22 @@ function calculate_scenarios(scenarios::DataFrame)
     return nrow(scenarios)
 end
 
-function MALBP_W_instance(filepath::String,config_name::String, models::ModelsInstance, sequences::ProdSequences, equipment::EquipmentInstance, n_stations:: Int, max_workers:: Int, worker_cost:: Int, recourse_cost:: Int, num_cycles:: Int, MILP_models::Array{String})
+function MALBP_W_instance(filepath::String,config_name::String, models::ModelsInstance, sequences::ProdSequences, equipment::EquipmentInstance, n_stations:: Int, max_workers:: Int, 
+                            worker_cost:: Int, recourse_cost:: Int, num_cycles:: Int, MILP_models::Array{String}, productivity_per_worker::Dict{Int64, Float64} =  Dict(1=>1., 2=>1., 3=>1., 4=>1.))
     name =  models.name  * "_" *equipment.name
-    return MALBP_W_instance(filepath,name,config_name, models, sequences, equipment, n_stations, max_workers, worker_cost, recourse_cost,  num_cycles, MILP_models)
+    return MALBP_W_instance(filepath,
+                                name,
+                                config_name, 
+                                models, 
+                                sequences, 
+                                equipment, 
+                                n_stations, 
+                                max_workers, 
+                                productivity_per_worker,
+                                worker_cost, 
+                                recourse_cost,  
+                                num_cycles, 
+                                MILP_models)
 end
 
 
@@ -167,21 +181,38 @@ function read_MALBP_W_instances(file_name::String)
     for model in config_file["model_files"]
         for equip in config_file["equipment_files"]
             models_instance = read_models_instance(model)
-            equipment_instance = read_equipment_instance(equip)
-            check_instance(config_file,models_instance, equipment_instance)
+            equip_instance = read_equipment_instance(equip)
+            check_instance(config_file,models_instance, equip_instance)
             scenarios = read_scenario_tree(config_file["scenario"], get_model_mixture(models_instance))
             num_cycles = config_file["scenario"]["sequence_length"] + config_file["n_stations"] - 1
-            current_instance =MALBP_W_instance(file_name,
-                        config_file["config_name"], 
-                        models_instance, 
-                        scenarios, 
-                        equipment_instance, 
-                        config_file["n_stations"], 
-                        config_file["max_workers"], 
-                        config_file["worker_cost"], 
-                        config_file["recourse_cost"], 
-                        num_cycles, 
-                        config_file["milp_models"])
+            if haskey(config_file, "productivity_per_worker")
+                productivity_per_worker = Dict{Int64,Float64}(k => v for (k,v) in pairs(config_file["productivity_per_worker"])) 
+                current_instance = MALBP_W_instance( file_name,
+                            config_file["config_name"], 
+                            models_instance, 
+                            scenarios, 
+                            equip_instance, 
+                            config_file["n_stations"], 
+                            config_file["max_workers"], 
+                            config_file["worker_cost"], 
+                            config_file["recourse_cost"], 
+                            num_cycles, 
+                            config_file["milp_models"],
+                            productivity_per_worker)
+            else
+                @info "No productivity per worker defined, using default values (only applies to nonlinear productivity)"
+                current_instance = MALBP_W_instance(file_name,
+                            config_file["config_name"], 
+                            models_instance, 
+                            scenarios, 
+                            equip_instance, 
+                            config_file["n_stations"], 
+                            config_file["max_workers"], 
+                            config_file["worker_cost"], 
+                            config_file["recourse_cost"], 
+                            num_cycles, 
+                            config_file["milp_models"])
+            end
             push!(instances, current_instance)
         end
     end
@@ -328,7 +359,8 @@ function read_csv(file_name::String)
             scenarios = read_scenario_tree(config_file["scenario"], get_model_mixture(models_instance))
         end
         num_cycles = config_file["scenario"]["sequence_length"] + config_file["n_stations"] - 1
-        current_instance = MALBP_W_instance(row.config_yaml,
+        if haskey(config_file, "productivity_per_worker")
+            current_instance = MALBP_W_instance(row.config_yaml,
                         config_file["config_name"], 
                         models_instance, 
                         scenarios, 
@@ -337,9 +369,23 @@ function read_csv(file_name::String)
                         config_file["max_workers"], 
                         config_file["worker_cost"], 
                         config_file["recourse_cost"], 
-                        config_file["scenario"]["sequence_length"],
+                        num_cycles, 
+                        config_file["milp_models"],
+                        config_file["productivity_per_worker"])
+        else
+            @info "No productivity per worker defined, using default values (only applies to nonlinear productivity)"
+            current_instance = MALBP_W_instance(row.config_yaml,
+                        config_file["config_name"], 
+                        models_instance, 
+                        scenarios, 
+                        equip_instance, 
+                        config_file["n_stations"], 
+                        config_file["max_workers"], 
+                        config_file["worker_cost"], 
+                        config_file["recourse_cost"], 
                         num_cycles, 
                         config_file["milp_models"])
+        end
         push!(instances, (current_instance, config_file))
 
     end

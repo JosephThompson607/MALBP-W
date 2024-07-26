@@ -100,6 +100,27 @@ function write_y_wts_solution(output_filepath::String, instance::MALBP_W_instanc
     CSV.write(output_filepath * "y_wts_solution.csv", y_wts_solution_df)
 end
 
+function write_y_lwts_solution(output_filepath::String, instance::MALBP_W_instance, y_lwts, only_nonzero::Bool=false)
+    #writes the solution to a file
+    y_wts_solution = []
+    for l in 1:instance.max_workers
+        for w in 1:instance.sequences.n_scenarios
+            for t in 1:instance.num_cycles
+                for s in 1:instance.equipment.n_stations
+                    if only_nonzero && value(y_wts[w, t, s]) == 0
+                        continue
+                    end
+                    y_wts_dict = Dict("workers"=>l,"scenario"=>w, "cycle"=>t, "station"=>s, "value"=>value(y_lwts[l,w, t, s]))
+                    push!(y_wts_solution, y_wts_dict)
+                end
+            end
+        end
+    end
+    #writes the y_wts_solution as a csv
+    y_wts_solution_df = DataFrame(y_wts_solution)
+    CSV.write(output_filepath * "y_wts_solution.csv", y_wts_solution_df)
+end
+
 function write_y_w_solution(output_filepath::String, instance::MALBP_W_instance, y_w, y; only_nonzero::Bool=false)
     #writes the solution to a file
     y_solution = []
@@ -126,7 +147,11 @@ function write_MALBP_W_solution_md(output_filepath::String, instance::MALBP_W_in
         write_x_soi_solution(output_filepath, instance, m[:x_soi], only_nonzero)
         write_u_se_solution(output_filepath, instance, m[:u_se], only_nonzero)
         write_y_w_solution(output_filepath, instance, m[:y_w], m[:y]; only_nonzero = only_nonzero)
-        write_y_wts_solution(output_filepath, instance, m[:y_wts], only_nonzero)
+        if haskey(m, :y_wts)
+            write_y_wts_solution(output_filepath, instance, m[:y_wts], only_nonzero)
+        else
+            write_y_lwts_solution(output_filepath, instance, m[:y_lwts], only_nonzero)
+        end
     else
         @info("Model is not solved or feasible, no solution written")
     end
@@ -143,7 +168,11 @@ function write_MALBP_W_solution_fixed(output_filepath::String, instance::MALBP_W
         write_x_so_solution(output_filepath, instance, m[:x_so], only_nonzero)
         write_u_se_solution(output_filepath, instance, m[:u_se], only_nonzero)
         write_y_w_solution(output_filepath, instance, m[:y_w], m[:y]; only_nonzero = only_nonzero)
-        write_y_wts_solution(output_filepath, instance, m[:y_wts], only_nonzero)
+        if haskey(m, :y_wts)
+            write_y_wts_solution(output_filepath, instance, m[:y_wts], only_nonzero)
+        else
+            write_y_lwts_solution(output_filepath, instance, m[:y_lwts], only_nonzero)
+        end
     else
         @info("Model is not solved or feasible, no solution written")
     end
@@ -166,7 +195,11 @@ function write_MALBP_W_solution_dynamic(output_filepath::String, instance::MALBP
         write_x_wsoj_solution(output_filepath, instance, x, only_nonzero)
         write_u_se_solution(output_filepath, instance, u, only_nonzero)
         write_y_w_solution(output_filepath, instance, y_w, y; only_nonzero = only_nonzero)
-        write_y_wts_solution(output_filepath, instance, m[:y_wts], only_nonzero)
+        if haskey(m, :y_wts)
+            write_y_wts_solution(output_filepath, instance, m[:y_wts], only_nonzero)
+        else
+            write_y_lwts_solution(output_filepath, instance, m[:y_lwts], only_nonzero)
+        end
     else
         @info("Model is not solved or feasible, no solution written")
     end

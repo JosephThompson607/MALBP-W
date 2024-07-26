@@ -47,7 +47,9 @@ function unfix_vars!(m::Model , instance::MALBP_W_instance)
             set_lower_bound(y_recorse, 0)
         end
     end
-    #unfixes worker_assignment, reassigns max workers bounds
+
+    if haskey(m, :y_wts)
+        #unfixes worker_assignment, reassigns max workers bounds
     for worker_assignment in y_wts
         if is_fixed(worker_assignment)
             unfix(worker_assignment)
@@ -55,6 +57,16 @@ function unfix_vars!(m::Model , instance::MALBP_W_instance)
             set_lower_bound(worker_assignment, 0)
         end
     end
+    
+    elseif haskey(m, :y_lwts)
+        #unfixes worker_assignment, reassigns max workers bounds
+        for worker_assignment in y_lwts
+            if is_fixed(worker_assignment)
+                unfix(worker_assignment)
+            end
+        end
+    end
+    
 
 end
 

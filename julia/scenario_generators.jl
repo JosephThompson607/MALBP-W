@@ -136,7 +136,6 @@ function sobold_limit(sequence_length::Int, model_mixtures::Dict{String, Float64
         current_sequence = []
        for j in 1:sequence_length
             points = (QuasiMonteCarlo.sample(sequence_length, [0], [1], SobolSample()).+ rand()).% 1
-            println(points)
             #finds the model that the point falls into
             model_index = findfirst(x -> x >= points[j], model_ranges)
             model = model_keys[model_index]

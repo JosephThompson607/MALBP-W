@@ -11,7 +11,11 @@ function random_model_destroy!(m::Model, instance::MALBP_W_instance; rng = Xoshi
     end
     models = sample(rng,collect(keys(instance.models.models)), n_destroy)
     x_wsoj = m[:x_wsoj]
-    y_wts = m[:y_wts]
+    if haskey(m, :y_wts)
+        y_wts = m[:y_wts]
+    elseif haskey(m, :y_lwts)
+        y_wts = m[:y_lwts]
+    end
     #fixes the task assignment, equipment, and worker assignment for the models that are not in the models list
     println("models: ", models)
     for (w,seq) in enumerate(eachrow(instance.sequences.sequences))
@@ -23,7 +27,11 @@ function random_model_destroy!(m::Model, instance::MALBP_W_instance; rng = Xoshi
                 #can also fix worker assignment at stations when the model passes through
                 for s in 1:(instance.equipment.n_stations)
                     t = j + s - 1
-                    fix(y_wts[w, t, s], start_value(y_wts[w, t, s]), force=true)
+                    if haskey(m, :y_wts)
+                        fix(y_wts[w, t, s], start_value(y_wts[w, t, s]), force=true)
+                    elseif haskey(m, :y_lwts)
+                             fix.(y_wts[:, w, t, s], start_value(y_wts[:, w, t, s]), force=true)
+                    end
                 end
 
             end
@@ -107,7 +115,11 @@ function random_station_destroy!(m::Model, instance::MALBP_W_instance; rng = Xos
     println("stations: ", stations)
     x_wsoj = m[:x_wsoj]
     u_se = m[:u_se]
-    y_wts = m[:y_wts]
+    if haskey(m, :y_wts)
+        y_wts = m[:y_wts]
+    elseif haskey(m, :y_lwts)
+        y_wts = m[:y_lwts]
+    end
     #fixes the task assignment, equipment, and worker assignment for the stations that are not in the stations list
     for s in 1:instance.equipment.n_stations
         if s in stations
@@ -115,7 +127,11 @@ function random_station_destroy!(m::Model, instance::MALBP_W_instance; rng = Xos
         else
             fix.(x_wsoj[:, s, :, :], start_value.(x_wsoj[:, s, :, :]), force=true)
             fix.(u_se[s, :], start_value.(u_se[s, :]), force=true)
-            fix.(y_wts[:, :, s], start_value.(y_wts[:, :, s]), force=true)
+            if haskey(m, :y_wts)
+                fix.(y_wts[:, :, s], start_value.(y_wts[:, :, s]), force=true)
+            elseif haskey(m, :y_lwts)
+                fix.(y_wts[:, :, :, s], start_value.(y_wts[:, :, :, s]), force=true)
+            end
         end
     end
 end

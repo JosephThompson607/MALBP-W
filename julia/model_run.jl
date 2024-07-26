@@ -22,6 +22,7 @@ end
 include("scenario_generators.jl")
 include("read_MALBP_W.jl") 
 include("output.jl")
+include("models/nonlinear/dynamic_nonlinear.jl")
 include("models/model_dependent.jl")
 include("models/dynamic.jl")
 include("models/fixed.jl")
