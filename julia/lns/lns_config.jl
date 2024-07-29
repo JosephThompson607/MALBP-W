@@ -116,6 +116,9 @@ function configure_change(search_strategy::Dict)
         elseif search_strategy["change"]["operator"] == "change_destroy_increase_size_reset_improve!"
             @info "Deconstructor change operator $(search_strategy["change"]["operator"]) recognized"
             destroy_change = change_destroy_increase_size_reset_improve!
+        elseif search_strategy["change"]["operator"] == "change_destroy_increase_size_reduce_improve!"
+            @info "Deconstructor change operator $(search_strategy["change"]["operator"]) recognized"
+            destroy_change = change_destroy_increase_size_reduce_improve!
         elseif search_strategy["change"]["operator"] == "adapt_lns!"
             @info "Deconstructor change operator $(search_strategy["change"]["operator"]) recognized"
             destroy_change = adapt_lns!
@@ -400,11 +403,13 @@ function set_destroy_size!(des::DestroyOp, instance::MALBP_W_instance)
     mixed_random_list = [random_station_model_destroy!, random_model_subtree_destroy!, random_station_subtree_destroy!]
     if !haskey(des.kwargs, :percent_destroy) && length([i for i in des.destroy_list for j in mixed_random_list if i == j]) == 0
         percent_destroy = min( 1/instance.equipment.n_stations, 1/instance.models.n_models )
+        des.kwargs[:min_destroy] = percent_destroy
          @info "No percent destroy specified, defaulting to the smallest amount that can change an operator: $percent_destroy"
          des.kwargs[:percent_destroy] = percent_destroy
          des.old_kwargs[:percent_destroy] = percent_destroy
     elseif !haskey(des.kwargs, :percent_destroy)
         percent_destroy = 1/ (instance.equipment.n_stations * instance.models.n_models)
+        des.kwargs[:min_destroy] = percent_destroy
          @info "No percent destroy specified, defaulting to the smallest amount that can change an operator: $percent_destroy"
          des.kwargs[:percent_destroy] = percent_destroy
          des.old_kwargs[:percent_destroy] = percent_destroy
