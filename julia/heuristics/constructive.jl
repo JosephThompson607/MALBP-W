@@ -127,7 +127,7 @@ function ehsans_heuristic(instance::MALBP_W_instance; order_function::Function =
     return x_soi
 end
 
-function necessary_workers(tasks::Vector{String}, cycle_time::Real, model::ModelInstance, productivity_per_worker::Array{Float64}= [1., 1., 1., 1.])
+function necessary_workers(tasks::Vector{String}, cycle_time::Real, model::ModelInstance, productivity_per_worker::Vector{Float64}= [1., 1., 1., 1.])
     #calculates the number of workers needed to complete the tasks
     remaining_time = sum([model.task_times[1][task] for task in tasks])
 
@@ -142,7 +142,7 @@ function necessary_workers(tasks::Vector{String}, cycle_time::Real, model::Model
     return length(productivity_per_worker) 
 end
 
-function base_worker_assign_func(instance::MALBP_W_instance, x_soi::Array{Int64,3}; productivity_per_worker::Array{Float64}= [1., 1., 1., 1.])
+function base_worker_assign_func(instance::MALBP_W_instance, x_soi::Array{Int64,3}; productivity_per_worker::Vector{Float64}= [1., 1., 1., 1.])
     model_index = [i for (i, model_dict) in instance.models.models]
     assign_matrix = zeros(Int, instance.sequences.n_scenarios, instance.num_cycles, instance.equipment.n_stations )
     for (w,scenario) in enumerate(eachrow(instance.sequences.sequences))
@@ -163,7 +163,7 @@ function base_worker_assign_func(instance::MALBP_W_instance, x_soi::Array{Int64,
     return assign_matrix
 end
 
-function worker_assignment_heuristic(instance::MALBP_W_instance, x_soi::Array{Int,3}; productivity_per_worker::Array{Float64}= [1., 1., 1., 1.])
+function worker_assignment_heuristic(instance::MALBP_W_instance, x_soi::Array{Int,3}; productivity_per_worker::Vector{Float64}= [1., 1., 1., 1.])
     y_wts = base_worker_assign_func(instance, x_soi, productivity_per_worker = productivity_per_worker)
     y_w = zeros(Int, instance.sequences.n_scenarios)
     y = 0
@@ -454,7 +454,7 @@ function fill_station!(instance::MALBP_W_instance,
 end
 
 
-function task_equip_heuristic(instance::MALBP_W_instance; order_function::Function = positional_weight_order)
+function task_equip_heuristic(instance::MALBP_W_instance; order_function::Function = positional_weight_order, productivity_per_worker::Vector{Float64}= [1., 1., 1., 1.])
     precedence_matrices = create_precedence_matrices(instance; order_function= order_function)
     #orders the models by decreasing probability
     models = [(model, index) for (index,(model_name, model)) in enumerate(instance.models.models)]
@@ -469,7 +469,7 @@ function task_equip_heuristic(instance::MALBP_W_instance; order_function::Functi
     for station in 1:instance.equipment.n_stations
         fill_station!(instance, remaining_tasks, station, models, c_time_si, x_soi, equipment_assignments, capabilities_so,  precedence_matrices)
     end
-    y, y_w, y_wts, _ = worker_assignment_heuristic(instance, x_soi)
+    y, y_w, y_wts, _ = worker_assignment_heuristic(instance, x_soi, productivity_per_worker = productivity_per_worker)
     return x_soi, y, y_w, y_wts, equipment_assignments
 end
 
@@ -549,7 +549,7 @@ end
 # end
 
 #Calculates the number of workers needed at a station, returns nothing if the tasks cannot be completed
-function necessary_workers_w_block(tasks::Vector{String}, cycle_time::Real, model::ModelInstance, productivity_per_worker::Array{Float64}= [1., 1., 1., 1.])
+function necessary_workers_w_block(tasks::Vector{String}, cycle_time::Real, model::ModelInstance, productivity_per_worker::Vector{Float64}= [1., 1., 1., 1.])
     #calculates the number of workers needed to complete the tasks
     #println("tasks: ", tasks)
     remaining_time = sum([model.task_times[1][task] for task in tasks])
@@ -751,7 +751,7 @@ end
 
 
 
-# config_filepath = "SALBP_benchmark/MM_instances/julia_debug.yaml"
+# config_filepath = "SALBP_benchmark/MM_instances/testing_yaml/julia_debug.yaml"
 # #config_filepath = "SALBP_benchmark/MM_instances/medium_instance_config_S10.yaml"
 # instances = read_MALBP_W_instances(config_filepath)
 # instance = instances[2]
