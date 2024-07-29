@@ -147,7 +147,7 @@ function read_MALBP_W_solution(results_folder::String)
     return x_soi_df, u_se_df, y_lwts_df, y_w_df
 end
 
-function warmstart_dynamic_from_md_setup!(m::Model, vars_fp::String, instance::MALBP_W_instance)
+function warmstart_dynamic_nonlinear_from_md_setup!(m::Model, vars_fp::String, instance::MALBP_W_instance)
     #usesful variables
     x_wsoj = m[:x_wsoj]
     u_se = m[:u_se]
@@ -182,7 +182,7 @@ function warmstart_dynamic_from_md_setup!(m::Model, vars_fp::String, instance::M
     #sets the start value of the y_lwts variables
     if !isempty(y_lwts_md_df)
         for row in eachrow(y_lwts_md_df)
-            l = row.worker
+            l = row.workers
             w = row.scenario
             t = row.cycle
             s = row.station
@@ -273,7 +273,7 @@ end
 
 function define_dynamic_nonlinear!(m::Model, instance::MALBP_W_instance, warmstart_vars_fp::String; preprocessing = true)
     define_dynamic_nonlinear_vars!(m, instance)
-    warmstart_dynamic_from_md_setup!(m, warmstart_vars_fp, instance)
+    warmstart_dynamic_nonlinear_from_md_setup!(m, warmstart_vars_fp, instance)
     define_dynamic_nonlinear_obj!(m, instance)
     define_dynamic_nonlinear_constraints!(m, instance)   
     if preprocessing   

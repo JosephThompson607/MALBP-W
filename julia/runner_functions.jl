@@ -169,6 +169,34 @@ function MMALBP_W_dynamic_ws( instance::MALBP_W_instance, optimizer::Gurobi.Math
     return m
 end
 
+function MMALBP_W_dynamic_nonlinear_ws( instance::MALBP_W_instance, optimizer::Gurobi.MathOptInterface.OptimizerWithAttributes, original_filepath::String, run_time::Real; save_variables::Bool=true, save_lp::Bool=false, warmstart_vars::String="", md_obj_val::Real=0.0, slurm_array_ind::Union{Int, Nothing}=nothing, preprocessing::Bool=false)
+    #if directory is not made yet, make it
+    if !isnothing(slurm_array_ind)
+        output_filepath = original_filepath * "dynamic/"* instance.name * "/slurm_" * string(slurm_array_ind) * "/"
+    else
+        output_filepath = original_filepath * "dynamic/"* instance.name * "/"
+    end
+    if !isdir(output_filepath )
+        mkpath(output_filepath)
+    end
+    #creates the model
+    m = Model(optimizer)
+    set_optimizer_attribute(m, "LogFile", output_filepath * "gurobi.log")
+    #defines the model dependent parameters
+    define_dynamic_nonlinear!(m, instance, warmstart_vars, preprocessing=preprocessing)
+    #writes the model to a file
+    optimize!(m)
+    if save_variables
+        write_MALBP_W_solution_dynamic(output_filepath, instance, m, false)
+    end
+    if save_lp
+        write_to_file(m, output_filepath * "model.lp")
+    end
+    #saves the objective function, relative gap, run time, and instance_name to a file
+    save_results(original_filepath * "dynamic/", m, run_time, instance, output_filepath, "dynamic_problem_linear_labor_recourse.csv"; prev_obj_val=md_obj_val)
+    return m
+end
+
 function MMALBP_W_dynamic_lns( instance::MALBP_W_instance, optimizer::Gurobi.MathOptInterface.OptimizerWithAttributes, original_filepath::String, run_time::Real, search_strategy_fp::String; rng,
                                 save_variables::Bool=true, save_lp::Bool=false, warmstart_vars::String="", md_obj_val::Real=0.0, slurm_array_ind::Union{Int, Nothing}=nothing, preprocessing::Bool=false)
     #if directory is not made yet, make it
@@ -352,16 +380,27 @@ function warmstart_dynamic(config_filepath::String, output_filepath::String, run
     end
 end
 
-function warmstart_dynamic_slurm(config_filepath::String, output_filepath::String, run_time::Float64, save_variables::Bool, save_lp::Bool, slurm_array_ind::Int; xp_folder::String="model_runs", preprocessing::Bool=false)
-    instances = read_md_results(config_filepath)
+function warmstart_dynamic_nonlinear_slurm(config_filepath::String, output_filepath::String, run_time::Float64, save_variables::Bool, save_lp::Bool, slurm_array_ind::Int; xp_folder::String="model_runs", preprocessing::Bool=false)
+    instance, warmstart_vars_fp, md_obj_val = read_md_result(config_filepath, slurm_array_ind)
     optimizer = optimizer_with_attributes(() -> Gurobi.Optimizer(GRB_ENV_REF[]), "TimeLimit" => run_time)
     #adds the date and time to the output file path
     now = Dates.now()
     now = Dates.format(now, "yyyy-mm-dd")
     output_filepath = xp_folder * "/" * now * "_" * output_filepath 
-    instance, var_folder, md_obj_val = instances[slurm_array_ind]
     @info "Running instance $(instance.name), from $(config_filepath). \n Output will be saved to $(output_filepath)"
-    MMALBP_W_dynamic_ws(instance, optimizer, output_filepath, run_time; save_variables= save_variables, save_lp=save_lp, warmstart_vars= var_folder, md_obj_val= md_obj_val, preprocessing=false)
+    MMALBP_W_dynamic_nonlinear_ws(instance, optimizer, output_filepath, run_time; save_variables= save_variables, save_lp=save_lp, warmstart_vars= warmstart_vars_fp, md_obj_val= md_obj_val, preprocessing=false)
+   
+end
+
+function warmstart_dynamic_slurm(config_filepath::String, output_filepath::String, run_time::Float64, save_variables::Bool, save_lp::Bool, slurm_array_ind::Int; xp_folder::String="model_runs", preprocessing::Bool=false)
+    instance, warmstart_vars_fp, md_obj_val = read_md_result(config_filepath, slurm_array_ind)
+    optimizer = optimizer_with_attributes(() -> Gurobi.Optimizer(GRB_ENV_REF[]), "TimeLimit" => run_time)
+    #adds the date and time to the output file path
+    now = Dates.now()
+    now = Dates.format(now, "yyyy-mm-dd")
+    output_filepath = xp_folder * "/" * now * "_" * output_filepath 
+    @info "Running instance $(instance.name), from $(config_filepath). \n Output will be saved to $(output_filepath)"
+    MMALBP_W_dynamic_nonlinear_ws(instance, optimizer, output_filepath, run_time; save_variables= save_variables, save_lp=save_lp, warmstart_vars= warmstart_vars_fp, md_obj_val= md_obj_val, preprocessing=false)
    
 end
 

@@ -102,7 +102,15 @@ function main()
     elseif parsed_args["xp_type"] == "warmstart"
         warmstart_dynamic(parsed_args["config_file"], output_file,parsed_args["run_time"], parsed_args["save_variables"], parsed_args["save_lp"];  preprocessing=parsed_args["preprocessing"])
     elseif parsed_args["xp_type"] == "warmstart_slurm"
+        if isnothing(parsed_args["slurm_array_ind"])
+            error("Slurm array index is required for slurm experiments")
+        end
         warmstart_dynamic_slurm(parsed_args["config_file"], output_file,parsed_args["run_time"], parsed_args["save_variables"], parsed_args["save_lp"], parsed_args["slurm_array_ind"] ;  preprocessing=parsed_args["preprocessing"])
+    elseif parsed_args["xp_type"] == "warmstart_slurm_nonlinear"
+        if isnothing(parsed_args["slurm_array_ind"])
+            error("Slurm array index is required for slurm experiments")
+        end
+        warmstart_dynamic_nonlinear_slurm(parsed_args["config_file"], output_file,parsed_args["run_time"], parsed_args["save_variables"], parsed_args["save_lp"], parsed_args["slurm_array_ind"] ;  preprocessing=parsed_args["preprocessing"])
     elseif parsed_args["xp_type"] == "csv_slurm"
         MMALBP_from_csv_slurm(parsed_args["config_file"], output_file,parsed_args["run_time"], parsed_args["save_variables"], parsed_args["save_lp"], parsed_args["slurm_array_ind"];  preprocessing=parsed_args["preprocessing"])
         if isnothing(parsed_args["slurm_array_ind"])
