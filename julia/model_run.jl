@@ -71,7 +71,7 @@ function parse_commandline()
             help = "Name of the experiment"
             arg_type = String
             default = "xp"
-        "--slurm_array_ind"
+        "--slurm_ind", "--slurm_array_ind"
             help = "Index of the slurm array job"
             arg_type = Int
         "--seed"
@@ -102,18 +102,18 @@ function main()
     elseif parsed_args["xp_type"] == "warmstart"
         warmstart_dynamic(parsed_args["config_file"], output_file,parsed_args["run_time"], parsed_args["save_variables"], parsed_args["save_lp"];  preprocessing=parsed_args["preprocessing"])
     elseif parsed_args["xp_type"] == "warmstart_slurm"
-        if isnothing(parsed_args["slurm_array_ind"])
+        if isnothing(parsed_args["slurm_ind"])
             error("Slurm array index is required for slurm experiments")
         end
-        warmstart_dynamic_slurm(parsed_args["config_file"], output_file,parsed_args["run_time"], parsed_args["save_variables"], parsed_args["save_lp"], parsed_args["slurm_array_ind"] ;  preprocessing=parsed_args["preprocessing"])
+        warmstart_dynamic_slurm(parsed_args["config_file"], output_file,parsed_args["run_time"], parsed_args["save_variables"], parsed_args["save_lp"], parsed_args["slurm_ind"] ;  preprocessing=parsed_args["preprocessing"])
     elseif parsed_args["xp_type"] == "warmstart_slurm_nonlinear"
-        if isnothing(parsed_args["slurm_array_ind"])
+        if isnothing(parsed_args["slurm_ind"])
             error("Slurm array index is required for slurm experiments")
         end
-        warmstart_dynamic_nonlinear_slurm(parsed_args["config_file"], output_file,parsed_args["run_time"], parsed_args["save_variables"], parsed_args["save_lp"], parsed_args["slurm_array_ind"] ;  preprocessing=parsed_args["preprocessing"])
+        warmstart_dynamic_nonlinear_slurm(parsed_args["config_file"], output_file,parsed_args["run_time"], parsed_args["save_variables"], parsed_args["save_lp"], parsed_args["slurm_ind"] ;  preprocessing=parsed_args["preprocessing"])
     elseif parsed_args["xp_type"] == "csv_slurm"
-        MMALBP_from_csv_slurm(parsed_args["config_file"], output_file,parsed_args["run_time"], parsed_args["save_variables"], parsed_args["save_lp"], parsed_args["slurm_array_ind"];  preprocessing=parsed_args["preprocessing"])
-        if isnothing(parsed_args["slurm_array_ind"])
+        MMALBP_from_csv_slurm(parsed_args["config_file"], output_file,parsed_args["run_time"], parsed_args["save_variables"], parsed_args["save_lp"], parsed_args["slurm_ind"];  preprocessing=parsed_args["preprocessing"])
+        if isnothing(parsed_args["slurm_ind"])
             error("Slurm array index is required for slurm experiments")
         end
     elseif parsed_args["xp_type"] == "lns_md"
@@ -126,20 +126,28 @@ function main()
             error("LNS config file is required for LNS experiments")
         end
         MMALBP_W_LNS(parsed_args["config_file"], output_file,parsed_args["run_time"], parsed_args["save_variables"], parsed_args["save_lp"], parsed_args["LNS_config"], preprocessing=parsed_args["preprocessing"], rng=rng)
-    elseif parsed_args["xp_type"] == "slurm_array_lns_md"
+    elseif parsed_args["xp_type"] == "slurm_lns_md" || parsed_args["xp_type"] == "slurm_array_lns_md"
         if isnothing(parsed_args["LNS_config"]) 
             error("LNS config file is required for LNS experiments")
-        elseif isnothing(parsed_args["slurm_array_ind"])
+        elseif isnothing(parsed_args["slurm_ind"])
             error("Slurm array index is required for slurm LNS experiments")
         end
-        MMALBP_md_lns_from_slurm(parsed_args["config_file"], output_file,parsed_args["run_time"], parsed_args["save_variables"], parsed_args["save_lp"], parsed_args["LNS_config"], parsed_args["slurm_array_ind"] ,rng=rng )
-    elseif parsed_args["xp_type"] == "slurm_array_lns"
+        MMALBP_md_lns_from_slurm(parsed_args["config_file"], output_file,parsed_args["run_time"], parsed_args["save_variables"], parsed_args["save_lp"], parsed_args["LNS_config"], parsed_args["slurm_ind"] ,rng=rng )
+    elseif parsed_args["xp_type"] == "slurm_lns" || parsed_args["xp_type"] == "slurm_array_lns"
         if isnothing(parsed_args["LNS_config"]) 
             error("LNS config file is required for LNS experiments")
-        elseif isnothing(parsed_args["slurm_array_ind"])
+        elseif isnothing(parsed_args["slurm_ind"])
             error("Slurm array index is required for slurm LNS experiments")
         end
-        MMALBP_W_LNS_slurm(parsed_args["config_file"], output_file,parsed_args["run_time"], parsed_args["save_variables"], parsed_args["save_lp"], parsed_args["LNS_config"], parsed_args["slurm_array_ind"], rng=rng )
+        MMALBP_W_LNS_slurm(parsed_args["config_file"], output_file,parsed_args["run_time"], parsed_args["save_variables"], parsed_args["save_lp"], parsed_args["LNS_config"], parsed_args["slurm_ind"], rng=rng )
+    elseif parsed_args["xp_type"] == "slurm_lns_nonlinear" || parsed_args["xp_type"] == "slurm_array_lns_nonlinear"
+        if isnothing(parsed_args["LNS_config"]) 
+            error("LNS config file is required for LNS experiments")
+        elseif isnothing(parsed_args["slurm_ind"])
+            error("Slurm array index is required for slurm LNS experiments")
+        end
+        MMALBP_W_LNS_slurm(parsed_args["config_file"], output_file,parsed_args["run_time"], parsed_args["save_variables"], parsed_args["save_lp"], parsed_args["LNS_config"], parsed_args["slurm_ind"], rng=rng, runner_function = MMALBP_W_dynamic_nonlinear_lns )
+
     else
         error("Invalid xp_type")
     end

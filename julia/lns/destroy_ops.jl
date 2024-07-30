@@ -180,7 +180,11 @@ function random_subtree_destroy!(m::Model, instance::MALBP_W_instance; rng = Xos
     end
     #randomly selects n_destroy sequences of tasks to remove
     x_wsoj = m[:x_wsoj]
-    y_wts = m[:y_wts]
+    if haskey(m, :y_wts)
+        y_wts = m[:y_wts]
+    elseif haskey(m, :y_lwts)
+        y_wts = m[:y_lwts]
+    end
     prod_sequences = instance.sequences.sequences[rand(rng, 1:instance.sequences.n_scenarios, n_destroy), :]
     for w in 1:instance.sequences.n_scenarios
         shared_scenario = false
@@ -193,7 +197,11 @@ function random_subtree_destroy!(m::Model, instance::MALBP_W_instance; rng = Xos
         if ! shared_scenario
             #fixes the task assignment and worker assignment for the stations that are not in the stations list
             fix.(x_wsoj[w, :, :, :], start_value.(x_wsoj[w, :, :, :]), force=true)
-            fix.(y_wts[w, :, :], start_value.(y_wts[w, :, :]), force=true)
+            if haskey(m, :y_wts)
+                fix.(y_wts[w, :, :], start_value.(y_wts[w, :, :]), force=true)
+            elseif haskey(m, :y_lwts)
+                fix.(y_wts[:, w, :, :], start_value.(y_wts[:, w, :, :]), force=true)
+            end
         end
     end
 end

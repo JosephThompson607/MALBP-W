@@ -5,11 +5,6 @@
 
 #function to unfix all fixed variables in the model and load their 
 function unfix_vars!(m::Model , instance::MALBP_W_instance)
-    
-
-    u_se = m[:u_se]
-    y_wts = m[:y_wts]
-    y_w = m[:y_w]
     y = m[:y]
     if is_fixed(y)
         unfix(y)
@@ -35,12 +30,15 @@ function unfix_vars!(m::Model , instance::MALBP_W_instance)
         end
     end
     #unfixes equipment assignment variables
+    u_se = m[:u_se]
     for u in u_se
         if is_fixed(u)
             unfix(u)
         end
     end
+
     #unfixes total recourse worker assignment
+    y_w = m[:y_w]
     for y_recorse in y_w
         if is_fixed(y_recorse)
             unfix(y_recorse)
@@ -50,6 +48,7 @@ function unfix_vars!(m::Model , instance::MALBP_W_instance)
 
     if haskey(m, :y_wts)
         #unfixes worker_assignment, reassigns max workers bounds
+        y_wts = m[:y_wts]
     for worker_assignment in y_wts
         if is_fixed(worker_assignment)
             unfix(worker_assignment)
@@ -59,6 +58,7 @@ function unfix_vars!(m::Model , instance::MALBP_W_instance)
     end
     
     elseif haskey(m, :y_lwts)
+        y_lwts = m[:y_lwts]
         #unfixes worker_assignment, reassigns max workers bounds
         for worker_assignment in y_lwts
             if is_fixed(worker_assignment)

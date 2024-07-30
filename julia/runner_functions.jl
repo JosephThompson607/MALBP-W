@@ -197,6 +197,37 @@ function MMALBP_W_dynamic_nonlinear_ws( instance::MALBP_W_instance, optimizer::G
     return m
 end
 
+function MMALBP_W_dynamic_nonlinear_lns( instance::MALBP_W_instance, optimizer::Gurobi.MathOptInterface.OptimizerWithAttributes, original_filepath::String, run_time::Real, search_strategy_fp::String; rng,
+        save_variables::Bool=true, save_lp::Bool=false, warmstart_vars::String="", md_obj_val::Real=0.0, slurm_array_ind::Union{Int, Nothing}=nothing, preprocessing::Bool=false)
+    #if directory is not made yet, make it
+    if !isnothing(slurm_array_ind)
+        output_filepath = original_filepath * "dynamic/"* instance.name * "/slurm_" * string(slurm_array_ind) * "/"
+    else
+        output_filepath = original_filepath * "dynamic/"* instance.name * "/"
+    end
+    if !isdir(output_filepath )
+        mkpath(output_filepath)
+    end
+    #creates the model
+    m = Model(optimizer)
+    set_optimizer_attribute(m, "LogFile", output_filepath * "gurobi.log")
+    #defines the  dyanmic model parameters
+    define_dynamic_nonlinear!(m, instance, warmstart_vars, preprocessing=preprocessing)
+    #solves the model in a lns loop
+    lns_conf = read_search_strategy_YAML(search_strategy_fp, run_time, model_dependent=false)
+    obj_dict, best_obj = large_neighborhood_search!(m, instance, lns_conf; lns_res_fp= output_filepath  , md_obj_val=md_obj_val, run_time=run_time, rng=rng)
+    if save_variables
+        write_MALBP_W_solution_dynamic(output_filepath, instance, m, false)
+    end
+    #writes the model to a file
+    if save_lp
+        write_to_file(m, output_filepath * "model.lp")
+    end
+    #saves the objective function, relative gap, run time, and instance_name to a file
+    save_results(original_filepath * "dynamic/", m, run_time, instance, output_filepath, "dynamic_problem_linear_labor_recourse.csv"; prev_obj_val=md_obj_val, best_obj_val = best_obj)
+    return m
+end
+
 function MMALBP_W_dynamic_lns( instance::MALBP_W_instance, optimizer::Gurobi.MathOptInterface.OptimizerWithAttributes, original_filepath::String, run_time::Real, search_strategy_fp::String; rng,
                                 save_variables::Bool=true, save_lp::Bool=false, warmstart_vars::String="", md_obj_val::Real=0.0, slurm_array_ind::Union{Int, Nothing}=nothing, preprocessing::Bool=false)
     #if directory is not made yet, make it
@@ -418,7 +449,7 @@ function MMALBP_W_LNS(config_filepath::String, output_filepath::String, run_time
 end
 
 #Runs the LNS model on a list of instances using a slurm array index
-function MMALBP_W_LNS_slurm(config_filepath::String, output_filepath::String, run_time::Float64, save_variables::Bool, save_lp::Bool, search_strategy_fp::String, slurm_array_ind::Int; xp_folder::String="model_runs", preprocessing::Bool=false, rng=Xoshiro())
+function MMALBP_W_LNS_slurm(config_filepath::String, output_filepath::String, run_time::Float64, save_variables::Bool, save_lp::Bool, search_strategy_fp::String, slurm_array_ind::Int; xp_folder::String="model_runs", preprocessing::Bool=false, rng=Xoshiro(), runner_function = MMALBP_W_dynamic_lns)
     instance, warmstart_vars_fp, md_obj_val = read_md_result(config_filepath, slurm_array_ind)
     optimizer = optimizer_with_attributes(() -> Gurobi.Optimizer(GRB_ENV_REF[]), "TimeLimit" => run_time)
     #adds the date and time to the output file path
@@ -426,8 +457,10 @@ function MMALBP_W_LNS_slurm(config_filepath::String, output_filepath::String, ru
     now = Dates.format(now, "yyyy-mm-dd")
     output_filepath = xp_folder * "/" * now * "_" * output_filepath 
     @info "Running instance $(instance.name), from $(config_filepath). \n Output will be saved to $(output_filepath)"
-    MMALBP_W_dynamic_lns(instance, optimizer, output_filepath, run_time,  search_strategy_fp; save_variables= save_variables, save_lp=save_lp, warmstart_vars= warmstart_vars_fp, md_obj_val= md_obj_val, slurm_array_ind=slurm_array_ind, preprocessing=preprocessing, rng=rng)
+    runner_function(instance, optimizer, output_filepath, run_time,  search_strategy_fp; save_variables= save_variables, save_lp=save_lp, warmstart_vars= warmstart_vars_fp, md_obj_val= md_obj_val, slurm_array_ind=slurm_array_ind, preprocessing=preprocessing, rng=rng)
 end
+
+
 
 
 
