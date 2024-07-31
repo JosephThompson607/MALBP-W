@@ -33,3 +33,5 @@ instance_data/
 my_model.mps
 *.txt
 Instances/
+irace.Rdata
+iracedump.rda
