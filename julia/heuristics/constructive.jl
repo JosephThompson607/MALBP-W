@@ -410,10 +410,10 @@ function fill_station!(instance::MALBP_W_instance,
                 end
                 continue
             end
+            #equipment task indexes are different from the indexes in the precedence matrix
             precedence_matrix = precedence_matrices[model.name]["precedence_matrix"]
             task_to_index = precedence_matrices[model.name]["task_to_index"]
             progress = false
-            #equipment task indexes are different from the indexes in the precedence matrix
             for task in unfinished_tasks[i]
                 task_index = task_to_index[task]
                 o = parse(Int, task)

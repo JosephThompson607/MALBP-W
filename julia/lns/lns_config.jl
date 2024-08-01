@@ -170,7 +170,6 @@ function configure_destroy(search_strategy::Dict; model_dependent::Bool=false)
         destroy_op = random_station_destroy!
         search_strategy["destroy"]["kwargs"] = Dict()
         search_strategy["change"]["operator"] = no_change
-        weight_update = no_weight_update
     else
         @info "Deconstructor specified: $(search_strategy["destroy"]["operator"])"
         if (haskey(search_strategy, "formulation") && search_strategy["formulation"] == "md") || model_dependent
@@ -290,7 +289,6 @@ function configure_destroy(search_strategy::Dict; model_dependent::Bool=false)
 
     #converts the keys to symbols
     destroy_kwargs = Dict(Symbol(k) => v for (k, v) in destroy_kwargs)
-    println("destroy op: ", destroy_op, "type: ", typeof(destroy_op))
     # DestroyOp(destroy!::Function,  destroy_kwargs::Dict; 
     #     destroy_weights::Dict=Dict{String, Float64}("random_model_destroy!"=>1., "random_station_destroy!"=>1., "random_subtree_destroy!"=>1.),
     #     weight_update::Function = no_weight_update,
