@@ -397,10 +397,11 @@ end
 
 #sets the smallest percentage to increase destroy size for the destroy operator
 function set_destroy_size!(des::DestroyOp, instance::MALBP_W_instance)
+    des.kwargs[:min_destroy] =  min( 1/instance.equipment.n_stations, 1/instance.models.n_models )
     #combined operators need to consider the size of original operators
     mixed_random_list = [random_station_model_destroy!, random_model_subtree_destroy!, random_station_subtree_destroy!]
     if !haskey(des.kwargs, :percent_destroy) && length([i for i in des.destroy_list for j in mixed_random_list if i == j]) == 0
-        percent_destroy = min( 1/instance.equipment.n_stations, 1/instance.models.n_models )
+        percent_destroy = des.kwargs[:min_destroy]
         des.kwargs[:min_destroy] = percent_destroy
          @info "No percent destroy specified, defaulting to the smallest amount that can change an operator: $percent_destroy"
          des.kwargs[:percent_destroy] = percent_destroy
