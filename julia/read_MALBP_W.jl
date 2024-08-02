@@ -323,7 +323,7 @@ function read_slurm_csv(file_name::String, slurm_ind::Int)
     models_instance = read_models_instance(row.model_yaml)
     equip_instance = read_equipment_instance(row.equipment_yaml)
     config_file = get_instance_YAML(row.config_yaml)
-    #config_file = overwrite_config_settings(row, config_file, models_instance, equip_instance)
+    config_file = overwrite_config_settings(row, config_file, models_instance, equip_instance)
     if hasproperty(row, :scenario_tree_yaml) && row.scenario_tree_yaml != "" && row.scenario_tree_yaml != "No Tree"
         scenarios = read_scenario_csv(row.scenario_tree_yaml)
     else
