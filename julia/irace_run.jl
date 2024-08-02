@@ -47,7 +47,8 @@ function irace_lns_config(;time_limit::Float64,
                             Dict{String, Float64}}=nothing, 
                             repair_time::Float64, 
                             seed::Union{Nothing, Int}=nothing,
-                            size_period::Int=1)
+                            size_period::Int=1,
+                            reward::Float64 = 1.0)
     
     #Destroy op config
     if isnothing(destroy_weights)
@@ -80,7 +81,8 @@ function irace_lns_config(;time_limit::Float64,
     change_kwargs = Dict(:change_freq => 1, 
                         :filter_out_current => false,
                         :change_decay => 0.9,
-                        :size_period => size_period)
+                        :size_period => size_period,
+                        :reward => reward)
     weight_update = getfield(ModelRun, Symbol(weight_update))
     change_weights =  Dict("no_change!"=>1.0, 
     "increase_size!"=>1.0, 
@@ -189,6 +191,10 @@ function parse_commandline()
         #     help = "probability of destroy operator model"
         #     arg_type = Float64
         #     default = 1/3
+        "--reward"
+            help = "Reward for ALNS"
+            arg_type = Float64
+            default = 1.0
         "--index", "-i"
             help = "index of the slurm array job"
             arg_type = Int
@@ -217,7 +223,8 @@ function main()
         weight_update = args["weight_update"],
         repair_time = args["repair_time_limit"],
         seed = args["seed"],
-        size_period = args["size_period"]
+        size_period = args["size_period"],
+        reward = args["reward"]
     )
     
     result = Inf

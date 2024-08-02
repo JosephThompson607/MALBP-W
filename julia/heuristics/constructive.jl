@@ -174,6 +174,7 @@ function worker_assignment_heuristic(instance::MALBP_W_instance, x_soi::Array{In
             peak_current =0
             station_index = (0,0,0)
             for (station,station_workers) in enumerate(y_wts[w, t, :])
+                #Just for identifying max station, not important for heuristic
                 if station_workers > peak_current
                     peak_current = station_workers
                     station_index = (w, t, station)

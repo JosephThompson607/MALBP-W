@@ -8,7 +8,7 @@ end
 
 
 #adaptive lns for destroy operator selection
-function adapt_des!(iter_no_improve::Int, lns_obj::LNSConf, m::Model; iteration::Int, iteration_time::Float64, des_weight_update::Function = no_weight_update, obj_val_delta::Float64=0., _...)
+function adapt_des!(iter_no_improve::Int, lns_obj::LNSConf, m::Model; iteration::Int, iteration_time::Float64, des_weight_update::Function = no_weight_update, obj_val_delta::Float64=0.,reward::Float64= 1., _...)
     #retrieves the decay and change decay parameters
     decay = lns_obj.des.kwargs[:des_decay]
     #rewards the destroy and change operator if there has been an improvement
@@ -17,7 +17,8 @@ function adapt_des!(iter_no_improve::Int, lns_obj::LNSConf, m::Model; iteration:
                                                                         obj_val_delta = obj_val_delta,
                                                                         iteration = iteration, 
                                                                         iteration_time = iteration_time, 
-                                                                        decay = decay)
+                                                                        decay = decay,
+                                                                        reward = reward)
 
     return iter_no_improve, lns_obj, m
 end
@@ -39,9 +40,9 @@ function iter_and_time_update(iter_no_improve::Int, weights::Float64; iteration:
 end
 
 #basic update operator
-function basic_update(iter_no_improve::Int, weights::Float64; decay::Float64, up_amount::Float64= 1., _...)
+function basic_update(iter_no_improve::Int, weights::Float64; decay::Float64, reward::Float64= 1., _...)
     if iter_no_improve == 0
-        return decay * weights + (1-decay) * up_amount
+        return decay * weights + (1-decay) * reward
     else
         return weights * decay
     end
