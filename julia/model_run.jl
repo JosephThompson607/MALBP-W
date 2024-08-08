@@ -11,6 +11,7 @@ using Random
 using StatsBase
 const GRB_ENV_REF = Ref{Gurobi.Env}()
 
+
 function __init__()
     global GRB_ENV_REF
     @suppress begin

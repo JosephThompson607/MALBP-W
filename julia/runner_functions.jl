@@ -1,4 +1,4 @@
-function MMALBP_W_model_dependent(instance::MALBP_W_instance, optimizer::Gurobi.MathOptInterface.OptimizerWithAttributes, original_filepath::String, run_time::Real; preprocessing::Bool=false, save_variables::Bool=true, save_lp::Bool=false, slurm_array_ind::Union{Int, Nothing}=nothing)
+function MMALBP_W_model_dependent(instance::MALBP_W_instance, optimizer, original_filepath::String, run_time::Real; preprocessing::Bool=false, save_variables::Bool=true, save_lp::Bool=false, slurm_array_ind::Union{Int, Nothing}=nothing)
     #if directory is not made yet, make it
     if !isnothing(slurm_array_ind)
         output_filepath = original_filepath * "md/"* instance.name * "/slurm_" * string(slurm_array_ind) * "/"
@@ -26,7 +26,7 @@ function MMALBP_W_model_dependent(instance::MALBP_W_instance, optimizer::Gurobi.
     return m
 end
 
-function MMALBP_W_model_dependent_nonlinear(instance::MALBP_W_instance, optimizer::Gurobi.MathOptInterface.OptimizerWithAttributes, original_filepath::String, run_time::Real; preprocessing::Bool=false, save_variables::Bool=true, save_lp::Bool=false, slurm_array_ind::Union{Int, Nothing}=nothing)
+function MMALBP_W_model_dependent_nonlinear(instance::MALBP_W_instance, optimizer, original_filepath::String, run_time::Real; preprocessing::Bool=false, save_variables::Bool=true, save_lp::Bool=false, slurm_array_ind::Union{Int, Nothing}=nothing)
     #if directory is not made yet, make it
     if !isnothing(slurm_array_ind)
         output_filepath = original_filepath * "md/"* instance.name * "/slurm_" * string(slurm_array_ind) * "/"
@@ -54,7 +54,7 @@ function MMALBP_W_model_dependent_nonlinear(instance::MALBP_W_instance, optimize
     return m
 end
 
-function MMALBP_W_fixed(instance::MALBP_W_instance, optimizer::Gurobi.MathOptInterface.OptimizerWithAttributes, original_filepath::String, run_time::Real;preprocessing::Bool=false, save_variables::Bool=true, save_lp::Bool=false, slurm_array_ind::Union{Int, Nothing}=nothing)
+function MMALBP_W_fixed(instance::MALBP_W_instance, optimizer, original_filepath::String, run_time::Real;preprocessing::Bool=false, save_variables::Bool=true, save_lp::Bool=false, slurm_array_ind::Union{Int, Nothing}=nothing)
     #if directory is not made yet, make it
     if !isnothing(slurm_array_ind)
         output_filepath = original_filepath * "fixed/"* instance.name * "/slurm_" * string(slurm_array_ind) * "/"
@@ -82,7 +82,7 @@ function MMALBP_W_fixed(instance::MALBP_W_instance, optimizer::Gurobi.MathOptInt
     return m
 end
 
-function MMALBP_W_dynamic( instance::MALBP_W_instance, optimizer::Gurobi.MathOptInterface.OptimizerWithAttributes, original_filepath::String, run_time::Real; save_variables::Bool=true, save_lp::Bool=false, slurm_array_ind::Union{Int, Nothing}=nothing, preprocessing::Bool=false, )
+function MMALBP_W_dynamic( instance::MALBP_W_instance, optimizer, original_filepath::String, run_time::Real; save_variables::Bool=true, save_lp::Bool=false, slurm_array_ind::Union{Int, Nothing}=nothing, preprocessing::Bool=false, )
     
     #if directory is not made yet, make it
     if !isnothing(slurm_array_ind)
@@ -111,7 +111,7 @@ function MMALBP_W_dynamic( instance::MALBP_W_instance, optimizer::Gurobi.MathOpt
     return m
 end
 
-function MMALBP_W_dynamic_nonlinear( instance::MALBP_W_instance, optimizer::Gurobi.MathOptInterface.OptimizerWithAttributes, original_filepath::String, run_time::Real; save_variables::Bool=true, save_lp::Bool=false, slurm_array_ind::Union{Int, Nothing}=nothing, preprocessing::Bool=false, )
+function MMALBP_W_dynamic_nonlinear( instance::MALBP_W_instance, optimizer, original_filepath::String, run_time::Real; save_variables::Bool=true, save_lp::Bool=false, slurm_array_ind::Union{Int, Nothing}=nothing, preprocessing::Bool=false, )
     
     #if directory is not made yet, make it
     if !isnothing(slurm_array_ind)
@@ -141,7 +141,7 @@ function MMALBP_W_dynamic_nonlinear( instance::MALBP_W_instance, optimizer::Guro
     return m
 end
 
-function MMALBP_W_dynamic_ws( instance::MALBP_W_instance, optimizer::Gurobi.MathOptInterface.OptimizerWithAttributes, original_filepath::String, run_time::Real; save_variables::Bool=true, save_lp::Bool=false, warmstart_vars::String="", md_obj_val::Real=0.0, slurm_array_ind::Union{Int, Nothing}=nothing, preprocessing::Bool=false)
+function MMALBP_W_dynamic_ws( instance::MALBP_W_instance, optimizer, original_filepath::String, run_time::Real; save_variables::Bool=true, save_lp::Bool=false, warmstart_vars::String="", md_obj_val::Real=0.0, slurm_array_ind::Union{Int, Nothing}=nothing, preprocessing::Bool=false)
     #if directory is not made yet, make it
     if !isnothing(slurm_array_ind)
         output_filepath = original_filepath * "dynamic/"* instance.name * "/slurm_" * string(slurm_array_ind) * "/"
@@ -170,7 +170,7 @@ function MMALBP_W_dynamic_ws( instance::MALBP_W_instance, optimizer::Gurobi.Math
     return m
 end
 
-function MMALBP_W_dynamic_nonlinear_ws( instance::MALBP_W_instance, optimizer::Gurobi.MathOptInterface.OptimizerWithAttributes, original_filepath::String, run_time::Real; save_variables::Bool=true, save_lp::Bool=false, warmstart_vars::String="", md_obj_val::Real=0.0, slurm_array_ind::Union{Int, Nothing}=nothing, preprocessing::Bool=false)
+function MMALBP_W_dynamic_nonlinear_ws( instance::MALBP_W_instance, optimizer, original_filepath::String, run_time::Real; save_variables::Bool=true, save_lp::Bool=false, warmstart_vars::String="", md_obj_val::Real=0.0, slurm_array_ind::Union{Int, Nothing}=nothing, preprocessing::Bool=false)
     #if directory is not made yet, make it
     if !isnothing(slurm_array_ind)
         output_filepath = original_filepath * "dynamic/"* instance.name * "/slurm_" * string(slurm_array_ind) * "/"
@@ -198,7 +198,7 @@ function MMALBP_W_dynamic_nonlinear_ws( instance::MALBP_W_instance, optimizer::G
     return m
 end
 
-function MMALBP_W_dynamic_nonlinear_lns( instance::MALBP_W_instance, optimizer::Gurobi.MathOptInterface.OptimizerWithAttributes, original_filepath::String, run_time::Real, search_strategy_fp::String; rng,
+function MMALBP_W_dynamic_nonlinear_lns( instance::MALBP_W_instance, optimizer, original_filepath::String, run_time::Real, search_strategy_fp::String; rng,
         save_variables::Bool=true, save_lp::Bool=false, warmstart_vars::String="", md_obj_val::Real=0.0, slurm_array_ind::Union{Int, Nothing}=nothing, preprocessing::Bool=false)
     #if directory is not made yet, make it
     if !isnothing(slurm_array_ind)
@@ -229,7 +229,7 @@ function MMALBP_W_dynamic_nonlinear_lns( instance::MALBP_W_instance, optimizer::
     return m
 end
 
-function MMALBP_W_dynamic_lns( instance::MALBP_W_instance, optimizer::Gurobi.MathOptInterface.OptimizerWithAttributes, original_filepath::String, run_time::Real, search_strategy_fp::String; rng,
+function MMALBP_W_dynamic_lns( instance::MALBP_W_instance, optimizer, original_filepath::String, run_time::Real, search_strategy_fp::String; rng,
                                 save_variables::Bool=true, save_lp::Bool=false, warmstart_vars::String="", md_obj_val::Real=0.0, slurm_array_ind::Union{Int, Nothing}=nothing, preprocessing::Bool=false)
     #if directory is not made yet, make it
     if !isnothing(slurm_array_ind)
@@ -262,7 +262,7 @@ end
 
 
 
-# function MMALBP_W_dynamic_lns_dict( instance::MALBP_W_instance, optimizer::Gurobi.MathOptInterface.OptimizerWithAttributes, original_filepath::String, run_time::Real, search_strategy::Dict; 
+# function MMALBP_W_dynamic_lns_dict( instance::MALBP_W_instance, optimizer, original_filepath::String, run_time::Real, search_strategy::Dict; 
 #     save_variables::Bool=true, save_lp::Bool=false, warmstart_vars::String="", md_obj_val::Real=0.0, slurm_array_ind::Union{Int, Nothing}=nothing, preprocessing::Bool=false)
 # #if directory is not made yet, make it
 # if !isnothing(slurm_array_ind)
@@ -292,7 +292,7 @@ end
 # return m
 # end
 
-function MMALBP_W_md_lns( instance::MALBP_W_instance, optimizer::Gurobi.MathOptInterface.OptimizerWithAttributes, original_filepath::String, run_time::Real, search_strategy::String; rng, 
+function MMALBP_W_md_lns( instance::MALBP_W_instance, optimizer, original_filepath::String, run_time::Real, search_strategy::String; rng, 
                                 save_variables::Bool=true, save_lp::Bool=false, slurm_array_ind::Union{Int, Nothing}=nothing, preprocessing::Bool=true, )
     #if directory is not made yet, make it
     if !isnothing(slurm_array_ind)
