@@ -154,6 +154,7 @@ function MMALBP_W_dynamic_ws( instance::MALBP_W_instance, optimizer::Gurobi.Math
     #creates the model
     m = Model(optimizer)
     set_optimizer_attribute(m, "LogFile", output_filepath * "gurobi.log")
+    println("PREPROCESSING AT MMALBP_W_dynamic_ws", preprocessing)
     #defines the model dependent parameters
     define_dynamic_linear!(m, instance, warmstart_vars, preprocessing=preprocessing)
     #writes the model to a file
@@ -402,7 +403,7 @@ optimizer = optimizer_with_attributes(() -> Gurobi.Optimizer(GRB_ENV_REF[]), "Ti
     output_filepath = xp_folder * "/" * now * "_" * output_filepath 
     for (instance, var_folder, md_obj_val) in instances
         @info "Running instance $(instance.name), from $(config_filepath). \n Output will be saved to $(output_filepath)"
-        MMALBP_W_dynamic_ws(instance, optimizer, output_filepath, run_time; save_variables= save_variables, save_lp=save_lp, warmstart_vars= var_folder, md_obj_val= md_obj_val, preprocessing=false)
+        MMALBP_W_dynamic_ws(instance, optimizer, output_filepath, run_time; save_variables= save_variables, save_lp=save_lp, warmstart_vars= var_folder, md_obj_val= md_obj_val, preprocessing=true)
     end
 end
 
@@ -414,7 +415,7 @@ function warmstart_dynamic_nonlinear_slurm(config_filepath::String, output_filep
     now = Dates.format(now, "yyyy-mm-dd")
     output_filepath = xp_folder * "/" * now * "_" * output_filepath 
     @info "Running instance $(instance.name), from $(config_filepath). \n Output will be saved to $(output_filepath)"
-    MMALBP_W_dynamic_nonlinear_ws(instance, optimizer, output_filepath, run_time; save_variables= save_variables, save_lp=save_lp, warmstart_vars= warmstart_vars_fp, md_obj_val= md_obj_val, preprocessing=false)
+    MMALBP_W_dynamic_nonlinear_ws(instance, optimizer, output_filepath, run_time; save_variables= save_variables, save_lp=save_lp, warmstart_vars= warmstart_vars_fp, md_obj_val= md_obj_val, preprocessing=preprocessing)
    
 end
 
@@ -425,7 +426,7 @@ function warmstart_dynamic_slurm(config_filepath::String, output_filepath::Strin
     now = Dates.format(now, "yyyy-mm-dd")
     output_filepath = xp_folder * "/" * now * "_" * output_filepath 
     @info "Running instance $(instance.name), from $(config_filepath). \n Output will be saved to $(output_filepath)"
-    MMALBP_W_dynamic_nonlinear_ws(instance, optimizer, output_filepath, run_time; save_variables= save_variables, save_lp=save_lp, warmstart_vars= warmstart_vars_fp, md_obj_val= md_obj_val, preprocessing=false)
+    MMALBP_W_dynamic_ws(instance, optimizer, output_filepath, run_time; save_variables= save_variables, save_lp=save_lp, warmstart_vars= warmstart_vars_fp, md_obj_val= md_obj_val, preprocessing=preprocessing)
    
 end
 

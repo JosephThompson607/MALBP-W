@@ -254,6 +254,7 @@ function define_dynamic_linear!(m::Model, instance::MALBP_W_instance; preprocess
     define_dynamic_linear_obj!(m, instance)
     define_dynamic_linear_constraints!(m, instance)
     if preprocessing   
+        @info "adding in redundant constraints"
         define_dynamic_linear_redundant_constraints!(m, instance)
     end
 
@@ -265,6 +266,7 @@ function define_dynamic_linear!(m::Model, instance::MALBP_W_instance, warmstart_
     define_dynamic_linear_obj!(m, instance)
     define_dynamic_linear_constraints!(m, instance)   
     if preprocessing   
+        @info "adding in preprocessing vars"
         define_dynamic_linear_redundant_constraints!(m, instance)
     end
 end
