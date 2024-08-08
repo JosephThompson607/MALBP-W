@@ -162,11 +162,11 @@ end
 
 #This function is used to set the initial values of the model dependent MALBP-W model
 function set_initial_values!(m::Model, instance::MALBP_W_instance; 
-                                    x_soi_start::Array{Int,3} = zeros(Int, instance.equipment.n_stations, instance.equipment.n_tasks, instance.models.n_models),
-                                    y_start::Int = 0,
-                                    y_w_start::Array{Int,1} = zeros(Int, instance.sequences.n_scenarios),
-                                    y_wts_start::Array{Int,3} = zeros(Int, instance.sequences.n_scenarios, instance.num_cycles, instance.equipment.n_stations),
-                                    equipment_assignments:: Dict{Int64, Vector{Int64}} = zeros(Int, instance.equipment.n_stations, instance.equipment.n_equipment)) 
+                                    x_soi_start::Union{Array{Int,3},Nothing} = zeros(Int, instance.equipment.n_stations, instance.equipment.n_tasks, instance.models.n_models),
+                                    y_start::Union{Int,Nothing} = 0,
+                                    y_w_start::Union{Array{Int,1},Nothing} = zeros(Int, instance.sequences.n_scenarios),
+                                    y_wts_start::Union{Array{Int,3},Nothing} = zeros(Int, instance.sequences.n_scenarios, instance.num_cycles, instance.equipment.n_stations),
+                                    equipment_assignments:: Union{Dict{Int64, Vector{Int64}}, Nothing} = zeros(Int, instance.equipment.n_stations, instance.equipment.n_equipment)) 
     
     model_indexes = [i for (i, model_dict) in instance.models.models]
     x_soi = m[:x_soi]
@@ -174,52 +174,61 @@ function set_initial_values!(m::Model, instance::MALBP_W_instance;
     y_w = m[:y_w]
     y = m[:y]
     u_se = m[:u_se]
-
+    if !isnothing(x_soi_start)
     #assigns tasks to stations
-    for s in 1:instance.equipment.n_stations
-        for o in 1:instance.equipment.n_tasks
-            for i in 1:instance.models.n_models
-                set_start_value(x_soi[s, o, i], x_soi_start[s, o, i])
+        for s in 1:instance.equipment.n_stations
+            for o in 1:instance.equipment.n_tasks
+                for i in 1:instance.models.n_models
+                    set_start_value(x_soi[s, o, i], x_soi_start[s, o, i])
+                end
             end
         end
     end
 
     #assigns workers to stations
-    for w in 1:instance.sequences.n_scenarios
-        set_start_value(y_w[w], y_w_start[w])
-        for t in 1:instance.num_cycles
-            for s in 1:instance.equipment.n_stations
-                    set_start_value(y_wts[w, t, s], y_wts_start[w, t, s])
+    if !isnothing(y_w_start)
+        for w in 1:instance.sequences.n_scenarios
+            set_start_value(y_w[w], y_w_start[w])
+            for t in 1:instance.num_cycles
+                for s in 1:instance.equipment.n_stations
+                        set_start_value(y_wts[w, t, s], y_wts_start[w, t, s])
+                end
             end
         end
+        set_start_value(y, y_start)
     end
-    set_start_value(y, y_start)
-    #assigns equipment to stations
-    for s in 1:instance.equipment.n_stations
-        for e in 1:instance.equipment.n_equipment
-            set_start_value(u_se[s, e], 0)
+    if !isnothing(equipment_assignments)
+        #assigns equipment to stations
+        for s in 1:instance.equipment.n_stations
+            for e in 1:instance.equipment.n_equipment
+                set_start_value(u_se[s, e], 0)
+            end
         end
-    end
-    for (station, equipment) in equipment_assignments
-        for e in equipment
-            set_start_value(u_se[station, e], 1.)
+        for (station, equipment) in equipment_assignments
+            for e in equipment
+                set_start_value(u_se[station, e], 1.)
+            end
         end
     end
 end
 
 
-function define_md_linear!(m::Model, instance::MALBP_W_instance; preprocess = false, start_heuristic::Function = task_equip_heuristic)
+function define_md_linear!(m::Model, instance::MALBP_W_instance; preprocess = false, start_heuristic::Union{Function,Nothing} = task_equip_heuristic)
     define_md_linear_vars!(m, instance)
     define_md_linear_obj!(m, instance)
     define_md_linear_constraints!(m, instance)   
     if preprocess
         @info "Preprocessing: adding redundant constraints to the model"
         define_md_linear_redundant_constraints!(m, instance)
+      
+    end
+    if !isnothing(start_heuristic)
+          
         @info "using heuristic $(start_heuristic) for initial task and worker assignments"
         time_start = time()
         #task_assignments, equip_assignments = MMALBP_W_model_dependent_decomposition_solve(instance; preprocessing=false)
         model_task_assignments, y_start, y_w_start, y_wts_start, equipment_assignments  = start_heuristic(instance)
-        total_cost = calculate_equip_cost(equipment_assignments, instance) + calculate_worker_cost(y_start, y_w_start, instance)
+        
         set_initial_values!(m, 
                             instance, 
                             x_soi_start = model_task_assignments, 
@@ -228,6 +237,11 @@ function define_md_linear!(m::Model, instance::MALBP_W_instance; preprocess = fa
                             y_wts_start = y_wts_start, 
                             equipment_assignments = equipment_assignments)
         @info "Heuristic start time: ", time() - time_start
+        if start_heuristic == ehsans_task_only
+            @info "Only have task assignments, returning large value to start"
+            return 1e12
+        end
+        total_cost = calculate_equip_cost(equipment_assignments, instance) + calculate_worker_cost(y_start, y_w_start, instance)
         return total_cost
     end
     return nothing

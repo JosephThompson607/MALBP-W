@@ -114,6 +114,12 @@ function ehsans_task_assign(instance::MALBP_W_instance, model::ModelInstance, pr
     return x_so
 end
 
+function ehsans_task_only(instance::MALBP_W_instance; order_function::Function = positional_weight_order, order_kwargs...)
+    x_soi = ehsans_heuristic(instance, order_function= order_function, order_kwargs...)
+    #y, y_w, y_wts, equipment_assignments
+    return x_soi, nothing, nothing, nothing, nothing
+end
+
 function ehsans_heuristic(instance::MALBP_W_instance; order_function::Function = positional_weight_order, order_kwargs...)
     model_indexes = [i for (i, model_dict) in instance.models.models]
     precedence_matrices = create_precedence_matrices(instance; order_function= order_function)

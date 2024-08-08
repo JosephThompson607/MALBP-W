@@ -61,6 +61,10 @@ function parse_commandline()
         "--preprocessing"
             help = "preprocess model constraints"
             action = :store_true
+        "--md_heuristic"
+            help = "heuristic for model dependent warmstart"
+            arg_type = String
+            default = "task_equip_heuristic"
         "--save_lp"
             help = "Save the model as a .lp file"
             action = :store_true
@@ -100,10 +104,14 @@ function main()
     else
         rng = Xoshiro()
     end
-    
+    if parsed_args["md_heuristic"] == "none"
+        parsed_args["md_heuristic"] = nothing
+    else
+        parsed_args["md_heuristic"] = getfield(ModelRun, Symbol(parsed_args["md_heuristic"]))
+    end
     output_file =  parsed_args["output_file"] * "/"
     if parsed_args["xp_type"] == "config_yaml"
-        MMALBP_from_yaml(parsed_args["config_file"], output_file,parsed_args["run_time"], parsed_args["save_variables"], parsed_args["save_lp"]; preprocessing=parsed_args["preprocessing"], grb_threads=parsed_args["grb_threads"])
+        MMALBP_from_yaml(parsed_args["config_file"], output_file,parsed_args["run_time"], parsed_args["save_variables"], parsed_args["save_lp"]; preprocessing=parsed_args["preprocessing"], grb_threads=parsed_args["grb_threads"], md_heuristic = parsed_args["md_heuristic"])
     elseif parsed_args["xp_type"] == "warmstart"
         warmstart_dynamic(parsed_args["config_file"], output_file,parsed_args["run_time"], parsed_args["save_variables"], parsed_args["save_lp"];  preprocessing=parsed_args["preprocessing"], grb_threads=parsed_args["grb_threads"])
     elseif parsed_args["xp_type"] == "warmstart_slurm"
@@ -117,7 +125,7 @@ function main()
         end
         warmstart_dynamic_nonlinear_slurm(parsed_args["config_file"], output_file,parsed_args["run_time"], parsed_args["save_variables"], parsed_args["save_lp"], parsed_args["slurm_ind"] ;  preprocessing=parsed_args["preprocessing"], grb_threads=parsed_args["grb_threads"])
     elseif parsed_args["xp_type"] == "csv_slurm"
-        MMALBP_from_csv_slurm(parsed_args["config_file"], output_file,parsed_args["run_time"], parsed_args["save_variables"], parsed_args["save_lp"], parsed_args["slurm_ind"];  preprocessing=parsed_args["preprocessing"], grb_threads=parsed_args["grb_threads"])
+        MMALBP_from_csv_slurm(parsed_args["config_file"], output_file,parsed_args["run_time"], parsed_args["save_variables"], parsed_args["save_lp"], parsed_args["slurm_ind"];  preprocessing=parsed_args["preprocessing"], grb_threads=parsed_args["grb_threads"],md_heuristic=parsed_args["md_heuristic"] )
         if isnothing(parsed_args["slurm_ind"])
             error("Slurm array index is required for slurm experiments")
         end
@@ -137,7 +145,7 @@ function main()
         elseif isnothing(parsed_args["slurm_ind"])
             error("Slurm array index is required for slurm LNS experiments")
         end
-        MMALBP_md_lns_from_slurm(parsed_args["config_file"], output_file,parsed_args["run_time"], parsed_args["save_variables"], parsed_args["save_lp"], parsed_args["LNS_config"], parsed_args["slurm_ind"] ,rng=rng , grb_threads=parsed_args["grb_threads"])
+        MMALBP_md_lns_from_slurm(parsed_args["config_file"], output_file,parsed_args["run_time"], parsed_args["save_variables"], parsed_args["save_lp"], parsed_args["LNS_config"], parsed_args["slurm_ind"] ,rng=rng , grb_threads=parsed_args["grb_threads"], md_heuristic = parsed_args["md_heuristic"])
     elseif parsed_args["xp_type"] == "slurm_lns" || parsed_args["xp_type"] == "slurm_array_lns"
         if isnothing(parsed_args["LNS_config"]) 
             error("LNS config file is required for LNS experiments")

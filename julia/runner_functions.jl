@@ -1,4 +1,4 @@
-function MMALBP_W_model_dependent(instance::MALBP_W_instance, optimizer, original_filepath::String, run_time::Real; preprocessing::Bool=false, save_variables::Bool=true, save_lp::Bool=false, slurm_array_ind::Union{Int, Nothing}=nothing)
+function MMALBP_W_model_dependent(instance::MALBP_W_instance, optimizer, original_filepath::String, run_time::Real; preprocessing::Bool=false, save_variables::Bool=true, save_lp::Bool=false, slurm_array_ind::Union{Int, Nothing}=nothing,md_heuristic=task_equip_heuristic )
     #if directory is not made yet, make it
     if !isnothing(slurm_array_ind)
         output_filepath = original_filepath * "md/"* instance.name * "/slurm_" * string(slurm_array_ind) * "/"
@@ -12,7 +12,7 @@ function MMALBP_W_model_dependent(instance::MALBP_W_instance, optimizer, origina
     m = Model(optimizer)
     set_optimizer_attribute(m, "LogFile", output_filepath * "gurobi.log")
     #defines the model dependent parameters
-    define_md_linear!(m, instance; preprocess=preprocessing)
+    define_md_linear!(m, instance; preprocess=preprocessing, start_heuristic=md_heuristic)
     #writes the model to a file
     optimize!(m)
     if save_variables
@@ -26,7 +26,7 @@ function MMALBP_W_model_dependent(instance::MALBP_W_instance, optimizer, origina
     return m
 end
 
-function MMALBP_W_model_dependent_nonlinear(instance::MALBP_W_instance, optimizer, original_filepath::String, run_time::Real; preprocessing::Bool=false, save_variables::Bool=true, save_lp::Bool=false, slurm_array_ind::Union{Int, Nothing}=nothing)
+function MMALBP_W_model_dependent_nonlinear(instance::MALBP_W_instance, optimizer, original_filepath::String, run_time::Real; preprocessing::Bool=false, save_variables::Bool=true, save_lp::Bool=false, slurm_array_ind::Union{Int, Nothing}=nothing, md_heuristic=task_equip_heuristic)
     #if directory is not made yet, make it
     if !isnothing(slurm_array_ind)
         output_filepath = original_filepath * "md/"* instance.name * "/slurm_" * string(slurm_array_ind) * "/"
@@ -40,7 +40,7 @@ function MMALBP_W_model_dependent_nonlinear(instance::MALBP_W_instance, optimize
     m = Model(optimizer)
     set_optimizer_attribute(m, "LogFile", output_filepath * "gurobi.log")
     #defines the model dependent parameters
-    define_md_nonlinear!(m, instance; preprocess=preprocessing)
+    define_md_nonlinear!(m, instance; preprocess=preprocessing, start_heuristic=md_heuristic)
     #writes the model to a file
     optimize!(m)
     if save_variables
@@ -293,7 +293,7 @@ end
 # end
 
 function MMALBP_W_md_lns( instance::MALBP_W_instance, optimizer, original_filepath::String, run_time::Real, search_strategy::String; rng, 
-                                save_variables::Bool=true, save_lp::Bool=false, slurm_array_ind::Union{Int, Nothing}=nothing, preprocessing::Bool=true, )
+                                save_variables::Bool=true, save_lp::Bool=false, slurm_array_ind::Union{Int, Nothing}=nothing, preprocessing::Bool=true, md_heuristic=task_equip_heuristic)
     #if directory is not made yet, make it
     if !isnothing(slurm_array_ind)
         output_filepath = original_filepath * "md/"* instance.name * "/slurm_" * string(slurm_array_ind) * "/"
@@ -307,7 +307,7 @@ function MMALBP_W_md_lns( instance::MALBP_W_instance, optimizer, original_filepa
     m = Model(optimizer)
     set_optimizer_attribute(m, "LogFile", output_filepath * "gurobi.log")
     #defines the  dyanmic model parameters
-    start_value = define_md_linear!(m, instance; preprocess=preprocessing)
+    start_value = define_md_linear!(m, instance; preprocess=preprocessing, start_heuristic=md_heuristic)
     #solves the model in a lns loop
     lns_conf = read_search_strategy_YAML(search_strategy_fp, run_time, model_dependent=true)
     obj_dict, best_obj = large_neighborhood_search!(m, instance, lns_conf; lns_res_fp= output_filepath  , md_obj_val=start_value, run_time=run_time, rng=rng)
@@ -323,7 +323,7 @@ function MMALBP_W_md_lns( instance::MALBP_W_instance, optimizer, original_filepa
     return m
 end
 
-function MMALBP_from_yaml(config_filepath::String, output_filepath::String, run_time::Float64, save_variables::Bool, save_lp::Bool; xp_folder::String="model_runs", preprocessing::Bool=false, grb_threads::Int=1)
+function MMALBP_from_yaml(config_filepath::String, output_filepath::String, run_time::Float64, save_variables::Bool, save_lp::Bool; xp_folder::String="model_runs", preprocessing::Bool=false, grb_threads::Int=1, md_heuristic=task_equip_heuristic)
     config_file = get_instance_YAML(config_filepath)
     instances = read_MALBP_W_instances(config_filepath)
 optimizer = optimizer_with_attributes(() -> Gurobi.Optimizer(GRB_ENV_REF[]), "TimeLimit" => run_time, "Threads" => grb_threads)    #adds the date and time to the output file path
@@ -334,7 +334,7 @@ optimizer = optimizer_with_attributes(() -> Gurobi.Optimizer(GRB_ENV_REF[]), "Ti
         for milp in config_file["milp_models"]
             @info "Running instance $(instance.name), of model $(milp). \n Output will be saved to $(output_filepath)"
             if milp== "model_dependent_problem_linear_labor_recourse"
-                m = MMALBP_W_model_dependent(instance, optimizer, output_filepath, run_time; save_variables= save_variables, save_lp=save_lp, preprocessing=preprocessing)
+                m = MMALBP_W_model_dependent(instance, optimizer, output_filepath, run_time; save_variables= save_variables, save_lp=save_lp, preprocessing=preprocessing, md_heuristic=md_heuristic)
             elseif milp == "model_dependent_problem_nonlinear_labor_recourse"
                 m = MMALBP_W_model_dependent_nonlinear(instance, optimizer, output_filepath, run_time; save_variables= save_variables, save_lp=save_lp, preprocessing=preprocessing)
             elseif milp == "dynamic_problem_linear_labor_recourse"
@@ -374,7 +374,7 @@ optimizer = optimizer_with_attributes(() -> Gurobi.Optimizer(GRB_ENV_REF[]), "Ti
 
 end
 
-function MMALBP_from_csv_slurm(config_filepath::String, output_filepath::String, run_time::Float64, save_variables::Bool, save_lp::Bool, slurm_array_ind::Int ; xp_folder::String="model_runs", preprocessing::Bool=false, rng=Xoshiro(), grb_threads=1)
+function MMALBP_from_csv_slurm(config_filepath::String, output_filepath::String, run_time::Float64, save_variables::Bool, save_lp::Bool, slurm_array_ind::Int ; xp_folder::String="model_runs", preprocessing::Bool=false, rng=Xoshiro(), grb_threads=1, md_heuristic::Union{Function, Nothing}=task_equip_heuristic)
     
     config_file, instance = read_slurm_csv(config_filepath, slurm_array_ind)
     optimizer = optimizer_with_attributes(() -> Gurobi.Optimizer(GRB_ENV_REF[]), "TimeLimit" => run_time, "Threads" => grb_threads)    #adds the date and time to the output file path
@@ -384,7 +384,7 @@ function MMALBP_from_csv_slurm(config_filepath::String, output_filepath::String,
     for milp in config_file["milp_models"]
             @info "Running instance $(instance.name), of model $(milp). \n Output will be saved to $(output_filepath)"
             if milp== "model_dependent_problem_linear_labor_recourse"
-                m = MMALBP_W_model_dependent(instance, optimizer, output_filepath, run_time; save_variables= save_variables, save_lp=save_lp, slurm_array_ind=slurm_array_ind,  preprocessing=preprocessing)
+                m = MMALBP_W_model_dependent(instance, optimizer, output_filepath, run_time; save_variables= save_variables, save_lp=save_lp, slurm_array_ind=slurm_array_ind,  preprocessing=preprocessing, md_heuristic=md_heuristic)
             elseif milp == "model_dependent_problem_nonlinear_labor_recourse"
                 m = MMALBP_W_model_dependent_nonlinear(instance, optimizer, output_filepath, run_time; save_variables= save_variables, save_lp=save_lp, preprocessing=preprocessing)
             elseif milp == "dynamic_problem_linear_labor_recourse"
