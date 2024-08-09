@@ -12,15 +12,15 @@ function adapt_des!(iter_no_improve::Int, lns_obj::LNSConf, m::Model; iteration:
     #retrieves the decay and change decay parameters
     decay = lns_obj.des.kwargs[:des_decay]
     #rewards the destroy and change operator if there has been an improvement
-    @info "The current weights are: $(lns_obj.des.destroy_weights)"
+    @info "The current weights are: $(lns_obj.des.destroy_weights), the reward is $(lns_obj.des.kwargs[:reward])"
     lns_obj.des.destroy_weights[string(lns_obj.des.destroy!)] = des_weight_update(iter_no_improve,
                                                                         lns_obj.des.destroy_weights[string(lns_obj.des.destroy!)]; 
                                                                         obj_val_delta = obj_val_delta,
                                                                         iteration = iteration, 
                                                                         iteration_time = iteration_time, 
                                                                         decay = decay,
-                                                                        reward = lns_obj.change.reward)
-    @inf "The new weights are: $(lns_obj.des.destroy_weights)"
+                                                                        reward = lns_obj.des.kwargs[:reward])
+    @info "The new weights are: $(lns_obj.des.destroy_weights)"
     return iter_no_improve, lns_obj, m
 end
 

@@ -67,7 +67,8 @@ function irace_lns_config(;time_limit::Float64,
     end
     weight_update = getfield(ModelRun, Symbol(weight_update))
     destroy_kwargs = Dict(:percent_destroy => percent_destroy,
-                         :des_decay => 0.9
+                         :des_decay => 0.9,
+                         :reward => reward
                          )
     destroy_op = DestroyOp(destroy_list,
                             destroy,
