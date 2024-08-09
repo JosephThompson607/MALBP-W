@@ -94,6 +94,7 @@ function large_neighborhood_search!(m::Model, instance::MALBP_W_instance, lns_co
     start_time = time()
     obj_vals = []
     incumbent = Inf
+    size_issue = false #keeps track of algorithm performance and makes sure it doesn't stall on too big of an instance
     incumbent_dict = Dict()
     #best_m = copy(m)
     #saves the initial objective value
@@ -158,6 +159,11 @@ function large_neighborhood_search!(m::Model, instance::MALBP_W_instance, lns_co
             break
         end
         if i < lns_conf.n_iterations
+            #If there is no lower bound, then we got stuck in the lp phase
+            if relative_gap(m) >= 1.0
+                println("TRIGGERED!!")
+                size_issue= true
+            end
             if primal_status(m) == MOI.FEASIBLE_POINT
                 x = all_variables(m)
                 solution = value.(x)
@@ -176,11 +182,11 @@ function large_neighborhood_search!(m::Model, instance::MALBP_W_instance, lns_co
                                     prev_best = old_incumbent,
                                     current_best = incumbent,
                                     )
-            lns_conf.change.change!(iter_no_improve, lns_conf, m; iteration=i, iteration_time=iteration_time, rng=rng, lns_conf.change.kwargs... )
+            lns_conf.change.change!(iter_no_improve, lns_conf, m; iteration=i, iteration_time=iteration_time, rng=rng, size_issue=size_issue, lns_conf.change.kwargs... )
             @info "iter_no_improve: $iter_no_improve , iteration: $i, operator: $(lns_conf.des.destroy!), change_operator: $(lns_conf.change.change!), 
             destroy size $(lns_conf.des.kwargs)"
         end
-
+        size_issue = false
     end
     #writes the results to a csv
     obj_df = DataFrame(obj_vals)
