@@ -110,7 +110,6 @@ function large_neighborhood_search!(m::Model, instance::MALBP_W_instance, lns_co
         #For the last iteration, the time limit is the remaining time (if over time, we have 0 remaining time)
         last_iter_time = min(max(0.0,run_time - (time() - start_time)), lns_conf.rep.kwargs[:time_limit])
         set_optimizer_attribute(m, "TimeLimit", last_iter_time)
-        println("mip repair kwargs: ", lns_conf.rep.kwargs)
         gap = max(1e-4, lns_conf.rep.kwargs[:mip_gap])
         set_optimizer_attribute(m, "MIPGap", gap)
         lns_conf.rep.kwargs[:mip_gap] *= lns_conf.rep.kwargs[:mip_gap_decay]
@@ -154,7 +153,7 @@ function large_neighborhood_search!(m::Model, instance::MALBP_W_instance, lns_co
         if time() - start_time > lns_conf.time_limit
             @info "Time limit reached, stopping LNS at iteration $i"
             break
-        elseif lns_conf.des.kwargs[:percent_destroy] >= 1.0 && iter_no_improve >= 5
+        elseif lns_conf.des.kwargs[:percent_destroy] >= 1.0 && iter_no_improve >= 3
             @info "solved full problem, no improvement"
             break
         end
@@ -176,8 +175,8 @@ function large_neighborhood_search!(m::Model, instance::MALBP_W_instance, lns_co
                                     change_weight_update = lns_conf.change.weight_update,
                                     prev_best = old_incumbent,
                                     current_best = incumbent,
+                                    reward = lns_conf_des.reward
                                     )
-            #Don't change the shaking operator in the first few iterations
             lns_conf.change.change!(iter_no_improve, lns_conf, m; iteration=i, iteration_time=iteration_time, rng=rng, lns_conf.change.kwargs... )
             @info "iter_no_improve: $iter_no_improve , iteration: $i, operator: $(lns_conf.des.destroy!), change_operator: $(lns_conf.change.change!), 
             destroy size $(lns_conf.des.kwargs)"

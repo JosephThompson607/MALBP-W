@@ -8,18 +8,19 @@ end
 
 
 #adaptive lns for destroy operator selection
-function adapt_des!(iter_no_improve::Int, lns_obj::LNSConf, m::Model; iteration::Int, iteration_time::Float64, des_weight_update::Function = no_weight_update, obj_val_delta::Float64=0.,reward::Float64= 1., _...)
+function adapt_des!(iter_no_improve::Int, lns_obj::LNSConf, m::Model; iteration::Int, iteration_time::Float64, des_weight_update::Function = no_weight_update, obj_val_delta::Float64=0., _...)
     #retrieves the decay and change decay parameters
     decay = lns_obj.des.kwargs[:des_decay]
     #rewards the destroy and change operator if there has been an improvement
+    @info "The current weights are: $(lns_obj.des.destroy_weights)"
     lns_obj.des.destroy_weights[string(lns_obj.des.destroy!)] = des_weight_update(iter_no_improve,
                                                                         lns_obj.des.destroy_weights[string(lns_obj.des.destroy!)]; 
                                                                         obj_val_delta = obj_val_delta,
                                                                         iteration = iteration, 
                                                                         iteration_time = iteration_time, 
                                                                         decay = decay,
-                                                                        reward = reward)
-
+                                                                        reward = lns_obj.change.reward)
+    @inf "The new weights are: $(lns_obj.des.destroy_weights)"
     return iter_no_improve, lns_obj, m
 end
 
