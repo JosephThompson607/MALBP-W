@@ -161,7 +161,6 @@ function large_neighborhood_search!(m::Model, instance::MALBP_W_instance, lns_co
         if i < lns_conf.n_iterations
             #If there is no lower bound, then we got stuck in the lp phase
             if relative_gap(m) >= 1.0
-                println("TRIGGERED!!")
                 size_issue= true
             end
             if primal_status(m) == MOI.FEASIBLE_POINT
