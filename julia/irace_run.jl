@@ -204,6 +204,10 @@ function parse_commandline()
             help = "period between increase of the size of the destroy block"
             arg_type = Int
             default = 1
+        "--debug"
+            help = "Turns off message surpressors"
+            arg_type=Bool
+            default=false
     end
 
     return parse_args(s)
@@ -232,18 +236,28 @@ function main()
     output = ""
     rng=Xoshiro(args["seed"])
     #Irace gets cranky if anything besides the obj value escapes
-    err = @capture_err begin
-    output = @capture_out begin
-    result = irace_LNS(args["config_file"], args["index"], lns_conf, args["output_file"], args["run_time"]; preprocessing= args["preprocessing"], rng=rng)
+    now = Dates.now()
+    now = Dates.format(now, "yyyy-mm-dd")
+    root_dir  = "model_runs/irace_$(now)/$(args["irace_config_id"])/"
+    if !isdir(root_dir)
+        mkpath(root_dir)
     end
-    end
-    #writes output to file
-    open("output.txt", "w") do io
-        println(io, output)
-    end
-    #writes error to file
-    open("error.txt", "w") do io
-        println(io, err)
+    if args["debug"] == true
+        result = irace_LNS(args["config_file"], args["index"], lns_conf, root_dir, args["run_time"]; preprocessing= args["preprocessing"], rng=rng)
+    else
+        err = @capture_err begin
+            output = @capture_out begin
+                result = irace_LNS(args["config_file"], args["index"], lns_conf, root_dir, args["run_time"]; preprocessing= args["preprocessing"], rng=rng)
+            end
+        end
+
+        open(root_dir * "output.txt", "w") do io
+            println(io, output)
+        end
+        #writes error to file
+        open(root_dir *"error.txt", "w") do io
+            println(io, err)
+        end
     end
     #Irace is too cool for return statements
     println(result)

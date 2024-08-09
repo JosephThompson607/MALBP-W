@@ -460,13 +460,6 @@ end
 #irace run for dynamic model LNS
 function irace_LNS(md_results_fp::String, md_res_index::Int, lns_conf::LNSConf, output_filepath::String, run_time::Float64; 
                     xp_folder::String="model_runs", preprocessing::Bool=true, rng=Xoshiro(), grb_threads::Int64=1)
-    #adds the date and time to the output file path
-    now = Dates.now()
-    now = Dates.format(now, "yyyy-mm-dd")
-    output_filepath = xp_folder * "/"  * now * output_filepath * "/" * "$md_res_index" * "/"
-    if !isdir(output_filepath)
-        mkpath(output_filepath)
-    end
         #We are assuming each irace instance is a single instance
     instance, warmstart_vars_fp, md_obj_val = read_md_result(md_results_fp, md_res_index)
     optimizer = optimizer_with_attributes(() -> Gurobi.Optimizer(GRB_ENV_REF[]), "TimeLimit" => run_time, "Threads" => grb_threads)   
