@@ -237,11 +237,12 @@ function define_md_linear!(m::Model, instance::MALBP_W_instance; preprocess = fa
                             y_wts_start = y_wts_start, 
                             equipment_assignments = equipment_assignments)
         @info "Heuristic start time: ", time() - time_start
-        if start_heuristic == ehsans_task_only
-            @info "Only have task assignments, returning large value to start"
+        if !isnothing(equipment_assignments) && !isnothing(y_wts_start)
+            total_cost = calculate_equip_cost(equipment_assignments, instance) + calculate_worker_cost(y_start, y_w_start, instance)
+        else
+            @info "Cannot calculate initial cost,Only have task assignments, returning large value to start"
             return 1e12
         end
-        total_cost = calculate_equip_cost(equipment_assignments, instance) + calculate_worker_cost(y_start, y_w_start, instance)
         return total_cost
     end
     return nothing

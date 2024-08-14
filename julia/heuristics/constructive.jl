@@ -480,6 +480,25 @@ function task_equip_heuristic(instance::MALBP_W_instance; order_function::Functi
     return x_soi, y, y_w, y_wts, equipment_assignments
 end
 
+function task_equip_heuristic_task_only(instance::MALBP_W_instance; order_function::Function = positional_weight_order, productivity_per_worker::Vector{Float64}= [1., 1., 1., 1.])
+    precedence_matrices = create_precedence_matrices(instance; order_function= order_function)
+    #orders the models by decreasing probability
+    models = [(model, index) for (index,(model_name, model)) in enumerate(instance.models.models)]
+    #we need to sort the tasks by the order function so that it is respected in the assignment
+    remaining_tasks = [ [task for (_, task) in order_function(model)] for (model,_) in models]
+    models = sort(models, by=x->x[1].probability, rev=true)
+    capabilities_so = zeros(Int, instance.equipment.n_stations, instance.equipment.n_tasks)
+    c_time_si = calculate_c_time_si(instance)
+    x_soi = zeros(Int, instance.equipment.n_stations, instance.equipment.n_tasks, instance.models.n_models)
+    equipment_assignments = Dict{Int, Vector{Int64}}()
+    #Gets all of the remaining tasks for the two models
+    for station in 1:instance.equipment.n_stations
+        fill_station!(instance, remaining_tasks, station, models, c_time_si, x_soi, equipment_assignments, capabilities_so,  precedence_matrices)
+    end
+    #y, y_w, y_wts, _ = worker_assignment_heuristic(instance, x_soi, productivity_per_worker = productivity_per_worker)
+    return x_soi, nothing, nothing, nothing, nothing
+end
+
 function x_soi_to_dict(instance::MALBP_W_instance, x_soi::Array{Int,3})
     model_task_assignments_so = Dict{String, Dict{Int, Vector{String}}}()
     model_task_assignments_os = Dict{String, Dict{String, Int}}()
