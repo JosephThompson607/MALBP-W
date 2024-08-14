@@ -207,7 +207,7 @@ function read_scenario_tree(scenario_info::Dict, model_mixtures::Dict{String, Fl
     scenario = ProdSequences(
         scenario_df,
         n_scenarios,
-        "full",
+        scenario_info["generator"],
         scenario_info["sequence_length"]
     )
     return scenario
