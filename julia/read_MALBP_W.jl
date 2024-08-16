@@ -280,35 +280,35 @@ function overwrite_config_settings(row, config_file, models_instance, equip_inst
     #If the row has n_stations, use the n_stations from the row
     if hasproperty(row, :n_stations) && row.n_stations != ""
         @info "Using number of stations from csv file: $(row.n_stations)" 
-        config_file["n_stations"] = row.n_stations
+        config_file["n_stations"] = Int(row.n_stations)
     end
     #If the row has max_workers, use the max_workers from the row
     if hasproperty(row, :max_workers) && row.max_workers != ""
         @info "Using max workers from csv file : $(row.max_workers)"
-        config_file["max_workers"] = row.max_workers
+        config_file["max_workers"] = Int(row.max_workers)
     end
     #If the row has worker_cost, use the worker_cost from the row
     if hasproperty(row, :worker_cost) && row.worker_cost != ""
         @info "Using worker cost from csv file : $(row.worker_cost)"
-        config_file["worker_cost"] = row.worker_cost
+        config_file["worker_cost"] = Int(row.worker_cost)
     end
     #If the row has recourse_cost, use the recourse_cost from the row
     if hasproperty(row, :recourse_cost) && row.recourse_cost != ""
         @info "Using recourse cost from csv file : $(row.recourse_cost)"
-        config_file["recourse_cost"] = row.recourse_cost
+        config_file["recourse_cost"] = Int(row.recourse_cost)
     end
     #If the row has sequence_length, use the sequence_length from the row
     if hasproperty(row, :sequence_length) && row.sequence_length != ""
         @info "Using sequence length from csv file : $(row.sequence_length)"
-        config_file["scenario"]["sequence_length"] = row.sequence_length
+        config_file["scenario"]["sequence_length"] = Int(row.sequence_length)
     end
     if hasproperty(row, :n_scenarios) && row.n_scenarios != ""
         @info "Using number of scenarios from csv file : $(row.n_scenarios)"
-        config_file["scenario"]["n_samples"] = row.n_scenarios
+        config_file["scenario"]["n_samples"] = Int(row.n_scenarios)
     end
     if hasproperty(row, :cycle_time) && row.cycle_time !=""
         @info "Using cycle time from csv file : $(row.cycle_time)"
-        models_instance.cycle_time = row.cycle_time
+        models_instance.cycle_time = Int(row.cycle_time)
     end
     return config_file
 
