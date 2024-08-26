@@ -91,8 +91,63 @@ function modified_hoffman(instance::MALBP_W_instance; productivity_per_worker::A
     end
 end
 
-function hoffman_salbp(model_instance::ModelInstance, cycle_time::Real)
-    precedence_matrix, task_to_index, index_to_task = create_precedence_matrix(model_instance, order_function = positional_weight_order)
+
+function hoffman_MALBP(model_instance::ModelInstance, cycle_time::Vector{Real}, precedence_matrix::Array{Int}, index_to_task::Dict{Int, String})
+    #precedence_matrix, task_to_index, index_to_task = create_precedence_matrix(model_instance, order_function = positional_weight_order)
+    function recursive_task_fill(station::Int, left_task::Int,  best_sequence::Vector{Int}, best_value::Real)
+       #check if all tasks have been assigned
+        if all(best_sequence .< 0)
+            return best_sequence, best_value
+        end
+        sequence = copy(best_sequence)
+        #finds the index of the first zero of the last row
+        limited_seq = sequence[left_task:end]
+        if isnothing(findfirst(x -> x == 0, limited_seq)) 
+            return best_sequence, best_value
+        end
+        task_index = (findfirst(x -> x == 0, limited_seq)) + left_task - 1
+        #Retrieves the task from the precedence matrix and assigns it to the station
+        task  = index_to_task[task_index]
+        test_leftovers = best_value - model_instance.task_times[1][task]
+        if test_leftovers < 0
+            left_task = task_index + 1
+            seq, val = recursive_task_fill(station, left_task, sequence, best_value)
+            return  seq, val
+        else
+            next_left = left_task + 1
+            seq2, val2 = recursive_task_fill(station, next_left, sequence, best_value)
+            sequence[task_index] = -station
+            sequence -= precedence_matrix[task_index, :]
+            seq, val = recursive_task_fill(station, left_task,   sequence, test_leftovers)
+            if val < val2
+                return seq, val
+            else
+                return seq2, val2
+            end
+            return seq, val
+        end
+    end
+   
+    best_sequence = copy(precedence_matrix[end, :])
+    station  = 1
+    cycle_leftovers = [cycle_time[station]]
+    left_task = 1  
+    n_iterations = 0
+    while any(best_sequence .>= 0) && n_iterations < 1000
+        best_sequence, best_value = recursive_task_fill(station, left_task, best_sequence, cycle_leftovers[station])
+        println("best sequence: ", best_sequence)
+        cycle_leftovers[station] = best_value
+        station += 1
+        push!(cycle_leftovers, cycle_time[station])
+        left_task = findfirst(x -> x == 0, best_sequence)
+        n_iterations += 1
+    end
+    println("solved after ", n_iterations, " iterations")
+    return best_sequence, cycle_leftovers
+end
+
+function hoffman_salbp(model_instance::ModelInstance, cycle_time::Real, precedence_matrix::Array{Int}, index_to_task::Dict{Int, String})
+    #precedence_matrix, task_to_index, index_to_task = create_precedence_matrix(model_instance, order_function = positional_weight_order)
     function recursive_task_fill(station::Int, left_task::Int,  best_sequence::Vector{Int}, best_value::Real)
        #check if all tasks have been assigned
         if all(best_sequence .< 0)
@@ -145,14 +200,20 @@ function hoffman_salbp(model_instance::ModelInstance, cycle_time::Real)
 end
 
 
-config_filepath = "SALBP_benchmark/MM_instances/julia_debug.yaml"
+config_filepath = "SALBP_benchmark/MM_instances/xp_yaml/julia_debug.yaml"
 instances = read_MALBP_W_instances(config_filepath)
-instance = instances[4]
+instance = instances[1]
 println("running instance", instance.config_name)
-modelA = instance.models.models["B"]
+min_workers = calculate_min_workers(instance)
 
-hoffman_salbp(modelA, instance.models.cycle_time)
-println("The model name is ", modelA.name)
+
+
+#sums the values of my_dict
+sum([time for (task, time) in my_dict])
+# modelA = instance.models.models["B"]
+
+# hoffman_salbp(modelA, instance.models.cycle_time)
+# println("The model name is ", modelA.name)
 # min_workers = calculate_min_workers(instance)
 # println("min workers", min_workers)
 # # precedence_matrices = create_precedence_matrices(instance; order_function = positional_weight_order)

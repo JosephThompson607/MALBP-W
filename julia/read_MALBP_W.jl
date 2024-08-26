@@ -330,7 +330,22 @@ function read_slurm_csv(file_name::String, slurm_ind::Int)
         scenarios = read_scenario_tree(config_file["scenario"], get_model_mixture(models_instance))
     end
     num_cycles = config_file["scenario"]["sequence_length"] + config_file["n_stations"] - 1
-    current_instance = MALBP_W_instance(row.config_yaml,
+    if haskey(config_file, "productivity_per_worker")
+        current_instance = MALBP_W_instance(row.config_yaml,
+                    config_file["config_name"], 
+                    models_instance, 
+                    scenarios, 
+                    equip_instance, 
+                    config_file["n_stations"], 
+                    config_file["max_workers"], 
+                    config_file["worker_cost"], 
+                    config_file["recourse_cost"], 
+                    num_cycles, 
+                    config_file["milp_models"],
+                    config_file["productivity_per_worker"])
+    else
+        @info "No productivity per worker defined, using default values (only applies to nonlinear productivity)"
+        current_instance = MALBP_W_instance(row.config_yaml,
                     config_file["config_name"], 
                     models_instance, 
                     scenarios, 
@@ -341,6 +356,7 @@ function read_slurm_csv(file_name::String, slurm_ind::Int)
                     config_file["recourse_cost"], 
                     num_cycles, 
                     config_file["milp_models"])
+    end
     return config_file, current_instance
 end
 
@@ -353,7 +369,7 @@ function read_csv(file_name::String)
         equip_instance = read_equipment_instance(row.equipment_yaml)
         config_file = get_instance_YAML(row.config_yaml)
         config_file = overwrite_config_settings(row, config_file, models_instance, equip_instance)
-        if row.scenario_tree_yaml != "" && row.scenario_tree_yaml != "No Tree"
+        if hasproperty(row, :scenario_tree_yaml) && row.scenario_tree_yaml != "" && row.scenario_tree_yaml != "No Tree"
             scenarios = read_scenario_csv(row.scenario_tree_yaml)
         else
             scenarios = read_scenario_tree(config_file["scenario"], get_model_mixture(models_instance))
@@ -389,7 +405,7 @@ function read_csv(file_name::String)
         push!(instances, (current_instance, config_file))
 
     end
-    return instance
+    return instances
 end
 
 

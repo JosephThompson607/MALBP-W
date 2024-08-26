@@ -1,5 +1,6 @@
 # include("../read_MALBP_W.jl")
 # include("preprocessing.jl")
+# using BenchmarkTools
 
 #orders the tasks for a model in descending order based on positional weight
 #returns a list of tuples with the positional weight as the first element and the task name as the second element
@@ -775,11 +776,37 @@ function task_2opt(instance::MALBP_W_instance, x_soi::Array{Int,3},; n_iteration
 end 
 
 
+# instances = read_csv("instance_data/MM_instances/tuning_worker_stations_draft.csv")
+# results = []
+# for instance in instances
+#     global x = instance[1]
+#     b = @belapsed (global y = task_equip_heuristic(x)) 
+#     (push!(results, Dict("time"=>b, "instance"=>x.name)))
+# end
+# #turns results to DataFrame
+# results_df = DataFrame(results)
+# println(results_df)
+# #saves the results to a csv file
+# CSV.write("task_equip_time_results.csv", results_df)
 
+# results = []
+# for instance in instances
+#     global x = instance[1]
+#     b = @belapsed (global y = ehsans_task_only(x)) 
+#     (push!(results, Dict("time"=>b, "instance"=>x.name)))
+# end
+# #turns results to DataFrame
+# results_df = DataFrame(results)
+# println(results_df)
+# #saves the results to a csv file
+# CSV.write("ehsans_time_results.csv", results_df)
 
-# config_filepath = "SALBP_benchmark/MM_instances/testing_yaml/julia_debug.yaml"
+#println("instances: ", instances)
+
+#config_filepath = "SALBP_benchmark/MM_instances/testing_yaml/julia_debug.yaml"
 # #config_filepath = "SALBP_benchmark/MM_instances/medium_instance_config_S10.yaml"
-# instances = read_MALBP_W_instances(config_filepath)
+#instances = read_MALBP_W_instances(config_filepath)
+#instances
 # instance = instances[2]
 
 # x_soi, y, y_w, y_wts, equipment_assignments = task_equip_heuristic(instance)
