@@ -19,6 +19,7 @@ function MMALBP_W_model_dependent(instance::MALBP_W_instance, optimizer, origina
         write_MALBP_W_solution_md(output_filepath, instance, m, false)
     end
     if save_lp
+        @info "Writing LP to file $(output_filepath * "model.lp")"
         write_to_file(m, output_filepath * "model.lp")
     end
     save_results(original_filepath * "md/", m, run_time, instance, output_filepath, "model_dependent_problem_linear_labor_recourse.csv")

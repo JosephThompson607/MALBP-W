@@ -136,7 +136,11 @@ function read_models_instance(file_name :: String)
         end
         precedence_relations = value["precedence_relations"]
         #converts precedence relations to string
-        precedence_relations = [string.(x) for x in precedence_relations]
+        if !isnothing(precedence_relations)
+            precedence_relations = [string.(x) for x in precedence_relations]
+        else
+            precedence_relations = []
+        end
         task_times  = value["task_times"]
         #converts the keys of the task times to strings
         for (key, value) in task_times

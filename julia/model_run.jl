@@ -37,7 +37,7 @@ include("heuristics/preprocessing.jl")
 include("heuristics/constructive.jl")
 include("heuristics/md_warmstart.jl")
 include("runner_functions.jl")
-
+include("heuristics/fixed_constructive.jl")
 
 
 function parse_commandline()
