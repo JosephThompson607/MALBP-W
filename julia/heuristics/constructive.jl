@@ -193,21 +193,22 @@ end
 function greedy_set_cover(tasks_to_assign::Vector{Int}, instance::MALBP_W_instance, station::Int)
     #if no tasks to assign, return empty list
     if length(tasks_to_assign) == 0
-        return [], zeros(Int, instance.equipment.n_tasks)
+        return [], zeros(Int, instance.equipment.n_tasks), 0
     end
     #assigns the equipment to the stations
     equipment_costs = instance.equipment.c_se[station,:][1]
     #sorts the equipment by cost, keeping track of their index in the original list
-    equipment_costs = sort(collect(enumerate(equipment_costs)), by=x->x[2])
+    equipment_costs_tup = sort(collect(enumerate(equipment_costs)), by=x->x[2])
     equipment_assignments = Vector{Int64}()
     tasks = copy(tasks_to_assign)
     capabilities = zeros(Int, instance.equipment.n_tasks)
     #converts r_oe vector of vectors to a matrix
     r_oe = transpose(stack(instance.equipment.r_oe))
     #First pass: use the cheapest equipment to cover remaining tasks until all tasks are covered
+    station_cost = 0
     while length(tasks) > 0
         o = popfirst!(tasks)
-        for (e, cost) in equipment_costs
+        for (e, cost) in equipment_costs_tup
             if instance.equipment.r_oe[o][ e] == 1
                 push!(equipment_assignments, e)
                 #removes the tasks that are covered by the equipment from the tasks
@@ -227,6 +228,7 @@ function greedy_set_cover(tasks_to_assign::Vector{Int}, instance::MALBP_W_instan
         for task in tasks_to_assign
             if reduced_cap[ task] <= 0
                 push!(filtered_equip, e)
+                station_cost += equipment_costs[e]
                 equip_needed = true
                 break
             end
@@ -236,9 +238,8 @@ function greedy_set_cover(tasks_to_assign::Vector{Int}, instance::MALBP_W_instan
             capabilities = reduced_cap
         end
     end
-    return filtered_equip, capabilities
+    return filtered_equip, capabilities, station_cost
 end
-
 
 
 function greedy_equipment_assignment_heuristic(instance::MALBP_W_instance, x_soi::Array{Int,3})
@@ -251,8 +252,7 @@ function greedy_equipment_assignment_heuristic(instance::MALBP_W_instance, x_soi
         assigned_tasks = dropdims(assigned_tasks, dims=2)
         #assigned tasks are all indices of nonzero elements
         assigned_tasks = findall(x->x>0, assigned_tasks)
-        #changes assigned tasks to strings
-        (equip_station_assignment, _) = greedy_set_cover(assigned_tasks, instance, station)
+        (equip_station_assignment, _ , _) = greedy_set_cover(assigned_tasks, instance, station)
         equipment_assignments[station] = equip_station_assignment
     end
     return equipment_assignments
@@ -343,7 +343,8 @@ function fill_station!(instance::MALBP_W_instance,
                         x_soi::Array{Int64, 3}, 
                         equipment_assignments::Dict{Int64, Vector{Int64}}, 
                         capabilities_so::Array{Int,2}, 
-                        precedence_matrices::Dict{String, Dict})
+                        precedence_matrices::Dict{String, Dict};
+                        set_cover_heuristic::Function=greedy_set_cover)
     while any(c_time_si[station,:] .> 0) && any([length(unfinished_tasks[i])>0 for i in 1:length(unfinished_tasks)]) 
         for (model, i) in models
             #skip if there is no capacity at the station or the model is finished
@@ -389,7 +390,7 @@ function fill_station!(instance::MALBP_W_instance,
                 assigned_tasks = dropdims(assigned_tasks, dims=2)
                 #assigned tasks are all indices of nonzero elements
                 assigned_tasks = findall(x->x>0, assigned_tasks)
-                equipment_assignment, capabilities_so[station, :] = greedy_set_cover(assigned_tasks, instance, station)
+                equipment_assignment, capabilities_so[station, :], _ = set_cover_heuristic(assigned_tasks, instance, station)
                 equipment_assignments[station] = equipment_assignment
             end 
         end

@@ -54,8 +54,62 @@ function combine_to_new_instance(orig_instance)
     return new_instance
 end
 
+
+
+function count_covered_items(tasks, r_eo)
+    #This function counts how many items 
+    n_equipment = size(r_eo)[1]
+    capabilities= zeros(n_equipment)
+    covered_tasks = Dict()
+    for e in 1:n_equipment
+        covered_tasks[e] = []
+        for o in tasks
+            if r_eo[e, o] >0
+                append!(covered_tasks[e], o)
+                capabilities[e] +=1
+            end
+        end
+    end
+    #ADDS IN A SMALL AMOUNT TO AVOID DIVIDING BY ZERO
+    return capabilities .+ 0.000001 , covered_tasks
+end
+
+
+#Greedy set cover with aln n error bounds
+function greedy_set_cover_v2(tasks::Vector{Int}, instance::MALBP_W_instance, station::Int)
+    tasks_to_assign = copy(tasks)
+    #if no tasks to assign, return empty list
+    if length(tasks_to_assign) == 0
+        return [], zeros(Int, instance.equipment.n_tasks)
+    end
+    #assigns the equipment to the stations
+    equipment_costs = instance.equipment.c_se[station,:][1]
+    #sorts the equipment by cost, keeping track of their index in the original list
+    #equipment_costs = sort(collect(enumerate(equipment_costs)), by=x->x[2])
+
+    equipment_assignments = Vector{Int64}()
+    capabilities = zeros(Int, instance.equipment.n_tasks)
+    #converts r_oe vector of vectors to a matrix
+    r_eo = stack(instance.equipment.r_oe)
+    #counter = 1
+    station_cost = 0.0
+    while !isempty(tasks_to_assign) #&& counter < 5
+        capability_counts, covered_tasks = count_covered_items(tasks_to_assign,r_eo)
+        relative_costs = equipment_costs ./ capability_counts
+        selected_equipment = argmin(relative_costs)
+        tasks_to_assign = setdiff(tasks_to_assign, covered_tasks[selected_equipment])
+        push!(equipment_assignments,selected_equipment)
+        capabilities += r_eo[selected_equipment, :]
+        station_cost += equipment_costs[selected_equipment]
+        #counter +=1
+
+    end
+    
+    return equipment_assignments, capabilities, station_cost
+end
+
 #This function creates a new instance with a single model that combines all the models of the original instance and then solves the problem
-function task_equip_heuristic_combined_precedence(orig_instance::MALBP_W_instance; order_function::Function = positional_weight_order, productivity_per_worker::Vector{Float64}= [1., 1., 1., 1.])
+function task_equip_heuristic_combined_precedence(orig_instance::MALBP_W_instance; order_function::Function = positional_weight_order, productivity_per_worker::Vector{Float64}= [1., 1., 1., 1.], set_cover_heuristic=greedy_set_cover)
     instance = combine_to_new_instance(orig_instance)
     precedence_matrices = create_precedence_matrices(instance; order_function= order_function)
     #orders the models by decreasing probability
@@ -69,7 +123,7 @@ function task_equip_heuristic_combined_precedence(orig_instance::MALBP_W_instanc
     equipment_assignments = Dict{Int, Vector{Int64}}()
     #Gets all of the remaining tasks for the two models
     for station in 1:instance.equipment.n_stations
-        fill_station!(instance, remaining_tasks, station, models, c_time_si, x_so, equipment_assignments, capabilities_so,  precedence_matrices)
+        fill_station!(instance, remaining_tasks, station, models, c_time_si, x_so, equipment_assignments, capabilities_so,  precedence_matrices, set_cover_heuristic=set_cover_heuristic)
     end
     #x_soi is x_so copied to a 3D array with orig_instance number of models
     x_soi = zeros(Int, instance.equipment.n_stations, instance.equipment.n_tasks, orig_instance.models.n_models)
@@ -82,7 +136,8 @@ end
 
 
 #This function creates a new instance with a single model that combines all the models of the original instance and then solves the problem
-function task_equip_heuristic_task_only_combined_precedence(orig_instance::MALBP_W_instance; order_function::Function = positional_weight_order, productivity_per_worker::Vector{Float64}= [1., 1., 1., 1.])
+function task_equip_heuristic_task_only_combined_precedence(orig_instance::MALBP_W_instance; order_function::Function = positional_weight_order, productivity_per_worker::Vector{Float64}= [1., 1., 1., 1.],
+    set_cover_heuristic::Function = greedy_set_cover)
     instance = combine_to_new_instance(orig_instance)
     precedence_matrices = create_precedence_matrices(instance; order_function= order_function)
     #orders the models by decreasing probability
@@ -96,7 +151,7 @@ function task_equip_heuristic_task_only_combined_precedence(orig_instance::MALBP
     equipment_assignments = Dict{Int, Vector{Int64}}()
     #Gets all of the remaining tasks for the two models
     for station in 1:instance.equipment.n_stations
-        fill_station!(instance, remaining_tasks, station, models, c_time_si, x_so, equipment_assignments, capabilities_so,  precedence_matrices)
+        fill_station!(instance, remaining_tasks, station, models, c_time_si, x_so, equipment_assignments, capabilities_so,  precedence_matrices, set_cover_heuristic = set_cover_heuristic)
     end
     #x_soi is x_so copied to a 3D array with orig_instance number of models
     x_soi = zeros(Int, instance.equipment.n_stations, instance.equipment.n_tasks, orig_instance.models.n_models)
@@ -108,13 +163,13 @@ function task_equip_heuristic_task_only_combined_precedence(orig_instance::MALBP
 end
 
  #Function for calculating the stating number of workers at each station
- function chunk_out_tasks(productivity_per_worker::Array{Float64}, instance::MALBP_W_instance, remaining_time::Real)
+ function chunk_out_tasks(productivity_per_worker::Array{Float64}, instance::MALBP_W_instance, remaining_time::Real, start_station::Int64 = 1, end_station::Int64 = instance.n_stations)
     #Here we assume tasks will be evenely distributed among stations.
     workers_per_station = zeros(Int, instance.n_stations)
     available_station_time = zeros(Float64, instance.n_stations)
     #assigns workers to stations, starting with the most productive workers (first workers)
     for (worker, productivity) in enumerate(productivity_per_worker)
-        for station in 1:instance.n_stations
+        for station in start_station:end_station
             available_task_time = instance.models.cycle_time * productivity
             remaining_time -= available_task_time
             workers_per_station[station] += 1
@@ -128,11 +183,15 @@ end
 end
 
 
-function calculate_min_workers(instance::MALBP_W_instance; productivity_per_worker::Array{Float64}= [1., 1., 1., 1.] )
+function calculate_min_workers(instance::MALBP_W_instance; productivity_per_worker::Array{Float64}= [1., 1., 1., 1.], start_station::Int64=1, end_station::Int64 = instance.n_stations, tasks::Union{Vector{String}, Nothing} = nothing )
     min_workers = Dict{String, Dict}()
+   
     for (model_name, model) in instance.models.models
-        remaining_time = sum([time for (task, time) in model.task_times[1]])
-        workers_per_station, available_station_time = chunk_out_tasks(productivity_per_worker, instance, remaining_time)
+        if isnothing(tasks)
+            tasks = keys(model.task_times[1])
+                end
+        remaining_time = sum([time for (task, time) in model.task_times[1] if task in tasks ])
+        workers_per_station, available_station_time = chunk_out_tasks(productivity_per_worker, instance, remaining_time, start_station, end_station)
         min_workers[model_name] = Dict("workers_per_station" => workers_per_station, 
                                     "available_station_time"=> available_station_time, 
                                     "total_workers" => sum(workers_per_station))
@@ -297,10 +356,13 @@ function hoffman_task_only(orig_instance)
     return x_soi, nothing, nothing, nothing, nothing
 end
 
-#config_filepath = "SALBP_benchmark/MM_instances/testing_yaml/constructive_debug.yaml"
+# #config_filepath = "SALBP_benchmark/MM_instances/testing_yaml/constructive_debug.yaml"
 # config_filepath = "SALBP_benchmark/MM_instances/xp_yaml/medium_instance_config_S10.yaml"
 # instances = read_MALBP_W_instances(config_filepath)
-
+# # instance = instances[1]
+# # x_soi, y, y_w, y_wts, equipment_assignments = task_equip_heuristic_combined_precedence(instance, set_cover_heuristic=greedy_set_cover_v2)
+# # total_cost = calculate_equip_cost(equipment_assignments, instance) + calculate_worker_cost(y, y_w, instance)
+# # println("new set cover combined cost: ", total_cost, " y ",y,  " u_se ", equipment_assignments)
 
 # for instance in instances
 
@@ -310,9 +372,15 @@ end
 #     x_soi, y, y_w, y_wts, equipment_assignments = task_equip_heuristic(instance)
 #     total_cost = calculate_equip_cost(equipment_assignments, instance) + calculate_worker_cost(y, y_w, instance)
 #     println("original cost: ", total_cost, " y ", y, " u_se ", equipment_assignments)
+
 #     x_soi, y, y_w, y_wts, equipment_assignments = task_equip_heuristic_combined_precedence(instance)
 #     total_cost = calculate_equip_cost(equipment_assignments, instance) + calculate_worker_cost(y, y_w, instance)
 #     println("combined cost: ", total_cost, " y ",y,  " u_se ", equipment_assignments)
+
+
+#     x_soi, y, y_w, y_wts, equipment_assignments = task_equip_heuristic_combined_precedence(instance, set_cover_heuristic=greedy_set_cover_v2)
+#     total_cost = calculate_equip_cost(equipment_assignments, instance) + calculate_worker_cost(y, y_w, instance)
+#     println("new set cover combined cost: ", total_cost, " y ",y,  " u_se ", equipment_assignments)
 
 #     x_soi, y, y_w, y_wts, equipment_assignments = two_step_combined_hoffman(instance)
 #     total_cost = calculate_equip_cost(equipment_assignments, instance) + calculate_worker_cost(y, y_w, instance)
