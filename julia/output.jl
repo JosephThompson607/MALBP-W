@@ -227,6 +227,7 @@ function save_results(output_filepath::String, m::Model, run_time::Real, instanc
     orig_instance["scenario"]["generator"] = instance.sequences.generator
     orig_instance["scenario"]["sequence_length"] = instance.sequences.sequence_length
     orig_instance["scenario"]["n_samples"] = instance.sequences.n_scenarios
+    orig_instance["cycle_time"] = instance.models.cycle_time
     #writes the instance file to the output folder
     YAML.write_file(var_fp * "instance.yaml", orig_instance)
     
@@ -262,6 +263,7 @@ function save_results(output_filepath::String, m::Model, run_time::Real, instanc
                         max_workers = instance.max_workers,
                         worker_cost = instance.worker_cost,
                         recourse_cost = instance.recourse_cost,
+                        cycle_time = instance.models.cycle_time
                         )
     else
         results = DataFrame(instance_name=instance.name, 
@@ -280,7 +282,8 @@ function save_results(output_filepath::String, m::Model, run_time::Real, instanc
                         n_scenarios=instance.sequences.n_scenarios,
                         max_workers = instance.max_workers,
                         worker_cost = instance.worker_cost,
-                        recourse_cost = instance.recourse_cost,)
+                        recourse_cost = instance.recourse_cost,
+                        cycle_time = instance.models.cycle_time)
     end
     #If the file does not exist, create it
     if !isfile(output_filepath * output_csv)
