@@ -74,13 +74,17 @@ function count_covered_items(tasks, r_eo)
     return capabilities .+ 0.000001 , covered_tasks
 end
 
+function greedy_set_cover_v2(tasks::Vector{String}, instance::MALBP_W_instance, station::Int)
+    tasks = [parse(Int, x) for x in tasks]
+    return greedy_set_cover_v2(tasks, instance, station)
+end
 
 #Greedy set cover with aln n error bounds
 function greedy_set_cover_v2(tasks::Vector{Int}, instance::MALBP_W_instance, station::Int)
     tasks_to_assign = copy(tasks)
     #if no tasks to assign, return empty list
     if length(tasks_to_assign) == 0
-        return [], zeros(Int, instance.equipment.n_tasks)
+        return [], zeros(Int, instance.equipment.n_tasks), 0
     end
     #assigns the equipment to the stations
     equipment_costs = instance.equipment.c_se[station,:][1]
@@ -134,6 +138,25 @@ function task_equip_heuristic_combined_precedence(orig_instance::MALBP_W_instanc
     return x_soi, y, y_w, y_wts, equipment_assignments
 end
 
+#This function creates a new instance with a single model that combines all the models of the original instance and then solves the problem
+function task_equip_heuristic_combined_precedence_fixed(orig_instance::MALBP_W_instance; order_function::Function = positional_weight_order,  set_cover_heuristic=greedy_set_cover)
+    instance = combine_to_new_instance(orig_instance)
+    precedence_matrices = create_precedence_matrices(instance; order_function= order_function)
+    #orders the models by decreasing probability
+    models = [(model, index) for (index,(model_name, model)) in enumerate(instance.models.models)]
+    #we need to sort the tasks by the order function so that it is respected in the assignment
+    remaining_tasks = [ [task for (_, task) in order_function(model)] for (model,_) in models]
+    models = sort(models, by=x->x[1].probability, rev=true)
+    capabilities_so = zeros(Int, instance.equipment.n_stations, instance.equipment.n_tasks)
+    c_time_si = calculate_c_time_si(instance)
+    x_so = zeros(Int, instance.equipment.n_stations, instance.equipment.n_tasks, instance.models.n_models)
+    equipment_assignments = Dict{Int, Vector{Int64}}()
+    #Gets all of the remaining tasks for the two models
+    for station in 1:instance.equipment.n_stations
+        fill_station!(instance, remaining_tasks, station, models, c_time_si, x_so, equipment_assignments, capabilities_so,  precedence_matrices, set_cover_heuristic=set_cover_heuristic)
+    end
+    return x_so, equipment_assignments
+end
 
 #This function creates a new instance with a single model that combines all the models of the original instance and then solves the problem
 function task_equip_heuristic_task_only_combined_precedence(orig_instance::MALBP_W_instance; order_function::Function = positional_weight_order, productivity_per_worker::Vector{Float64}= [1., 1., 1., 1.],
