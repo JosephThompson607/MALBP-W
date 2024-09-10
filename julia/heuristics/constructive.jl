@@ -138,7 +138,7 @@ function necessary_workers(tasks::Vector{String}, cycle_time::Real, model::Model
             return worker
         end
     end
-    @warn("Not enough workers to complete the tasks for model $(model.name): still have $(remaining_time) time left")
+   # @warn("Not enough workers to complete the tasks for model $(model.name): still have $(remaining_time) time left")
     return length(productivity_per_worker) 
 end
 
@@ -151,7 +151,7 @@ function base_worker_assign_func(instance::MALBP_W_instance, x_soi::Array{Int64,
                 t = j + s - 1
                 #gets the minimum number of workers needed to complete the tasks
                 tasks = findall(x->x>0, x_soi[s,:,i])
-                tasks = [string(task) for task in tasks]
+                tasks = [string(task) for task in tasks if string(task) in keys(instance.models.models[model].task_times[1])]
                 assign_matrix[w, t, s] = necessary_workers(tasks, 
                                                             instance.models.cycle_time, instance.models.models[model], 
                                                             productivity_per_worker)

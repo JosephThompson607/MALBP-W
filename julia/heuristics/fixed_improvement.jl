@@ -80,6 +80,7 @@ end
 #Calculates the number of workers needed at a station, returns nothing if the tasks cannot be completed
 function necessary_workers_w_block(tasks::Vector{String}, cycle_time::Real, model::ModelInstance, productivity_per_worker::Vector{Float64}= [1., 1., 1., 1.])
     #calculates the number of workers needed to complete the tasks
+
     remaining_time = sum([model.task_times[1][task] for task in tasks])
     for (worker, productivity) in enumerate(productivity_per_worker)
         available_task_time = cycle_time * productivity
@@ -111,20 +112,39 @@ function opt2_task_swap!(x_soi::Array{Int,3}, s::Int64, s_prime::Int64, o::Int64
     x_soi[s_prime, o_prime, i] = 0
     x_soi[s, o_prime, i] = 1
     #removes the old tasks
-    s_new_tasks = filter(x -> x != o, original_tasks)
-    s_prime_new_tasks = filter(x-> x != o_prime, s_prime_original_tasks)
+   new_s_tasks  = filter(x -> x != o, original_tasks)
+    new_s_prime_tasks = filter(x-> x != o_prime, s_prime_original_tasks)
     #adds the new tasks, Taking union bc sometimes the task is already there in md case
-    s_prime_new_tasks = union(s_prime_new_tasks, o)
-    s_new_tasks = union(s_new_tasks, o_prime)
-    new_y_s_prime = necessary_workers_w_block(s_prime_new_tasks, instance.models.cycle_time, instance.models.models[model], productivity_per_worker=productivity_per_worker)
-    new_y_s = necessary_workers_w_block(s_new_tasks, instance.models.cycle_time, instance.models.models[model], productivity_per_worker=productivity_per_worker)
+    new_s_prime_tasks = union(new_s_prime_tasks, o)
+    new_s_tasks = union(new_s_tasks, o_prime)
+    new_y_s_prime = necessary_workers_w_block(new_s_prime_tasks, instance.models.cycle_time, instance.models.models[model], productivity_per_worker=productivity_per_worker)
+    new_y_s = necessary_workers_w_block(new_s_tasks, instance.models.cycle_time, instance.models.models[model], productivity_per_worker=productivity_per_worker)
     #Check if task assignment respects cycle_time and worker constraints
     if isnothing(new_y_s_prime) || isnothing(new_y_s)
         return nothing, nothing, nothing, nothing
     end
-    return new_y_s, new_y_s_prime, s_new_tasks, s_prime_new_tasks
+    return new_y_s, new_y_s_prime, new_s_tasks, new_s_prime_tasks
 
 end
+
+function evaluate_swap!(instance, equip_costs, s, s_prime, y_s, y_s_prime, new_y_s, new_y_s_prime, new_s_tasks, new_s_prime_tasks)
+    old_cost_s = equip_costs[s]
+    old_cost_s_prime = equip_costs[s_prime]
+    new_workers = new_y_s + new_y_s_prime
+    old_workers = y_s + y_s_prime   
+    new_equip_s, _, new_cost_s = greedy_set_cover_v2(new_s_tasks, instance, s)
+    new_equip_s_prime, _, new_cost_s_prime = greedy_set_cover_v2(new_s_prime_tasks, instance, s_prime)
+    #new cost is the workers at the stations and the equipment
+    new_cost = instance.worker_cost * new_workers + new_cost_s + new_cost_s_prime
+    old_cost = instance.worker_cost * old_workers + old_cost_s + old_cost_s_prime
+    if new_cost < old_cost
+        return true, new_equip_s, new_equip_s_prime, new_cost_s, new_cost_s_prime
+    else
+        return false, nothing, nothing, nothing, nothing
+    end
+end
+
+
 function opt2_insertion_w_equip!(x_soi::Array{Int,3}, s::Int, left::Int, right::Int, o::Int, instance::MALBP_W_instance, equipment_assignments::Dict{Int, Vector{Int64}}, equip_costs::Vector, productivity_per_worker::Vector{Float64}; i =1, model::String = "combined_model", predecessors, successors)
     original_tasks = findall(x-> x > 0, dropdims(sum(x_soi[s,:,:], dims=(2)), dims=2))
     y_s = necessary_workers_w_block(original_tasks, instance.models.cycle_time, instance.models.models[model], productivity_per_worker=productivity_per_worker)
@@ -144,37 +164,45 @@ function opt2_insertion_w_equip!(x_soi::Array{Int,3}, s::Int, left::Int, right::
             end
 
             #checks to make sure the swap was feasible, if not feasible, resets assignments
-            if isnothing(new_y_s) || isnothing(new_y_s_prime)
+            if isnothing(new_y_s) || isnothing(new_y_s_prime) 
                 #resets the assignments back to what they were
                 x_soi[s, o_prime, i] = 0
                 x_soi[s_prime, o_prime, i] = 1
                 x_soi[s_prime,o, i] = 0
                 x_soi[s,o,i] = 0
                 continue
-            end
-            #calculation of equipment costs of swap
-            old_cost_s = equip_costs[s]
-            old_cost_s_prime = equip_costs[s_prime]
-            new_workers = new_y_s + new_y_s_prime
-            old_workers = y_s + y_s_prime   
-            new_equip_s, _, new_cost_s = greedy_set_cover_v2(new_s_tasks, instance, s)
-            new_equip_s_prime, _, new_cost_s_prime = greedy_set_cover_v2(new_s_prime_tasks, instance, s_prime)
-            #new cost is the workers at the stations and the equipment
-            new_cost = instance.worker_cost * new_workers + new_cost_s + new_cost_s_prime
-            old_cost = instance.worker_cost * old_workers + old_cost_s + old_cost_s_prime
-            if new_cost < old_cost
+            
+            elseif !isnothing(y_s) && !isnothing(y_s_prime)
+                accept, new_equip_s, new_equip_s_prime, new_cost_s, new_cost_s_prime = evaluate_swap!(instance, equip_costs, s, s_prime, y_s, y_s_prime, new_y_s, new_y_s_prime, new_s_tasks, new_s_prime_tasks)
+                if accept
+                    equip_costs[s] = new_cost_s
+                    equip_costs[s_prime] = new_cost_s_prime
+                    equipment_assignments[s] = new_equip_s
+                    equipment_assignments[s_prime] = new_equip_s_prime
+                    return true
+                      
+                else
+                    #resets the assignments back to what they were
+                    x_soi[s, o_prime, i] = 0
+                    x_soi[s_prime, o_prime, i] = 1
+                    x_soi[s_prime,o, i] = 0
+                    x_soi[s,o,i] = 0
+                    continue
+                end 
+                #previous assignments were infeasible
+            else
+                new_equip_s, _, new_cost_s = greedy_set_cover_v2(new_s_tasks, instance, s)
+                new_equip_s_prime, _, new_cost_s_prime = greedy_set_cover_v2(new_s_prime_tasks, instance, s_prime)
                 equip_costs[s] = new_cost_s
                 equip_costs[s_prime] = new_cost_s_prime
                 equipment_assignments[s] = new_equip_s
                 equipment_assignments[s_prime] = new_equip_s_prime
                 return true
-            else
-                #resets the assignments back to what they were
-                x_soi[s, o_prime, i] = 0
-                x_soi[s_prime, o_prime, i] = 1
-                x_soi[s_prime,o, i] = 0
-                x_soi[s,o,i] = 0
-            end 
+            end
+
+            #calculation of equipment costs of swap
+
+          
         end
     end
     #sets x_soi back to the original value
@@ -183,36 +211,31 @@ function opt2_insertion_w_equip!(x_soi::Array{Int,3}, s::Int, left::Int, right::
 end
 
 
-function opt1_insertion_w_equip!(x_soi::Array{Int,3}, s::Int, left::Int, right::Int, o::Int, instance::MALBP_W_instance, equipment_assignments::Dict{Int, Vector{Int64}}, equip_costs::Vector, productivity_per_worker::Vector{Float64}; i =1, model::String = "combined_model",kwargs...)
+function opt1_insertion_w_equip!(x_soi::Array{Int,3}, s::Int, left::Int, right::Int, o::Int, instance::MALBP_W_instance, equipment_assignments::Dict{Int, Vector{Int64}}, equip_costs::Vector, productivity_per_worker::Vector{Float64}; i =1, model::String = "combined_model", relax_worker_infeasibility=true, kwargs...)
     original_tasks = findall(x-> x > 0, dropdims(sum(x_soi[s,:,:], dims=(2)), dims=2))
     x_soi[s,o,i] = 0
-    new_tasks = findall(x-> x > 0, dropdims(sum(x_soi[s,:,:], dims=(2)), dims=2))
+    new_s_tasks = findall(x-> x > 0, dropdims(sum(x_soi[s,:,:], dims=(2)), dims=2))
     y_s = necessary_workers_w_block(original_tasks, instance.models.cycle_time, instance.models.models[model], productivity_per_worker=productivity_per_worker)
-    y_s_without_task = necessary_workers_w_block(new_tasks, instance.models.cycle_time, instance.models.models[model], productivity_per_worker= productivity_per_worker)
+    #In some edge cases, can be passed a solution that is infeasible with the combined precedence diagram approach, if we relax worker relax_worker_infeasibility, we just move on to the next station
+    if isnothing(y_s) && relax_worker_infeasibility
+        x_soi[s,o,i] = 1
+        return false
+    end
+    new_y_s = necessary_workers_w_block(new_s_tasks, instance.models.cycle_time, instance.models.models[model], productivity_per_worker= productivity_per_worker)
     for s_prime in left:right
         s_prime_original_tasks = findall(x-> x > 0, dropdims(sum(x_soi[s_prime,:,:], dims=(2)), dims=2))
         x_soi[s_prime,o, i] = 1
         #Taking union bc sometimes the task is already there
-        s_prime_new_tasks = union(s_prime_original_tasks, o)
+        new_s_prime_tasks = union(s_prime_original_tasks, o)
         y_s_prime = necessary_workers_w_block( s_prime_original_tasks, instance.models.cycle_time, instance.models.models[model], productivity_per_worker=productivity_per_worker)
-        new_y_sprime = necessary_workers_w_block(s_prime_new_tasks, instance.models.cycle_time, instance.models.models[model], productivity_per_worker=productivity_per_worker)
+        new_y_s_prime = necessary_workers_w_block(new_s_prime_tasks, instance.models.cycle_time, instance.models.models[model], productivity_per_worker=productivity_per_worker)
         #Check if task assignment respects cycle_time and worker constraints
-        if isnothing(new_y_sprime)
+        if isnothing(new_y_s_prime)
             x_soi[s_prime,o, i] = 0
             continue
         end
-        
-        #calculation of equipment costs of swap
-        old_cost_s = equip_costs[s]
-        old_cost_s_prime = equip_costs[s_prime]
-        new_workers = y_s_without_task + new_y_sprime
-        old_workers = y_s + y_s_prime   
-        new_equip_s, _, new_cost_s = greedy_set_cover_v2(new_tasks, instance, s)
-        new_equip_s_prime, _, new_cost_s_prime = greedy_set_cover_v2(s_prime_new_tasks, instance, s_prime)
-        #new cost is the workers at the stations and the equipment
-        new_cost = instance.worker_cost * new_workers + new_cost_s + new_cost_s_prime
-        old_cost = instance.worker_cost * old_workers + old_cost_s + old_cost_s_prime
-        if new_cost < old_cost
+        accept, new_equip_s, new_equip_s_prime, new_cost_s, new_cost_s_prime = evaluate_swap!(instance, equip_costs, s, s_prime, y_s, y_s_prime, new_y_s, new_y_s_prime, new_s_tasks, new_s_prime_tasks)
+        if accept
             equip_costs[s] = new_cost_s
             equip_costs[s_prime] = new_cost_s_prime
             equipment_assignments[s] = new_equip_s
@@ -340,7 +363,6 @@ function both_opts2(instance::MALBP_W_instance,
     return x_so, equipment_assignments
 end
 
-
 function construct_then_improve(orig_instance::MALBP_W_instance; 
                                 set_cover_heuristic::Function=greedy_set_cover_v2, 
                                 productivity_per_worker::Vector{Float64}= [1., 1., 1., 1.],
@@ -359,7 +381,8 @@ function construct_then_improve(orig_instance::MALBP_W_instance;
 end
 
 #config_filepath = "SALBP_benchmark/MM_instances/testing_yaml/constructive_debug.yaml"
-config_filepath = "SALBP_benchmark/MM_instances/xp_yaml/medium_instance_config_S10.yaml"
+config_filepath = "xps/paper1_large_instances.yaml"
+#config_filepath = "xps/paper1_instances.yaml"
 instances = read_MALBP_W_instances(config_filepath)
 
 n_iterations_list = [10, 100, 200]

@@ -36,6 +36,7 @@ function create_combined_precedence_diagram(instance)
         edge = [string(pair[1]), string(pair[2])]
         push!(precedence_relations, edge)
     end
+
     return precedence_relations, task_times
 end
 
@@ -129,10 +130,18 @@ function task_equip_heuristic_combined_precedence(orig_instance::MALBP_W_instanc
     for station in 1:instance.equipment.n_stations
         fill_station!(instance, remaining_tasks, station, models, c_time_si, x_so, equipment_assignments, capabilities_so,  precedence_matrices, set_cover_heuristic=set_cover_heuristic)
     end
-    #x_soi is x_so copied to a 3D array with orig_instance number of models
+    #x_soi is x_so copied to a 3D array with orig_instance number of models, filtering out tasks that are not applicable to a given model
+    model_indexes = [i for (i, model_dict) in orig_instance.models.models]
     x_soi = zeros(Int, instance.equipment.n_stations, instance.equipment.n_tasks, orig_instance.models.n_models)
-    for model in 1:orig_instance.models.n_models
-        x_soi[:,:,model] = x_so[:,:,1]
+    for i in 1:orig_instance.models.n_models
+        model = model_indexes[i]
+        for s in 1:orig_instance.equipment.n_stations
+            for o in 1:orig_instance.equipment.n_tasks
+                if string(o) in keys(orig_instance.models.models[model].task_times[1])
+                    x_soi[s,o,i] = x_so[s,o,1]
+                end
+            end
+        end
     end
     y, y_w, y_wts, _ = worker_assignment_heuristic(orig_instance, x_soi, productivity_per_worker = productivity_per_worker)
     return x_soi, y, y_w, y_wts, equipment_assignments
@@ -155,7 +164,7 @@ function task_equip_heuristic_combined_precedence_fixed(orig_instance::MALBP_W_i
     for station in 1:instance.equipment.n_stations
         fill_station!(instance, remaining_tasks, station, models, c_time_si, x_so, equipment_assignments, capabilities_so,  precedence_matrices, set_cover_heuristic=set_cover_heuristic)
     end
-    return x_so, equipment_assignments
+    return x_so, equipment_assignments, instance
 end
 
 #This function creates a new instance with a single model that combines all the models of the original instance and then solves the problem
@@ -219,7 +228,6 @@ function calculate_min_workers(instance::MALBP_W_instance; productivity_per_work
                                     "available_station_time"=> available_station_time, 
                                     "total_workers" => sum(workers_per_station))
     end
-    
     return min_workers
 end
 
