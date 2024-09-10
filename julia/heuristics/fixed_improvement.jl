@@ -27,9 +27,13 @@ end
 
 function calculate_left(x_soi::Array{Int, 3}, o::Int, i::Int, model::String, predecessors::Dict{String, Dict{String, Vector{String}}}; _...)
     left = 1
-    for pred in predecessors[model][String(task)]
-        pred_station = findfirst(x>0,x_soi[:,parse(Int, pred),i])
-        if pred_station > left
+    for pred in predecessors[model][string(o)]
+        
+        pred_station = findfirst(x-> x > 0,x_soi[:,parse(Int, pred),i])
+        #if the predecessor is not there, we should return the original station
+        if isnothing(pred_station)
+            return findfirst(x-> x > 0,x_soi[:,o,i])
+        elseif pred_station > left
             left = pred_station
         end
     end
@@ -38,9 +42,12 @@ end
 
 function calculate_right(x_soi::Array{Int, 3}, o::Int, i::Int, model::String,  successors::Dict{String, Dict{String, Vector{String}}}; max_stations::Int)
     right = max_stations
-    for suc in successors[model][String(o)]
-        suc_station = findfirst(x>0,x_soi[:,parse(Int, suc),i])
-        if suc_station < right
+    for suc in successors[model][string(o)]
+        suc_station = findfirst(x-> x >0,x_soi[:,parse(Int, suc),i])
+        #if the predecessor is not there, we should return the original station
+        if isnothing(suc_station)
+            return findfirst(x-> x > 0,x_soi[:,o,i])
+        elseif suc_station < right
             right = suc_station
         end
     end
@@ -85,9 +92,9 @@ function necessary_workers_w_block(tasks::Vector{String}, cycle_time::Real, mode
 end
 
 #Calculates the number of workers needed at a station, returns nothing if the tasks cannot be completed
-function necessary_workers_w_block(tasks::Vector{Int}, cycle_time::Real, model::ModelInstance, productivity_per_worker::Vector{Float64}= [1., 1., 1., 1.])
+function necessary_workers_w_block(tasks::Vector{Int}, cycle_time::Real, model::ModelInstance; productivity_per_worker::Vector{Float64}= [1., 1., 1., 1.])
     #calculates the number of workers needed to complete the tasks
-    remaining_time = sum([model.task_times[1][String(task)] for task in tasks])
+    remaining_time = sum([model.task_times[1][string(task)] for task in tasks])
     for (worker, productivity) in enumerate(productivity_per_worker)
         available_task_time = cycle_time * productivity
         remaining_time -= available_task_time
@@ -99,34 +106,105 @@ function necessary_workers_w_block(tasks::Vector{Int}, cycle_time::Real, model::
 end
 
 
+function opt2_task_swap!(x_soi::Array{Int,3}, s::Int64, s_prime::Int64, o::Int64, o_prime::Int64, i::Int64, instance::MALBP_W_instance, original_tasks::Vector{Int64}, s_prime_original_tasks::Vector{Int64}, model::String, productivity_per_worker::Vector{Float64} )
+    x_soi[s_prime,o, i] = 1
+    x_soi[s_prime, o_prime, i] = 0
+    x_soi[s, o_prime, i] = 1
+    #removes the old tasks
+    s_new_tasks = filter(x -> x != o, original_tasks)
+    s_prime_new_tasks = filter(x-> x != o_prime, s_prime_original_tasks)
+    #adds the new tasks, Taking union bc sometimes the task is already there in md case
+    s_prime_new_tasks = union(s_prime_new_tasks, o)
+    s_new_tasks = union(s_new_tasks, o_prime)
+    new_y_s_prime = necessary_workers_w_block(s_prime_new_tasks, instance.models.cycle_time, instance.models.models[model], productivity_per_worker=productivity_per_worker)
+    new_y_s = necessary_workers_w_block(s_new_tasks, instance.models.cycle_time, instance.models.models[model], productivity_per_worker=productivity_per_worker)
+    #Check if task assignment respects cycle_time and worker constraints
+    if isnothing(new_y_s_prime) || isnothing(new_y_s)
+        return nothing, nothing, nothing, nothing
+    end
+    return new_y_s, new_y_s_prime, s_new_tasks, s_prime_new_tasks
+
+end
+function opt2_insertion_w_equip!(x_soi::Array{Int,3}, s::Int, left::Int, right::Int, o::Int, instance::MALBP_W_instance, equipment_assignments::Dict{Int, Vector{Int64}}, equip_costs::Vector, productivity_per_worker::Vector{Float64}; i =1, model::String = "combined_model", predecessors, successors)
+    original_tasks = findall(x-> x > 0, dropdims(sum(x_soi[s,:,:], dims=(2)), dims=2))
+    y_s = necessary_workers_w_block(original_tasks, instance.models.cycle_time, instance.models.models[model], productivity_per_worker=productivity_per_worker)
+    x_soi[s,o,i] = 0
+    for s_prime in left:right
+        s_prime_original_tasks = findall(x-> x > 0, dropdims(sum(x_soi[s_prime,:,:], dims=(2)), dims=2))
+        y_s_prime = necessary_workers_w_block( s_prime_original_tasks, instance.models.cycle_time, instance.models.models[model], productivity_per_worker=productivity_per_worker)
+        for o_prime in s_prime_original_tasks
+            #check if it is viable to swap the two tasks at the station
+            if left < s && s < calculate_right(x_soi, o_prime, i, model, successors, max_stations= s)
+                new_y_s ,new_y_s_prime, new_s_tasks, new_s_prime_tasks = opt2_task_swap!(x_soi, s, s_prime, o, o_prime, i, instance, original_tasks, s_prime_original_tasks, model, productivity_per_worker )
+            elseif right > s && s > calculate_left(x_soi, o_prime, i , model, predecessors)
+                new_y_s, new_y_s_prime, new_s_tasks, new_s_prime_tasks  = opt2_task_swap!(x_soi, s, s_prime, o, o_prime, i, instance, original_tasks, s_prime_original_tasks, model, productivity_per_worker )
+            else
+                #No eligible tasks to swap
+                continue
+            end
+
+            #checks to make sure the swap was feasible, if not feasible, resets assignments
+            if isnothing(new_y_s) || isnothing(new_y_s_prime)
+                #resets the assignments back to what they were
+                x_soi[s, o_prime, i] = 0
+                x_soi[s_prime, o_prime, i] = 1
+                x_soi[s_prime,o, i] = 0
+                x_soi[s,o,i] = 0
+                continue
+            end
+            #calculation of equipment costs of swap
+            old_cost_s = equip_costs[s]
+            old_cost_s_prime = equip_costs[s_prime]
+            new_workers = new_y_s + new_y_s_prime
+            old_workers = y_s + y_s_prime   
+            new_equip_s, _, new_cost_s = greedy_set_cover_v2(new_s_tasks, instance, s)
+            new_equip_s_prime, _, new_cost_s_prime = greedy_set_cover_v2(new_s_prime_tasks, instance, s_prime)
+            #new cost is the workers at the stations and the equipment
+            new_cost = instance.worker_cost * new_workers + new_cost_s + new_cost_s_prime
+            old_cost = instance.worker_cost * old_workers + old_cost_s + old_cost_s_prime
+            if new_cost < old_cost
+                equip_costs[s] = new_cost_s
+                equip_costs[s_prime] = new_cost_s_prime
+                equipment_assignments[s] = new_equip_s
+                equipment_assignments[s_prime] = new_equip_s_prime
+                return true
+            else
+                #resets the assignments back to what they were
+                x_soi[s, o_prime, i] = 0
+                x_soi[s_prime, o_prime, i] = 1
+                x_soi[s_prime,o, i] = 0
+                x_soi[s,o,i] = 0
+            end 
+        end
+    end
+    #sets x_soi back to the original value
+    x_soi[s,o,i] = 1
+    return false
+end
 
 
-
-function opt1_insertion_w_equip!(x_soi::Array{Int,3}, s::Int, left::Int, right::Int, o::Int, instance::MALBP_W_instance, equipment_assignments::Dict{Int, Vector{Int64}}, equip_costs::Vector, productivity_per_worker::Vector{Float64}; i =1, model::String = "combined_model")
+function opt1_insertion_w_equip!(x_soi::Array{Int,3}, s::Int, left::Int, right::Int, o::Int, instance::MALBP_W_instance, equipment_assignments::Dict{Int, Vector{Int64}}, equip_costs::Vector, productivity_per_worker::Vector{Float64}; i =1, model::String = "combined_model",kwargs...)
     original_tasks = findall(x-> x > 0, dropdims(sum(x_soi[s,:,:], dims=(2)), dims=2))
     x_soi[s,o,i] = 0
-    new_tasks = Stringfindall(x-> x > 0, dropdims(sum(x_soi[s,:,:], dims=(2)), dims=2))
+    new_tasks = findall(x-> x > 0, dropdims(sum(x_soi[s,:,:], dims=(2)), dims=2))
     y_s = necessary_workers_w_block(original_tasks, instance.models.cycle_time, instance.models.models[model], productivity_per_worker=productivity_per_worker)
     y_s_without_task = necessary_workers_w_block(new_tasks, instance.models.cycle_time, instance.models.models[model], productivity_per_worker= productivity_per_worker)
     for s_prime in left:right
         s_prime_original_tasks = findall(x-> x > 0, dropdims(sum(x_soi[s_prime,:,:], dims=(2)), dims=2))
         x_soi[s_prime,o, i] = 1
-        s_prime_new_tasks = [s_prime_original_tasks; task]
+        #Taking union bc sometimes the task is already there
+        s_prime_new_tasks = union(s_prime_original_tasks, o)
         y_s_prime = necessary_workers_w_block( s_prime_original_tasks, instance.models.cycle_time, instance.models.models[model], productivity_per_worker=productivity_per_worker)
         new_y_sprime = necessary_workers_w_block(s_prime_new_tasks, instance.models.cycle_time, instance.models.models[model], productivity_per_worker=productivity_per_worker)
         #Check if task assignment respects cycle_time and worker constraints
         if isnothing(new_y_sprime)
             x_soi[s_prime,o, i] = 0
-            x_soi[s,o,i] = 1
             continue
         end
-
+        
         #calculation of equipment costs of swap
         old_cost_s = equip_costs[s]
-       #println(old_cost_s)
         old_cost_s_prime = equip_costs[s_prime]
-        #println(old_cost_s_prime)
-        println("y_s_without_task: ", y_s_without_task, "new_y_sprime: ", new_y_sprime)
         new_workers = y_s_without_task + new_y_sprime
         old_workers = y_s + y_s_prime   
         new_equip_s, _, new_cost_s = greedy_set_cover_v2(new_tasks, instance, s)
@@ -134,41 +212,27 @@ function opt1_insertion_w_equip!(x_soi::Array{Int,3}, s::Int, left::Int, right::
         #new cost is the workers at the stations and the equipment
         new_cost = instance.worker_cost * new_workers + new_cost_s + new_cost_s_prime
         old_cost = instance.worker_cost * old_workers + old_cost_s + old_cost_s_prime
-        #println("NEW COST: ", new_cost)
-        #println("OLD COST: ", old_cost)
         if new_cost < old_cost
-            #changing tasks
-            #moves task to new station
-            #remove the task from the previous station
-            # for model in keys(instance.models.models)
-            #     push!(x_so[model][s_prime], task)
-            #     x_so[model][station] = new_tasks
-            #     x_os[model][task] = station
-            # end
-            #changing equipment
-            equip_costs[station] = new_cost_s
+            equip_costs[s] = new_cost_s
             equip_costs[s_prime] = new_cost_s_prime
-            equipment_assignments[station] = new_equip_s
+            equipment_assignments[s] = new_equip_s
             equipment_assignments[s_prime] = new_equip_s_prime
             return true
         else
             x_soi[s_prime,o, i] = 0
-            x_soi[s,o,i] = 1
         end 
-
     end
+    #sets x_soi back to the original value
+    x_soi[s,o,i] = 1
     return false
 end
 
 function calculate_station_equip_cost(equipment_assignments::Dict{Int, Vector{Int64}}, station::Int, instance::MALBP_W_instance)
     #calculates the total cost of the equipment assignments
     station_cost = 0
-    println("station assignments: ", equipment_assignments[station])
-
     for equip in equipment_assignments[station]
         station_cost += instance.equipment.c_se[station][equip]
     end
-    println("station cost: ", station_cost)
     return station_cost
 end
 
@@ -180,29 +244,35 @@ function calculate_equip_cost_per_station(equipment_assignments::Dict{Int, Vecto
     return station_costs
 end
 
-function task_1opt_fixed(instance::MALBP_W_instance, x_soi::Array{Int,3}, equipment_assignments; n_iterations::Int=100, productivity_per_worker::Vector{Float64}= [1., 1., 1., 1.], model_name::String="combined_model")
+function task_opt_fixed(instance::MALBP_W_instance, 
+                        x_soi::Array{Int,3}, 
+                        equipment_assignments; 
+                        n_iterations::Int=100, 
+                        productivity_per_worker::Vector{Float64}= [1., 1., 1., 1.], 
+                        model_name::String="combined_model", 
+                        opt_function!::Function=opt1_insertion_w_equip!)
     equip_costs = calculate_equip_cost_per_station(equipment_assignments, instance)
     predecessors, successors = precedence_relations_dict(instance)
     counter = 0
     improvement = false
     while counter < n_iterations
-            for (s, o) in findall(a-> a > 0, x_soi[:,:,1])
+            for (s, o) in Tuple.(findall(a-> a > 0, x_soi[:,:,1]))
                 left = calculate_left(x_soi, o, 1, model_name, predecessors)
-                improvement = opt1_insertion_w_equip!( x_soi, s, left, s-1, o, instance , equipment_assignments, equip_costs, productivity_per_worker)
+                improvement = opt_function!( x_soi, s, left, s-1, o, instance , equipment_assignments, equip_costs, productivity_per_worker; predecessors=predecessors, successors=successors)
                 if improvement
                     continue
                 end
                 right = calculate_right(x_soi, o,1, model_name, successors, max_stations = instance.equipment.n_stations)
-                improvement = opt1_insertion_w_equip!(x_soi, s, s+1, right, o,  instance, equipment_assignments, equip_costs, productivity_per_worker)
+                improvement = opt_function!(x_soi, s, s+1, right, o,  instance, equipment_assignments, equip_costs, productivity_per_worker; predecessors=predecessors, successors=successors)
                 if improvement
-                    println("Improvement !")
+                    continue
                 end
         end
         counter += 1
     end
 
 
-    return x_so, equipment_assignments
+    return x_soi, equipment_assignments
 end 
 
 function x_soi_to_dict(instance::MALBP_W_instance, x_soi::Array{Int,3})
@@ -225,42 +295,106 @@ function x_soi_to_dict(instance::MALBP_W_instance, x_soi::Array{Int,3})
 end
 
 
-function get_tasks_assigned_from_xsoi(x_soi, station::Int)
+function get_tasks_assigned_from_xsoi(x_soi::Array{Int,3}, station::Int)
     station_assignments = dropdims(sum(x_soi[station,:,:], dims = (2)), dims = 2)
     station_assignments = findall(x -> x > 0 , station_assignments)
     #string_vector = map(string, station_assignments)
     return station_assignments
 end
 
+#inserts the empty stations into the equipment assignment so the improvement heuristic does not break
+function fix_empty_stations!(equipment_assignments::Dict, instance::MALBP_W_instance)
+    for station in 1:instance.equipment.n_stations
+        if !haskey(equipment_assignments, station)
+            equipment_assignments[station] = []
+        end
+    end
 
-function construct_then_improve(orig_instance::MALBP_W_instance, set_cover_heuristic::Function=greedy_set_cover_v2, productivity_per_worker::Vector{Float64}= [1., 1., 1., 1.],n_iterations=100)
-    x_so, equipment_assignments = task_equip_heuristic_combined_precedence_fixed(orig_instance,  set_cover_heuristic=set_cover_heuristic)
-    x_so, equipment_assignments = task_1opt_fixed(instance, x_so, equipment_assignments, n_iterations = n_iterations, productivity_per_worker=productivity_per_worker)
-    x_soi = zeros(Int, instance.equipment.n_stations, instance.equipment.n_tasks, orig_instance.models.n_models)
+end
+
+function both_opts(instance::MALBP_W_instance, 
+    x_soi::Array{Int,3}, 
+    equipment_assignments; 
+    n_iterations::Int=100, 
+    productivity_per_worker::Vector{Float64}= [1., 1., 1., 1.], 
+    model_name::String="combined_model", 
+    opt_function!::Function = opt1_insertion_w_equip!
+    )
+    x_so, equipment_assignments = task_opt_fixed(instance, x_soi, equipment_assignments; n_iterations = n_iterations, productivity_per_worker=productivity_per_worker, opt_function! = opt1_insertion_w_equip!)
+    x_so, equipment_assignments = task_opt_fixed(instance, x_soi, equipment_assignments; n_iterations = n_iterations, productivity_per_worker=productivity_per_worker, opt_function! = opt2_insertion_w_equip!)
+    return x_so, equipment_assignments
+end
+
+function both_opts2(instance::MALBP_W_instance, 
+    x_soi::Array{Int,3}, 
+    equipment_assignments; 
+    n_iterations::Int=100, 
+    productivity_per_worker::Vector{Float64}= [1., 1., 1., 1.], 
+    model_name::String="combined_model", 
+    opt_function!::Function = opt1_insertion_w_equip!
+    )
+    x_so, equipment_assignments = task_opt_fixed(instance, x_soi, equipment_assignments; n_iterations = n_iterations, productivity_per_worker=productivity_per_worker, opt_function! = opt1_insertion_w_equip!)
+    x_so, equipment_assignments = task_opt_fixed(instance, x_soi, equipment_assignments; n_iterations = n_iterations, productivity_per_worker=productivity_per_worker, opt_function! = opt2_insertion_w_equip!)
+    x_so, equipment_assignments = task_opt_fixed(instance, x_soi, equipment_assignments; n_iterations = n_iterations, productivity_per_worker=productivity_per_worker, opt_function! = opt1_insertion_w_equip!)
+
+    return x_so, equipment_assignments
+end
+
+
+function construct_then_improve(orig_instance::MALBP_W_instance; 
+                                set_cover_heuristic::Function=greedy_set_cover_v2, 
+                                productivity_per_worker::Vector{Float64}= [1., 1., 1., 1.],
+                                n_iterations::Int=100,
+                                swapper::Function=task_opt_fixed,
+                                opt_function::Function= opt1_insertion_w_equip!)
+    x_so, equipment_assignments, combined_model = task_equip_heuristic_combined_precedence_fixed(orig_instance,  set_cover_heuristic=set_cover_heuristic)
+    fix_empty_stations!(equipment_assignments, orig_instance)
+    x_so, equipment_assignments = swapper(combined_model, x_so, equipment_assignments; n_iterations = n_iterations, productivity_per_worker=productivity_per_worker, opt_function! = opt_function)
+    x_soi = zeros(Int, orig_instance.equipment.n_stations, orig_instance.equipment.n_tasks, orig_instance.models.n_models)
     for model in 1:orig_instance.models.n_models
         x_soi[:,:,model] = x_so[:,:,1]
     end
     y, y_w, y_wts, _ = worker_assignment_heuristic(orig_instance, x_soi, productivity_per_worker = productivity_per_worker)
+    return x_soi, y, y_w, y_wts, equipment_assignments
 end
 
 #config_filepath = "SALBP_benchmark/MM_instances/testing_yaml/constructive_debug.yaml"
 config_filepath = "SALBP_benchmark/MM_instances/xp_yaml/medium_instance_config_S10.yaml"
 instances = read_MALBP_W_instances(config_filepath)
 
+n_iterations_list = [10, 100, 200]
+for n_iterations in n_iterations_list
+    println("now with $n_iterations: ")
+    for instance in instances
+        x_soi, y, y_w, y_wts, equipment_assignments = task_equip_heuristic_combined_precedence(instance, set_cover_heuristic=greedy_set_cover_v2)
+        original_cost = calculate_equip_cost(equipment_assignments, instance) + calculate_worker_cost(y, y_w, instance)
+        # println("original y: ", y)
+        #println("original cost: ", original_cost)
+        # # assigned_tasks = get_tasks_assigned_from_xsoi(x_soi,2)
+        # # println("These are the assigned tasks:", assigned_tasks)
 
+        x_soi, y, y_w, y_wts, equipment_assignments = construct_then_improve(instance; set_cover_heuristic=greedy_set_cover_v2, n_iterations=100, opt_function = opt1_insertion_w_equip!)
+        opt1_cost = calculate_equip_cost(equipment_assignments, instance) + calculate_worker_cost(y, y_w, instance)
+        # print("opt1 y ", y)
+        # println("opt1 equip assign: ", equipment_assignments)
+        #println("opt1 cost: ", opt1_cost)
 
-instance = instances[2]
-println("Min workers: ", calculate_min_workers(instance, start_station = 1, end_station = 1, tasks=[ "7"]))
-x_soi, y, y_w, y_wts, equipment_assignments = task_equip_heuristic_combined_precedence(instance, set_cover_heuristic=greedy_set_cover_v2)
-total_cost = calculate_equip_cost(equipment_assignments, instance) + calculate_worker_cost(y, y_w, instance)
-println("original cost: ", total_cost)
-# assigned_tasks = get_tasks_assigned_from_xsoi(x_soi,2)
-# println("These are the assigned tasks:", assigned_tasks)
+        x_soi, y, y_w, y_wts, equipment_assignments = construct_then_improve(instance; set_cover_heuristic=greedy_set_cover_v2, n_iterations=100, opt_function = opt2_insertion_w_equip!)
+        opt2_cost = calculate_equip_cost(equipment_assignments, instance) + calculate_worker_cost(y, y_w, instance)
+        # print("opt2 y ", y)
+        # println("opt2 equip assign: ", equipment_assignments)
+        #println("opt2 cost: ", opt2_cost)
+        x_soi, y, y_w, y_wts, equipment_assignments = construct_then_improve(instance; set_cover_heuristic=greedy_set_cover_v2, n_iterations=100, swapper=both_opts)
+        bothopt_cost = calculate_equip_cost(equipment_assignments, instance) + calculate_worker_cost(y, y_w, instance)
+        # print("bothopt y ", y)
+        # println("bothopt equip assign: ", equipment_assignments)
+        #println("bothopt cost: ", total_cost)
+        x_soi, y, y_w, y_wts, equipment_assignments = construct_then_improve(instance; set_cover_heuristic=greedy_set_cover_v2, n_iterations=100, swapper=both_opts2)
+        bothopt2_cost = calculate_equip_cost(equipment_assignments, instance) + calculate_worker_cost(y, y_w, instance)
+        println("instance_name: $(instance.name) original cost $(original_cost) , opt1_cost $(opt1_cost) , opt2_cost $(opt2_cost) , bothopt $(bothopt_cost) , multi_apply $(bothopt2_cost)")
 
-x_soi, y, y_w, y_wts, equipment_assignments = task_1opt(instance, x_soi, equipment_assignments, n_iterations= 1000)
-total_cost = calculate_equip_cost(equipment_assignments, instance) + calculate_worker_cost(y, y_w, instance)
-println("cost after 1 opt: ", total_cost)
-print("x_soi", sum(x_soi, dims=(2,3)))
+    end
+end
 # new_equip_assign, new_capabilities = greedy_set_cover_v2(assigned_tasks, instance, 2)
 # println("new equip assignment", new_equip_assign)
 # #task_location, station_capababilities = get_equipment_capable_stations(instance, equipment_assignments)
