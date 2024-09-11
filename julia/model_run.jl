@@ -38,6 +38,7 @@ include("heuristics/constructive.jl")
 include("heuristics/md_warmstart.jl")
 include("runner_functions.jl")
 include("heuristics/fixed_constructive.jl")
+include("sample_tester.jl")
 
 
 function parse_commandline()
@@ -87,6 +88,10 @@ function parse_commandline()
             help = "Number of threads for Gurobi"
             arg_type = Int
             default = 1
+        "--scenario_generator"
+            help = "how to generate production sequences. options are sobold_limit and monte_carlo_limit"
+            arg_type = String
+            default = "monte_carlo_limit"
     end
 
     return parse_args(s)
@@ -160,7 +165,13 @@ function main()
             error("Slurm array index is required for slurm LNS experiments")
         end
         MMALBP_W_LNS_slurm(parsed_args["config_file"], output_file,parsed_args["run_time"], parsed_args["save_variables"], parsed_args["save_lp"], parsed_args["LNS_config"], parsed_args["slurm_ind"], rng=rng, runner_function = MMALBP_W_dynamic_nonlinear_lns , grb_threads=parsed_args["grb_threads"])
-
+    elseif parsed_args["xp_type"] == "md_sample_test_slurm"
+        if isnothing(parsed_args["slurm_ind"])
+            error("Slurm array index is required for slurm LNS experiments")
+        end
+        slurm_md_sample_test(parsed_args["config_file"], output_file,parsed_args["run_time"], parsed_args["save_variables"], parsed_args["save_lp"], parsed_args["LNS_config"], parsed_args["slurm_ind"], rng=rng , grb_threads=parsed_args["grb_threads"], scenario_generator = parsed_args["scenario_generator"])
+    elseif parsed_args["xp_type"] == "md_sample_test"
+        md_sample_test(parsed_args["config_file"], output_file,parsed_args["run_time"], parsed_args["save_variables"], parsed_args["save_lp"], rng=rng , grb_threads=parsed_args["grb_threads"], scenario_generator = parsed_args["scenario_generator"])
     else
         error("Invalid xp_type")
     end

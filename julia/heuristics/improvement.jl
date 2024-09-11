@@ -1,6 +1,6 @@
-include("../read_MALBP_W.jl")
-include("../heuristics/constructive.jl")
-include("preprocessing.jl")
+# include("../read_MALBP_W.jl")
+# include("../heuristics/constructive.jl")
+# include("preprocessing.jl")
 
 function get_equipment_capable_stations(instance, equipment_assignments)
     #For each task, gets the stations that are capable of performing the task

@@ -198,6 +198,8 @@ function warmstart_dynamic_from_md_setup!(m::Model, vars_fp::String, instance::M
     end
 end
 
+
+
 function define_dynamic_linear_redundant_constraints!(m::Model, instance::MALBP_W_instance)
     # usesful variables
     model_indexes = [i for (i, model_dict) in instance.models.models]

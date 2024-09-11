@@ -1,8 +1,8 @@
 
 using Graphs
-include("../read_MALBP_W.jl")
-include("../heuristics/preprocessing.jl")
-include("../heuristics/constructive.jl")
+# include("../read_MALBP_W.jl")
+# include("../heuristics/preprocessing.jl")
+# include("../heuristics/constructive.jl")
 
 
 

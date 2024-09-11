@@ -179,8 +179,11 @@ function check_instance(config_file, models_instance, equipment_instance)
     end
 end
 #takes an instance filepath as an input, and returns an array of MALBP_W_instance struct
-function read_MALBP_W_instances(file_name::String)
+function read_MALBP_W_instances(file_name::String; scenario_generator::Union{Nothing, String}=nothing)
     config_file = get_instance_YAML(file_name)
+    if !isnothing(scenario_generator)
+        config_file["scenario"]["generator"] = scenario_generator
+    end
     instances = []
     for model in config_file["model_files"]
         for equip in config_file["equipment_files"]

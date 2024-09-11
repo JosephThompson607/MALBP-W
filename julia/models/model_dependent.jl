@@ -212,6 +212,22 @@ function set_initial_values!(m::Model, instance::MALBP_W_instance;
     end
 end
 
+function sample_warmstart!(m::Model, new_m::Model)
+    x_soi = m[:x_soi]
+    u_se = m[:u_se]
+    # y_wts = m[:y_wts]
+    # y_w = m[:y_w]
+    y = m[:y]
+    new_x_soi = new_m[:x_soi]
+    new_u_se = new_m[:u_se]
+    # new_y_wts = new_m[:y_wts]
+    # new_y_w = new_m[:y_w]
+    new_y = new_m[:y]
+
+    set_start_value.(new_x_soi, value.(x_soi))
+    set_start_value.(new_u_se, value.(u_se))
+    set_start_value(new_y, value(y))
+end
 
 function define_md_linear!(m::Model, instance::MALBP_W_instance; preprocess = false, start_heuristic::Union{Function,Nothing} = task_equip_heuristic)
     define_md_linear_vars!(m, instance)

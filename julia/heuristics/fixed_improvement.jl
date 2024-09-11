@@ -1,5 +1,5 @@
-include("fixed_constructive.jl")
-include("improvement.jl")
+# include("fixed_constructive.jl")
+# include("improvement.jl")
 
 #For each task generates the list of tasks that are depending on it, and the list of tasks that it depends on
 function precedence_relations_dict(instance::MALBP_W_instance)
@@ -126,6 +126,7 @@ function opt2_task_swap!(x_soi::Array{Int,3}, s::Int64, s_prime::Int64, o::Int64
     return new_y_s, new_y_s_prime, new_s_tasks, new_s_prime_tasks
 
 end
+
 
 function evaluate_swap!(instance, equip_costs, s, s_prime, y_s, y_s_prime, new_y_s, new_y_s_prime, new_s_tasks, new_s_prime_tasks)
     old_cost_s = equip_costs[s]
