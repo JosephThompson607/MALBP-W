@@ -173,9 +173,10 @@ end
 function add_more_samples!(instance, n_samples::Int64; generator::String="monte_carlo_limit", seed::Union{Int64, Nothing}=nothing)
     model_mixtures = get_model_mixture(instance.models)
     if generator == "sobold_limit"
-        println("using sobold_limit")
+        @info "adding $n_samples scenarios with sobold_limit"
         new_scenarios_df = sobold_limit(instance.sequences.sequence_length, model_mixtures, n_samples, seed=seed)
     elseif generator == "monte_carlo_limit"
+        @info "adding $n_samples scenarios with monte_carlo_limit"
         new_scenarios_df = monte_carlo_tree_limit(instance.sequences.sequence_length, model_mixtures, n_samples, seed=seed)
     else
         error("Cannot find generator $generator")
