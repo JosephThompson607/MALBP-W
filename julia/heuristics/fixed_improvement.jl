@@ -381,44 +381,60 @@ function construct_then_improve(orig_instance::MALBP_W_instance;
     return x_soi, y, y_w, y_wts, equipment_assignments
 end
 
-#config_filepath = "SALBP_benchmark/MM_instances/testing_yaml/constructive_debug.yaml"
-config_filepath = "xps/paper1_large_instances.yaml"
-#config_filepath = "xps/paper1_instances.yaml"
-instances = read_MALBP_W_instances(config_filepath)
 
-n_iterations_list = [10, 100, 200]
-for n_iterations in n_iterations_list
-    println("now with $n_iterations: ")
-    for instance in instances
-        x_soi, y, y_w, y_wts, equipment_assignments = task_equip_heuristic_combined_precedence(instance, set_cover_heuristic=greedy_set_cover_v2)
-        original_cost = calculate_equip_cost(equipment_assignments, instance) + calculate_worker_cost(y, y_w, instance)
-        # println("original y: ", y)
-        #println("original cost: ", original_cost)
-        # # assigned_tasks = get_tasks_assigned_from_xsoi(x_soi,2)
-        # # println("These are the assigned tasks:", assigned_tasks)
-
-        x_soi, y, y_w, y_wts, equipment_assignments = construct_then_improve(instance; set_cover_heuristic=greedy_set_cover_v2, n_iterations=100, opt_function = opt1_insertion_w_equip!)
-        opt1_cost = calculate_equip_cost(equipment_assignments, instance) + calculate_worker_cost(y, y_w, instance)
-        # print("opt1 y ", y)
-        # println("opt1 equip assign: ", equipment_assignments)
-        #println("opt1 cost: ", opt1_cost)
-
-        x_soi, y, y_w, y_wts, equipment_assignments = construct_then_improve(instance; set_cover_heuristic=greedy_set_cover_v2, n_iterations=100, opt_function = opt2_insertion_w_equip!)
-        opt2_cost = calculate_equip_cost(equipment_assignments, instance) + calculate_worker_cost(y, y_w, instance)
-        # print("opt2 y ", y)
-        # println("opt2 equip assign: ", equipment_assignments)
-        #println("opt2 cost: ", opt2_cost)
-        x_soi, y, y_w, y_wts, equipment_assignments = construct_then_improve(instance; set_cover_heuristic=greedy_set_cover_v2, n_iterations=100, swapper=both_opts)
-        bothopt_cost = calculate_equip_cost(equipment_assignments, instance) + calculate_worker_cost(y, y_w, instance)
-        # print("bothopt y ", y)
-        # println("bothopt equip assign: ", equipment_assignments)
-        #println("bothopt cost: ", total_cost)
-        x_soi, y, y_w, y_wts, equipment_assignments = construct_then_improve(instance; set_cover_heuristic=greedy_set_cover_v2, n_iterations=100, swapper=both_opts2)
-        bothopt2_cost = calculate_equip_cost(equipment_assignments, instance) + calculate_worker_cost(y, y_w, instance)
-        println("instance_name: $(instance.name) original cost $(original_cost) , opt1_cost $(opt1_cost) , opt2_cost $(opt2_cost) , bothopt $(bothopt_cost) , multi_apply $(bothopt2_cost)")
-
+function construct_then_improve_task_only(orig_instance::MALBP_W_instance; 
+    set_cover_heuristic::Function=greedy_set_cover_v2, 
+    productivity_per_worker::Vector{Float64}= [1., 1., 1., 1.],
+    n_iterations::Int=100,
+    swapper::Function=task_opt_fixed,
+    opt_function::Function= opt1_insertion_w_equip!)
+    x_so, equipment_assignments, combined_model = task_equip_heuristic_combined_precedence_fixed(orig_instance,  set_cover_heuristic=set_cover_heuristic)
+    fix_empty_stations!(equipment_assignments, orig_instance)
+    x_so, equipment_assignments = swapper(combined_model, x_so, equipment_assignments; n_iterations = n_iterations, productivity_per_worker=productivity_per_worker, opt_function! = opt_function)
+    x_soi = zeros(Int, orig_instance.equipment.n_stations, orig_instance.equipment.n_tasks, orig_instance.models.n_models)
+    for model in 1:orig_instance.models.n_models
+        x_soi[:,:,model] = x_so[:,:,1]
     end
+    return x_soi,nothing, nothing, nothing, nothing
 end
+# #config_filepath = "SALBP_benchmark/MM_instances/testing_yaml/constructive_debug.yaml"
+# config_filepath = "xps/paper1_large_instances.yaml"
+# #config_filepath = "xps/paper1_instances.yaml"
+# instances = read_MALBP_W_instances(config_filepath)
+
+# n_iterations_list = [10, 100, 200]
+# for n_iterations in n_iterations_list
+#     println("now with $n_iterations: ")
+#     for instance in instances
+#         x_soi, y, y_w, y_wts, equipment_assignments = task_equip_heuristic_combined_precedence(instance, set_cover_heuristic=greedy_set_cover_v2)
+#         original_cost = calculate_equip_cost(equipment_assignments, instance) + calculate_worker_cost(y, y_w, instance)
+#         # println("original y: ", y)
+#         #println("original cost: ", original_cost)
+#         # # assigned_tasks = get_tasks_assigned_from_xsoi(x_soi,2)
+#         # # println("These are the assigned tasks:", assigned_tasks)
+
+#         x_soi, y, y_w, y_wts, equipment_assignments = construct_then_improve(instance; set_cover_heuristic=greedy_set_cover_v2, n_iterations=100, opt_function = opt1_insertion_w_equip!)
+#         opt1_cost = calculate_equip_cost(equipment_assignments, instance) + calculate_worker_cost(y, y_w, instance)
+#         # print("opt1 y ", y)
+#         # println("opt1 equip assign: ", equipment_assignments)
+#         #println("opt1 cost: ", opt1_cost)
+
+#         x_soi, y, y_w, y_wts, equipment_assignments = construct_then_improve(instance; set_cover_heuristic=greedy_set_cover_v2, n_iterations=100, opt_function = opt2_insertion_w_equip!)
+#         opt2_cost = calculate_equip_cost(equipment_assignments, instance) + calculate_worker_cost(y, y_w, instance)
+#         # print("opt2 y ", y)
+#         # println("opt2 equip assign: ", equipment_assignments)
+#         #println("opt2 cost: ", opt2_cost)
+#         x_soi, y, y_w, y_wts, equipment_assignments = construct_then_improve(instance; set_cover_heuristic=greedy_set_cover_v2, n_iterations=100, swapper=both_opts)
+#         bothopt_cost = calculate_equip_cost(equipment_assignments, instance) + calculate_worker_cost(y, y_w, instance)
+#         # print("bothopt y ", y)
+#         # println("bothopt equip assign: ", equipment_assignments)
+#         #println("bothopt cost: ", total_cost)
+#         x_soi, y, y_w, y_wts, equipment_assignments = construct_then_improve(instance; set_cover_heuristic=greedy_set_cover_v2, n_iterations=100, swapper=both_opts2)
+#         bothopt2_cost = calculate_equip_cost(equipment_assignments, instance) + calculate_worker_cost(y, y_w, instance)
+#         println("instance_name: $(instance.name) original cost $(original_cost) , opt1_cost $(opt1_cost) , opt2_cost $(opt2_cost) , bothopt $(bothopt_cost) , multi_apply $(bothopt2_cost)")
+
+#     end
+# end
 # new_equip_assign, new_capabilities = greedy_set_cover_v2(assigned_tasks, instance, 2)
 # println("new equip assignment", new_equip_assign)
 # #task_location, station_capababilities = get_equipment_capable_stations(instance, equipment_assignments)
