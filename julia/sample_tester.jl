@@ -28,7 +28,7 @@ function slurm_md_sample_test(config_filepath::String, output_filepath::String, 
 
 end
 
-function md_iterative_sampling(instance::MALBP_W_instance, optimizer, original_filepath::String, run_time::Real; scenario_generator::String, preprocessing::Bool=false, save_variables::Bool=true, save_lp::Bool=false, slurm_array_ind::Union{Int, Nothing}=nothing,md_heuristic=task_equip_heuristic, max_iterations=15,  )
+function md_iterative_sampling(instance::MALBP_W_instance, optimizer, original_filepath::String, run_time::Real; scenario_generator::String, preprocessing::Bool=false, save_variables::Bool=true, save_lp::Bool=false, slurm_array_ind::Union{Int, Nothing}=nothing,md_heuristic=task_equip_heuristic, max_iterations=20,  )
     #if directory is not made yet, make it
     iter = 0
 
@@ -49,7 +49,7 @@ function md_iterative_sampling(instance::MALBP_W_instance, optimizer, original_f
         write_to_file(m, output_filepath * "model.lp")
     end
     if save_variables
-        write_MALBP_W_solution_md(output_filepath, instance, new_m, false)
+        write_MALBP_W_solution_md(output_filepath, instance, m, false)
     end
     save_results(original_filepath , m, run_time, instance, output_filepath, "model_dependent_problem_linear_labor_recourse.csv")
     while iter < max_iterations
