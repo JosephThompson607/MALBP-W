@@ -19,7 +19,7 @@ function slurm_md_sample_test(config_filepath::String, output_filepath::String, 
     _, instance = read_slurm_csv(config_filepath, slurm_array_ind)
     optimizer = optimizer_with_attributes(() -> Gurobi.Optimizer(GRB_ENV_REF[]), "TimeLimit" => run_time, "Threads" => grb_threads)    #adds the date and time to the output file path
     now = Dates.now()
-    now = Dates.format(now, "yyyy-mm-ddTHH:MM")
+    now = Dates.format(now, "yyyy-mm-dd")
     output_filepath = xp_folder * "/" * now * "_" * output_filepath *  "md/"* instance.name * "/slurm_" * string(slurm_array_ind) * "/"
     if !isdir(output_filepath)
         mkpath(output_filepath)
@@ -28,7 +28,7 @@ function slurm_md_sample_test(config_filepath::String, output_filepath::String, 
 
 end
 
-function md_iterative_sampling(instance::MALBP_W_instance, optimizer, original_filepath::String, run_time::Real; scenario_generator::String, preprocessing::Bool=false, save_variables::Bool=true, save_lp::Bool=false, slurm_array_ind::Union{Int, Nothing}=nothing,md_heuristic=task_equip_heuristic, max_iterations=10,  )
+function md_iterative_sampling(instance::MALBP_W_instance, optimizer, original_filepath::String, run_time::Real; scenario_generator::String, preprocessing::Bool=false, save_variables::Bool=true, save_lp::Bool=false, slurm_array_ind::Union{Int, Nothing}=nothing,md_heuristic=task_equip_heuristic, max_iterations=15,  )
     #if directory is not made yet, make it
     iter = 0
 
@@ -48,9 +48,12 @@ function md_iterative_sampling(instance::MALBP_W_instance, optimizer, original_f
         @info "Writing LP to file $(output_filepath * "model.lp")"
         write_to_file(m, output_filepath * "model.lp")
     end
+    if save_variables
+        write_MALBP_W_solution_md(output_filepath, instance, new_m, false)
+    end
     save_results(original_filepath , m, run_time, instance, output_filepath, "model_dependent_problem_linear_labor_recourse.csv")
     while iter < max_iterations
-        add_more_samples!(instance, 3; generator=scenario_generator)
+        add_more_samples!(instance, 1; generator=scenario_generator)
         output_filepath = original_filepath * "/samples_$(instance.sequences.n_scenarios)/"
         if !isdir(output_filepath)
             mkpath(output_filepath)
