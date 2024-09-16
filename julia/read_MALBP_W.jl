@@ -309,9 +309,9 @@ function overwrite_config_settings(row, config_file, models_instance, equip_inst
         @info "Using sequence length from csv file : $(row.sequence_length)"
         config_file["scenario"]["sequence_length"] = Int(row.sequence_length)
     end
-    if hasproperty(row, :n_scenarios) && row.n_scenarios != ""
+    if hasproperty(row, :n_samples) && row.n_samples != ""
         @info "Using number of scenarios from csv file : $(row.n_scenarios)"
-        config_file["scenario"]["n_samples"] = Int(row.n_scenarios)
+        config_file["scenario"]["n_samples"] = Int(row.n_samples)
     end
     if hasproperty(row, :cycle_time) && row.cycle_time !=""
         @info "Using cycle time from csv file : $(row.cycle_time)"
