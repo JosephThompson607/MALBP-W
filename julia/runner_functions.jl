@@ -293,8 +293,8 @@ end
 # return m
 # end
 
-function MMALBP_W_md_lns( instance::MALBP_W_instance, optimizer, original_filepath::String, run_time::Real, search_strategy::String; rng, 
-                                save_variables::Bool=true, save_lp::Bool=false, slurm_array_ind::Union{Int, Nothing}=nothing, preprocessing::Bool=true, md_heuristic=task_equip_heuristic)
+function MMALBP_W_md_lns( instance::MALBP_W_instance, optimizer, original_filepath::String, run_time::Real, search_strategy_fp::String; rng, 
+                                save_variables::Bool=true, save_lp::Bool=false, slurm_array_ind::Union{Int, Nothing}=nothing, preprocessing::Bool=false, md_heuristic=task_equip_heuristic)
     #if directory is not made yet, make it
     if !isnothing(slurm_array_ind)
         output_filepath = original_filepath * "md/"* instance.name * "/slurm_" * string(slurm_array_ind) * "/"
@@ -307,8 +307,21 @@ function MMALBP_W_md_lns( instance::MALBP_W_instance, optimizer, original_filepa
     #creates the model
     m = Model(optimizer)
     set_optimizer_attribute(m, "LogFile", output_filepath * "gurobi.log")
+    set_optimizer_attribute(m, "TimeLimit", 60)
     #defines the  dyanmic model parameters
     start_value = define_md_linear!(m, instance; preprocess=preprocessing, start_heuristic=md_heuristic)
+    #Does a quick initial solve to make sure we have a feasible solution
+    optimize!(m)
+    #If the initial solve is not feasible, we try to find an inital solution
+    if primal_status(m) != MOI.FEASIBLE_POINT
+        @info "looking for feasible initial solution"
+        set_optimizer_attribute(m, "TimeLimit", 1200)
+        optimize!(m)
+    end
+    x = all_variables(m)
+    solution = value.(x)
+    set_start_value.(x, solution)
+    set_optimizer_attribute(m, "TimeLimit", run_time)
     #solves the model in a lns loop
     lns_conf = read_search_strategy_YAML(search_strategy_fp, run_time, model_dependent=true)
     obj_dict, best_obj = large_neighborhood_search!(m, instance, lns_conf; lns_res_fp= output_filepath  , md_obj_val=start_value, run_time=run_time, rng=rng)
@@ -363,15 +376,16 @@ function MMALBP_md_lns_from_yaml(config_filepath::String, output_filepath::Strin
     end
 end
 
-function MMALBP_md_lns_from_slurm(config_filepath::String, output_filepath::String, run_time::Float64, save_variables::Bool, save_lp::Bool, search_strategy_fp::String, slurm_array_ind::Int; xp_folder::String="model_runs", preprocessing::Bool=false, rng=Xoshiro(), grb_threads=1)
-    config_file = get_instance_YAML(config_filepath)
-    instance, config_file = read_slurm_csv(config_filepath,slurm_array_ind)
-optimizer = optimizer_with_attributes(() -> Gurobi.Optimizer(GRB_ENV_REF[]), "TimeLimit" => run_time, "Threads" => grb_threads)    #adds the date and time to the output file path
+function MMALBP_md_lns_from_slurm(config_filepath::String, output_filepath::String, run_time::Float64, save_variables::Bool, save_lp::Bool, search_strategy_fp::String, slurm_array_ind::Int; xp_folder::String="model_runs", preprocessing::Bool=false, md_heuristic::Function=task_equip_heuristic_task_only_combined_precedence,rng=Xoshiro(), grb_threads=1)
+    config_file, instance = read_slurm_csv(config_filepath,slurm_array_ind)
+    println("typeof(instance), ", typeof(instance))
+    println("instance ", instance)
+    optimizer = optimizer_with_attributes(() -> Gurobi.Optimizer(GRB_ENV_REF[]), "TimeLimit" => run_time, "Threads" => grb_threads)    #adds the date and time to the output file path
     now = Dates.now()
     now = Dates.format(now, "yyyy-mm-dd")
     output_filepath = xp_folder * "/" * now * "_" * output_filepath 
     @info "Running instance $(instance.name), \n Output will be saved to $(output_filepath), on slurm array index $(slurm_array_ind)"
-    m = MMALBP_W_md_lns(instance, optimizer, output_filepath, run_time, search_strategy_fp; save_variables= save_variables, save_lp=save_lp, preprocessing=preprocessing, slurm_array_ind=slurm_array_ind, rng=rng)
+    m = MMALBP_W_md_lns(instance, optimizer, output_filepath, run_time, search_strategy_fp; save_variables= save_variables, save_lp=save_lp, preprocessing=preprocessing, slurm_array_ind=slurm_array_ind, rng=rng, md_heuristic=md_heuristic)
 
 end
 
