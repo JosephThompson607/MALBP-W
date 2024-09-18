@@ -153,7 +153,15 @@ function main()
         elseif isnothing(parsed_args["slurm_ind"])
             error("Slurm array index is required for slurm LNS experiments")
         end
-        MMALBP_md_lns_from_slurm(parsed_args["config_file"], output_file,parsed_args["run_time"], parsed_args["save_variables"], parsed_args["save_lp"], parsed_args["LNS_config"], parsed_args["slurm_ind"] ,rng=rng , grb_threads=parsed_args["grb_threads"], md_heuristic = parsed_args["md_heuristic"])
+        MMALBP_md_lns_from_slurm(parsed_args["config_file"], 
+                                output_file,parsed_args["run_time"], 
+                                parsed_args["save_variables"], 
+                                parsed_args["save_lp"], 
+                                parsed_args["LNS_config"], 
+                                parsed_args["slurm_ind"] ,
+                                rng=rng , 
+                                grb_threads=parsed_args["grb_threads"], 
+                                md_heuristic = parsed_args["md_heuristic"])
     elseif parsed_args["xp_type"] == "slurm_lns" || parsed_args["xp_type"] == "slurm_array_lns"
         if isnothing(parsed_args["LNS_config"]) 
             error("LNS config file is required for LNS experiments")
