@@ -179,7 +179,7 @@ function check_instance(config_file, models_instance, equipment_instance)
     end
 end
 #takes an instance filepath as an input, and returns an array of MALBP_W_instance struct
-function read_MALBP_W_instances(file_name::String; scenario_generator::Union{Nothing, String}=nothing)
+function read_MALBP_W_instances(file_name::String; scenario_generator::Union{Nothing, String}=nothing, rng=Xoshiro())
     config_file = get_instance_YAML(file_name)
     if !isnothing(scenario_generator)
         config_file["scenario"]["generator"] = scenario_generator
@@ -190,7 +190,7 @@ function read_MALBP_W_instances(file_name::String; scenario_generator::Union{Not
             models_instance = read_models_instance(model)
             equip_instance = read_equipment_instance(equip)
             check_instance(config_file,models_instance, equip_instance)
-            scenarios = read_scenario_tree(config_file["scenario"], get_model_mixture(models_instance))
+            scenarios = read_scenario_tree(config_file["scenario"], get_model_mixture(models_instance), rng=rng)
             num_cycles = config_file["scenario"]["sequence_length"] + config_file["n_stations"] - 1
             if haskey(config_file, "productivity_per_worker")
                 productivity_per_worker = Dict{Int64,Float64}(k => v for (k,v) in pairs(config_file["productivity_per_worker"])) 
@@ -324,7 +324,10 @@ end
 
 
 #reads the instances from a csv file
-function read_slurm_csv(file_name::String, slurm_ind::Int)
+function read_slurm_csv(file_name::String, slurm_ind::Int;scenario_generator::Union{Nothing, String}=nothing, rng=Xoshiro())
+    if !isnothing(scenario_generator)
+        config_file["scenario"]["generator"] = scenario_generator
+    end
     results = CSV.read(file_name, DataFrame)
     row = results[slurm_ind, :]
     models_instance = read_models_instance(row.model_yaml)
@@ -334,7 +337,7 @@ function read_slurm_csv(file_name::String, slurm_ind::Int)
     if hasproperty(row, :scenario_tree_yaml) && row.scenario_tree_yaml != "" && row.scenario_tree_yaml != "No Tree"
         scenarios = read_scenario_csv(row.scenario_tree_yaml)
     else
-        scenarios = read_scenario_tree(config_file["scenario"], get_model_mixture(models_instance))
+        scenarios = read_scenario_tree(config_file["scenario"], get_model_mixture(models_instance), rng=rng)
     end
     num_cycles = config_file["scenario"]["sequence_length"] + config_file["n_stations"] - 1
     if haskey(config_file, "productivity_per_worker")
@@ -368,7 +371,7 @@ function read_slurm_csv(file_name::String, slurm_ind::Int)
 end
 
 #reads the instances from a csv file
-function read_csv(file_name::String)
+function read_csv(file_name::String; rng=Xoshiro())
     results = CSV.read(file_name, DataFrame)
     instances = []
     for row in eachrow(results)
@@ -379,7 +382,7 @@ function read_csv(file_name::String)
         if hasproperty(row, :scenario_tree_yaml) && row.scenario_tree_yaml != "" && row.scenario_tree_yaml != "No Tree"
             scenarios = read_scenario_csv(row.scenario_tree_yaml)
         else
-            scenarios = read_scenario_tree(config_file["scenario"], get_model_mixture(models_instance))
+            scenarios = read_scenario_tree(config_file["scenario"], get_model_mixture(models_instance), rng=rng)
         end
         num_cycles = config_file["scenario"]["sequence_length"] + config_file["n_stations"] - 1
         if haskey(config_file, "productivity_per_worker")

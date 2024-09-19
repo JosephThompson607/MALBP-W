@@ -16,7 +16,7 @@ end
 
 
 function slurm_md_sample_test(config_filepath::String, output_filepath::String, run_time::Float64, save_variables::Bool, save_lp::Bool,slurm_array_ind::Int; xp_folder::String="model_runs", preprocessing::Bool=false, rng=Xoshiro(), grb_threads=1,  md_heuristic::Union{Function, Nothing}=task_equip_heuristic, scenario_generator::String = "monte_carlo_limit")
-    _, instance = read_slurm_csv(config_filepath, slurm_array_ind)
+    _, instance = read_slurm_csv(config_filepath, slurm_array_ind, scenario_generator=scenario_generator)
     optimizer = optimizer_with_attributes(() -> Gurobi.Optimizer(GRB_ENV_REF[]), "TimeLimit" => run_time, "Threads" => grb_threads)    #adds the date and time to the output file path
     now = Dates.now()
     now = Dates.format(now, "yyyy-mm-dd")

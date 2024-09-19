@@ -34,8 +34,7 @@ function generate_scenario_tree(sequence_length::Int, model_mixtures::Dict{Strin
 end
 
 #generates a monte carlo sampled scenario tree
-function monte_carlo_tree_limit(sequence_length::Int, model_mixtures::Dict{String, Float64}, n_samples::Int; seed::Union{Int, Nothing}=nothing)
-    Random.seed!(seed)
+function monte_carlo_tree_limit(sequence_length::Int, model_mixtures::Dict{String, Float64}, n_samples::Int; rng=Xoshiro())
     #If the model mixtures do not sum to 1, throw an error
     if round(sum(values(model_mixtures)),digits= 6) != 1
         error("model mixtures do not sum to 1. They sum to: $(sum(values(model_mixtures)))")
@@ -55,7 +54,7 @@ function monte_carlo_tree_limit(sequence_length::Int, model_mixtures::Dict{Strin
         current_probability = 1
        for j in 1:sequence_length
             #samples from the model mixtures
-            model = sample(collect(keys(model_mixtures)), Weights(collect(values(model_mixtures))))
+            model = sample(rng,collect(keys(model_mixtures)), Weights(collect(values(model_mixtures))))
             push!(current_sequence, model)
         end
         push!(final_sequences, Dict("sequence" => current_sequence, "probability" => 1/n_samples))
@@ -66,7 +65,7 @@ end
 
 
 #generates a uniformly distributed tree
-function uniform_limit(sequence_length::Int, model_mixtures::Dict{String, Float64}, n_samples::Int; seed::Union{Int, Nothing}=nothing)
+function uniform_limit(sequence_length::Int, model_mixtures::Dict{String, Float64}, n_samples::Int; rng=Xoshiro())
     Random.seed!(seed)
     #If the model mixtures do not sum to 1, throw an error
     if round(sum(values(model_mixtures)),digits= 6) != 1
@@ -108,7 +107,7 @@ end
 
 
 #generates a uniformly distributed tree
-function sobold_limit(sequence_length::Int, model_mixtures::Dict{String, Float64}, n_samples::Int; seed::Union{Int, Nothing}=nothing)
+function sobold_limit(sequence_length::Int, model_mixtures::Dict{String, Float64}, n_samples::Int; rng=Xoshiro())
     Random.seed!(seed)
     #If the model mixtures do not sum to 1, throw an error
     if round(sum(values(model_mixtures)),digits= 6) != 1
@@ -135,7 +134,7 @@ function sobold_limit(sequence_length::Int, model_mixtures::Dict{String, Float64
     for i in 1:n_samples
         current_sequence = []
        for j in 1:sequence_length
-            points = (QuasiMonteCarlo.sample(sequence_length, [0], [1], SobolSample()).+ rand()).% 1
+            points = (QuasiMonteCarlo.sample(rng,sequence_length, [0], [1], Sobolsample(rng,)).+ rand()).% 1
             #finds the model that the point falls into
             model_index = findfirst(x -> x >= points[j], model_ranges)
             model = model_keys[model_index]
@@ -190,7 +189,7 @@ function add_more_samples!(instance, n_samples::Int64; generator::String="monte_
 end
 
 #reads scenario tree file from csv accepts a dictionary of scenario tree info and model mixtures(optional)
-function read_scenario_tree(scenario_info::Dict, model_mixtures::Dict{String, Float64} )
+function read_scenario_tree(scenario_info::Dict, model_mixtures::Dict{String, Float64} ; rng=Xoshiro())
     if scenario_info["generator"] == "read_csv"
         return read_scenario_csv(scenario_info["file_name"])
     elseif scenario_info["generator"] == "full"
@@ -199,10 +198,8 @@ function read_scenario_tree(scenario_info::Dict, model_mixtures::Dict{String, Fl
         if !haskey(scenario_info, "n_samples")
             error("n_samples is required for monte_carlo_tree_limit, please provide it in the config file")
         end
-        if !haskey(scenario_info, "seed")
-            scenario_info["seed"] = nothing
-        end
-        scenario_df = monte_carlo_tree_limit(scenario_info["sequence_length"], model_mixtures, scenario_info["n_samples"], seed=scenario_info["seed"])
+        
+        scenario_df = monte_carlo_tree_limit(scenario_info["sequence_length"], model_mixtures, scenario_info["n_samples"], rng=rng)
     elseif scenario_info["generator"] == "sobold_limit"
         if !haskey(scenario_info, "n_samples")
             error("n_samples is required for sobold_limit, please provide it in the config file")
@@ -210,7 +207,7 @@ function read_scenario_tree(scenario_info::Dict, model_mixtures::Dict{String, Fl
         if !haskey(scenario_info, "seed")
             scenario_info["seed"] = nothing
         end
-        scenario_df = sobold_limit(scenario_info["sequence_length"], model_mixtures, scenario_info["n_samples"], seed=scenario_info["seed"])
+        scenario_df = sobold_limit(scenario_info["sequence_length"], model_mixtures, scenario_info["n_samples"], rng=rng)
     elseif scenario_info["generator"] == "uniform_limit"
         if !haskey(scenario_info, "n_samples")
             error("n_samples is required for uniform_limit, please provide it in the config file")
@@ -218,7 +215,7 @@ function read_scenario_tree(scenario_info::Dict, model_mixtures::Dict{String, Fl
         if !haskey(scenario_info, "seed")
             scenario_info["seed"] = nothing
         end
-        scenario_df = uniform_limit(scenario_info["sequence_length"], model_mixtures, scenario_info["n_samples"], seed=scenario_info["seed"])
+        scenario_df = uniform_limit(scenario_info["sequence_length"], model_mixtures, scenario_info["n_samples"], rng=rng)
     else
         error("unrecognized generator, currently we only support read_csv, monte_carlo_tree_limit, uniform_limit, and full for scenario tree generation.")
     end
