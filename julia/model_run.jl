@@ -181,6 +181,15 @@ function main()
             error("Slurm array index is required for slurm LNS experiments")
         end
         slurm_md_sample_test(parsed_args["config_file"], output_file,parsed_args["run_time"], parsed_args["save_variables"], parsed_args["save_lp"], parsed_args["slurm_ind"], rng=rng , grb_threads=parsed_args["grb_threads"], scenario_generator = parsed_args["scenario_generator"])
+    elseif parsed_args["xp_type"] == "md_then_dyn_lns"
+        if isnothing(parsed_args["LNS_config"]) 
+            error("LNS config file is required for LNS experiments")
+        elseif isnothing(parsed_args["slurm_ind"])
+            error("Slurm array index is required for slurm LNS experiments")
+        end
+        MMALBP_md_then_dynamic_lns(parsed_args["config_file"], output_file,parsed_args["run_time"], parsed_args["save_variables"], parsed_args["save_lp"], parsed_args["LNS_config"], parsed_args["slurm_ind"], rng=rng, md_heuristic=parsed_args["md_heuristic"], grb_threads=parsed_args["grb_threads"])
+
+
     elseif parsed_args["xp_type"] == "md_sample_test"
         md_sample_test(parsed_args["config_file"], output_file,parsed_args["run_time"], parsed_args["save_variables"], parsed_args["save_lp"], rng=rng , grb_threads=parsed_args["grb_threads"], scenario_generator = parsed_args["scenario_generator"])
     else

@@ -234,12 +234,12 @@ function read_md_result(file_name::String, res_index::Int; sequence_csv_name::St
     obj_val = row.objective_value
     models_instance = read_models_instance(row.model_fp)
     equip_instance = read_equipment_instance(row.equip_fp)
-    config_file = get_instance_YAML(row.instance_fp)
+    config_file = get_instance_YAML(String(row.instance_fp))
     config_file = overwrite_config_settings(row, config_file, models_instance, equip_instance)
     scenarios_fp = row.output_folder * sequence_csv_name
     scenarios = read_scenario_csv(scenarios_fp)
     num_cycles = config_file["scenario"]["sequence_length"] + config_file["n_stations"] - 1
-    current_instance = MALBP_W_instance(row.instance_fp,
+    current_instance = MALBP_W_instance(String(row.instance_fp),
                     config_file["config_name"], 
                     models_instance, 
                     scenarios, 
@@ -329,10 +329,16 @@ function read_slurm_csv(file_name::String, slurm_ind::Int;scenario_generator::Un
         config_file["scenario"]["generator"] = scenario_generator
     end
     results = CSV.read(file_name, DataFrame)
+    if hasproperty(results, :equip_fp)
+        rename!(results, :equip_fp => :equipment_yaml)
+    end
+    if hasproperty(results, :instance_fp)
+        rename!(results, :instance_fp => :config_yaml)
+    end
     row = results[slurm_ind, :]
     models_instance = read_models_instance(row.model_yaml)
     equip_instance = read_equipment_instance(row.equipment_yaml)
-    config_file = get_instance_YAML(row.config_yaml)
+    config_file = get_instance_YAML(String(row.config_yaml))
     config_file = overwrite_config_settings(row, config_file, models_instance, equip_instance)
     if hasproperty(row, :scenario_tree_yaml) && row.scenario_tree_yaml != "" && row.scenario_tree_yaml != "No Tree"
         scenarios = read_scenario_csv(row.scenario_tree_yaml)
@@ -341,7 +347,7 @@ function read_slurm_csv(file_name::String, slurm_ind::Int;scenario_generator::Un
     end
     num_cycles = config_file["scenario"]["sequence_length"] + config_file["n_stations"] - 1
     if haskey(config_file, "productivity_per_worker")
-        current_instance = MALBP_W_instance(row.config_yaml,
+        current_instance = MALBP_W_instance(String(row.config_yaml),
                     config_file["config_name"], 
                     models_instance, 
                     scenarios, 
@@ -355,7 +361,7 @@ function read_slurm_csv(file_name::String, slurm_ind::Int;scenario_generator::Un
                     config_file["productivity_per_worker"])
     else
         @info "No productivity per worker defined, using default values (only applies to nonlinear productivity)"
-        current_instance = MALBP_W_instance(row.config_yaml,
+        current_instance = MALBP_W_instance(String(row.config_yaml),
                     config_file["config_name"], 
                     models_instance, 
                     scenarios, 
@@ -386,7 +392,7 @@ function read_csv(file_name::String; rng=Xoshiro())
         end
         num_cycles = config_file["scenario"]["sequence_length"] + config_file["n_stations"] - 1
         if haskey(config_file, "productivity_per_worker")
-            current_instance = MALBP_W_instance(row.config_yaml,
+            current_instance = MALBP_W_instance(String(row.config_yaml),
                         config_file["config_name"], 
                         models_instance, 
                         scenarios, 
@@ -400,7 +406,7 @@ function read_csv(file_name::String; rng=Xoshiro())
                         config_file["productivity_per_worker"])
         else
             @info "No productivity per worker defined, using default values (only applies to nonlinear productivity)"
-            current_instance = MALBP_W_instance(row.config_yaml,
+            current_instance = MALBP_W_instance(String(row.config_yaml),
                         config_file["config_name"], 
                         models_instance, 
                         scenarios, 
