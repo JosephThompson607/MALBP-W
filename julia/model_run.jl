@@ -76,6 +76,10 @@ function parse_commandline()
             help = "Maximum run time for the model"
             arg_type = Float64
             default = 3600.0
+        "--md_run_time"
+            help = "Maximum run time for the model"
+            arg_type = Float64
+            default = 3600.0
         "--output_file", "-o"
             help = "Name of the experiment"
             arg_type = String
@@ -187,7 +191,7 @@ function main()
         elseif isnothing(parsed_args["slurm_ind"])
             error("Slurm array index is required for slurm LNS experiments")
         end
-        MMALBP_md_then_dynamic_lns(parsed_args["config_file"], output_file,parsed_args["run_time"], parsed_args["save_variables"], parsed_args["save_lp"], parsed_args["LNS_config"], parsed_args["slurm_ind"], rng=rng, md_heuristic=parsed_args["md_heuristic"], grb_threads=parsed_args["grb_threads"])
+        MMALBP_md_then_dynamic_lns(parsed_args["config_file"], output_file,parsed_args["run_time"], parsed_args["save_variables"], parsed_args["save_lp"], parsed_args["LNS_config"], parsed_args["slurm_ind"], rng=rng, md_heuristic=parsed_args["md_heuristic"], grb_threads=parsed_args["grb_threads"], md_run_time=parsed_args["md_run_time"])
 
 
     elseif parsed_args["xp_type"] == "md_sample_test"
