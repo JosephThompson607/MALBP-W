@@ -337,7 +337,7 @@ function MMALBP_W_md_lns( instance::MALBP_W_instance, optimizer, original_filepa
     return m
 end
 
-function MMALBP_from_yaml(config_filepath::String, output_filepath::String, run_time::Float64, save_variables::Bool, save_lp::Bool; xp_folder::String="model_runs", preprocessing::Bool=false, grb_threads::Int=1, md_heuristic=task_equip_heuristic)
+function MMALBP_from_yaml(config_filepath::String, output_filepath::String, run_time::Float64, save_variables::Bool, save_lp::Bool; xp_folder::String="model_runs", preprocessing::Bool=false, grb_threads::Int=1, rng=Xoshiro(),md_heuristic=task_equip_heuristic)
     config_file = get_instance_YAML(config_filepath)
     instances = read_MALBP_W_instances(config_filepath, rng=rng)
     optimizer = optimizer_with_attributes(() -> Gurobi.Optimizer(GRB_ENV_REF[]), "TimeLimit" => run_time, "Threads" => grb_threads)    #adds the date and time to the output file path

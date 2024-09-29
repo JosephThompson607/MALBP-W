@@ -107,114 +107,88 @@ function define_fixed_linear_constraints!(m::Model, instance::MALBP_W_instance)
     # end
 end
 
-#defines the redundant constraints of the model dependent MALBP-W model
-# function define_fixed_linear_redundant_constraints!(m::Model, instance::MALBP_W_instance)
-#     # usesful variables
-#     model_indexes = [i for (i, model_dict) in instance.models.models]
-#     #model variables
-#     x_so = m[:x_so]
-#     #PREPROCESSING 1: TASKS cannot be to early or too late
-#     #calculates the infeasible task assignments
-#     infeasible_tasks_forward, infeasible_tasks_backwards = get_infeasible_task_assignments(instance; productivity_per_worker = Dict(1=>1., 2=>1., 3=>1., 4=>1.))
-#     #prohibits the infeasible task assignments
-#     for (model, tasks) in infeasible_tasks_forward
-#         i = findfirst( ==(model), model_indexes) 
-#         for (task, stations) in tasks
-#             for station in stations
-#                 @constraint(m, x_so[station, parse(Int,task), i] == 0)
-#             end
-#         end
-#     end
-#     for (model, tasks) in infeasible_tasks_backwards
-#         i = findfirst( ==(model), model_indexes) 
-#         for (task,stations) in tasks
-#             for station in stations
-#                 @constraint(m, x_so[station,parse(Int,task), i] == 0)
-#             end
-#         end
-#     end
-#     #PREPROCESSING 2: Pairs of tasks that take up a large amount of time cannot both be started too late or too early
-#     #calculates the infeasible task pairs
-#     infeasible_pairs_forward, infeasible_pairs_backwards = get_infeasible_assignment_pairs(instance; productivity_per_worker = Dict(1=>1., 2=>1., 3=>1., 4=>1.)) 
-#     #prohibits the infeasible task pairs
-#     for (model, pairs) in infeasible_pairs_forward
-#         i = findfirst( ==(model), model_indexes) 
-#         for ((task1, task2), stations) in pairs
-#             for station in stations
-#                 @constraint(m, x_so[station, parse(Int,task1), i] + x_so[station, parse(Int,task2), i] <= 1)
-#             end
-#         end
-#     end
-#     for (model, pairs) in infeasible_pairs_backwards
-#         i = findfirst( ==(model), model_indexes) 
-#         for ((task1, task2), stations) in pairs
-#             for station in stations
-#                 @constraint(m, x_so[station, parse(Int,task1), i] + x_so[station, parse(Int,task2), i] <= 1)
-#             end
-#         end
-#     end
-# end
 
-function heuristic_start_fixed!(m::Model, instance::MALBP_W_instance; 
-                                    task_assign_func::Function = ehsans_heuristic, 
-                                    worker_assign_func::Function = base_worker_assign_func, 
-                                    equipment_assign_func::Function = base_equipment_assign_func)
-    #assigns tasks to stations
+function set_initial_values_fixed!(m::Model, instance::MALBP_W_instance; 
+                                    x_soi_start::Union{Array{Int,3},Nothing} = zeros(Int, instance.equipment.n_stations, instance.equipment.n_tasks, instance.models.n_models),
+                                    y_start::Union{Int,Nothing} = 0,
+                                    y_w_start::Union{Array{Int,1},Nothing} = zeros(Int, instance.sequences.n_scenarios),
+                                    y_wts_start::Union{Array{Int,3},Nothing} = zeros(Int, instance.sequences.n_scenarios, instance.num_cycles, instance.equipment.n_stations),
+                                    equipment_assignments:: Union{Dict{Int64, Vector{Int64}}, Nothing} = zeros(Int, instance.equipment.n_stations, instance.equipment.n_equipment)) 
+    
     model_indexes = [i for (i, model_dict) in instance.models.models]
     x_so = m[:x_so]
     y_wts = m[:y_wts]
     y_w = m[:y_w]
     y = m[:y]
-    model_task_assignments = task_assign_func(instance)
-    println("MODEL TASK ASSIGNMENTS: ", model_task_assignments)
-    for (model, station_assignments) in model_task_assignments
-        i = findfirst( ==(model), model_indexes) 
-        for (station, tasks) in station_assignments
-            for task in tasks
-                set_start_value( x_so[station, parse(Int,task), i], 1)
+    u_se = m[:u_se]
+    if !isnothing(x_soi_start)
+    #assigns tasks to stations
+        for s in 1:instance.equipment.n_stations
+            for o in 1:instance.equipment.n_tasks
+                set_start_value(x_so[s, o,], x_soi_start[s, o, 1])
             end
         end
     end
     #assigns workers to stations
-    y_start, y_w_start, y_wts_start = worker_assign_func(instance, model_task_assignments)
-    println("y_start: ", y_start)
-    for w in 1:instance.sequences.n_scenarios
-        set_start_value(y_w[w], y_w_start[w])
-        for t in 1:instance.num_cycles
-            for s in 1:instance.equipment.n_stations
-                    set_start_value(y_wts[w, t, s], y_wts_start[w, t, s])
+    if !isnothing(y_w_start)
+        for w in 1:instance.sequences.n_scenarios
+            set_start_value(y_w[w], y_w_start[w])
+            for t in 1:instance.num_cycles
+                for s in 1:instance.equipment.n_stations
+                        set_start_value(y_wts[w, t, s], y_wts_start[w, t, s])
+                end
+            end
+        end
+        set_start_value(y, y_start)
+    end
+    if !isnothing(equipment_assignments)
+        #assigns equipment to stations
+        for s in 1:instance.equipment.n_stations
+            for e in 1:instance.equipment.n_equipment
+                set_start_value(u_se[s, e], 0)
+            end
+        end
+        for (station, equipment) in equipment_assignments
+            for e in equipment
+                set_start_value(u_se[station, e], 1.)
             end
         end
     end
-    set_start_value(y, y_start)
-    #assigns equipment to stations
-    u_se = m[:u_se]
-    equipment_assignments = equipment_assign_func(instance, model_task_assignments)
-    for (station, equipment) in equipment_assignments
-        for e in equipment
-            set_start_value(u_se[station, e], 1.)
-        end
-    end
-
-
 end
 
-function define_fixed_linear!(m::Model, instance::MALBP_W_instance; preprocess = false)
+function define_fixed_linear!(m::Model, instance::MALBP_W_instance; preprocess = false, start_heuristic::Union{Function,Nothing} = task_equip_heuristic_task_only_combined_precedence)
     define_fixed_linear_vars!(m, instance)
     define_fixed_linear_obj!(m, instance)
     define_fixed_linear_constraints!(m, instance)   
     if preprocess
         @info "TODO Preprocessing: adding redundant constraints to the model"
         #define_fixed_linear_redundant_constraints!(m, instance)
-        # @info "using heuristic for initial task and worker assignments"
-        # time_start = time()
-        # heuristic_start!(m, 
-        #                 instance, 
-        #                 task_assign_func = ehsans_heuristic, 
-        #                 worker_assign_func = worker_assignment_heuristic, 
-        #                 equipment_assign_func = greedy_equipment_assignment_heuristic)
-        # @info "Heuristic start time: ", time() - time_start
+       
     end
+    if !isnothing(start_heuristic)
+          
+        @info "using heuristic $(start_heuristic) for initial task and worker assignments"
+        time_start = time()
+        #task_assignments, equip_assignments = MMALBP_W_model_dependent_decomposition_solve(instance; preprocessing=false)
+        model_task_assignments, y_start, y_w_start, y_wts_start, equipment_assignments  = start_heuristic(instance)
+        
+        set_initial_values_fixed!(m, 
+                            instance, 
+                            x_soi_start = model_task_assignments, 
+                            y_start = y_start, 
+                            y_w_start = y_w_start, 
+                            y_wts_start = y_wts_start, 
+                            equipment_assignments = equipment_assignments)
+        @info "Heuristic start time: ", time() - time_start
+        if !isnothing(equipment_assignments) && !isnothing(y_wts_start)
+            total_cost = calculate_equip_cost(equipment_assignments, instance) + calculate_worker_cost(y_start, y_w_start, instance)
+        else
+            @info "Cannot calculate initial cost,Only have task assignments, returning large value to start"
+            return 1e12
+        end
+        return total_cost
+    end
+    return nothing
 end
 
 
