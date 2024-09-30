@@ -378,8 +378,6 @@ end
 
 function MMALBP_md_lns_from_slurm(config_filepath::String, output_filepath::String, run_time::Float64, save_variables::Bool, save_lp::Bool, search_strategy_fp::String, slurm_array_ind::Int; xp_folder::String="model_runs", preprocessing::Bool=false, md_heuristic::Function=task_equip_heuristic_task_only_combined_precedence,rng=Xoshiro(), grb_threads=1)
     config_file, instance = read_slurm_csv(config_filepath,slurm_array_ind, rng=rng)
-    println("typeof(instance), ", typeof(instance))
-    println("instance ", instance)
     optimizer = optimizer_with_attributes(() -> Gurobi.Optimizer(GRB_ENV_REF[]), "TimeLimit" => run_time, "Threads" => grb_threads)    #adds the date and time to the output file path
     now = Dates.now()
     now = Dates.format(now, "yyyy-mm-dd")
