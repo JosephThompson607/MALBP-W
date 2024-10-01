@@ -44,7 +44,7 @@ function monte_carlo_tree_limit(sequence_length::Int, model_mixtures::Dict{Strin
     #If the model mixtures are not positive, throw an error
     elseif any(values(model_mixtures) .< 0)
         error("model mixtures must be positive")
-    elseif n_samples > length(model_mixtures)^sequence_length
+    elseif (sequence_length<12) && (n_samples > length(model_mixtures)^sequence_length)
         @info "Number of samples is greater than the number of possible sequences, returning all possible sequences"
         return generate_scenario_tree(sequence_length, model_mixtures)
     end
