@@ -136,6 +136,20 @@ function read_MALBP_W_solution(results_folder::String)
     return x_soi_df, u_se_df, y_wts_df, y_w_df
 end
 
+
+function read_1st_stage_solution(results_folder::String)
+    
+    #Opens the u_se file
+    u_se_fp = results_folder * "u_se_solution.csv"
+    u_se_df = CSV.read(u_se_fp, DataFrame)
+
+    #Opens the y_w file
+    y_w_fp = results_folder * "y_solution.csv"
+    y_w_df = CSV.read(y_w_fp, DataFrame)
+    return u_se_df, y_w_df
+end
+
+
 function warmstart_dynamic_from_md_setup!(m::Model, vars_fp::String, instance::MALBP_W_instance)
     #usesful variables
     x_wsoj = m[:x_wsoj]
@@ -198,6 +212,34 @@ function warmstart_dynamic_from_md_setup!(m::Model, vars_fp::String, instance::M
     end
 end
 
+
+function warmstart_dynamic_from_dynamic_and_fix!(m::Model, vars_fp::String)
+    #usesful variables
+    u_se = m[:u_se]
+    y = m[:y]
+    #Gets the relevant values from the given folder
+    u_se_md_df, y_w_md_df = read_1st_stage_solution(vars_fp)
+
+    #Sets the start value of the equipment variables if they are in the model dependent solution
+    if !isempty(u_se_md_df)
+        for row in eachrow(u_se_md_df)
+            s = row.station
+            e = row.equipment
+            fix(u_se[s, e], row.value, force=true)
+        end
+    end
+
+    #Sets the start value of the worker y_w variables, if the scenario == fixed, then it is the y variable
+    if !isempty(y_w_md_df)
+        for row in eachrow(y_w_md_df)
+            w = row.scenario
+            if w == "fixed"
+                fix(y, row.value, force=true)
+            end
+        end
+    end
+
+end
 
 
 function define_dynamic_linear_redundant_constraints!(m::Model, instance::MALBP_W_instance)
@@ -265,6 +307,17 @@ end
 function define_dynamic_linear!(m::Model, instance::MALBP_W_instance, warmstart_vars_fp::String; preprocessing = true)
     define_dynamic_linear_vars!(m, instance)
     warmstart_dynamic_from_md_setup!(m, warmstart_vars_fp, instance)
+    define_dynamic_linear_obj!(m, instance)
+    define_dynamic_linear_constraints!(m, instance)   
+    if preprocessing   
+        @info "adding in preprocessing vars"
+        define_dynamic_linear_redundant_constraints!(m, instance)
+    end
+end
+
+function define_dynamic_linear_oos!(m::Model, instance::MALBP_W_instance, warmstart_vars_fp::String; preprocessing = true)
+    define_dynamic_linear_vars!(m, instance)
+    warmstart_dynamic_from_dynamic_and_fix!(m, warmstart_vars_fp)
     define_dynamic_linear_obj!(m, instance)
     define_dynamic_linear_constraints!(m, instance)   
     if preprocessing   

@@ -169,14 +169,24 @@ function read_scenario_csv(file_name::String)
     return sequences
 end
 
-function add_more_samples!(instance, n_samples::Int64; generator::String="monte_carlo_limit", seed::Union{Int64, Nothing}=nothing)
+
+function generate_new_sequences!(instance; rng=Xoshiro(), generator::String="monte_carlo_limit")
+    n_samples = instance.sequences.n_scenarios
+    println("scenarioss before", instance.sequences.sequences)
+    delete!(instance.sequences.sequences, 1:n_samples)
+    instance.sequences.n_scenarios = 0
+    add_more_samples!(instance, n_samples, rng = rng, generator=generator)
+    println("scenarios after:", instance.sequences.sequences)
+end
+
+function add_more_samples!(instance, n_samples::Int64;rng=Xoshiro(), generator::String="monte_carlo_limit", )
     model_mixtures = get_model_mixture(instance.models)
     if generator == "sobold_limit"
         @info "adding $n_samples scenarios with sobold_limit"
-        new_scenarios_df = sobold_limit(instance.sequences.sequence_length, model_mixtures, n_samples, seed=seed)
+        new_scenarios_df = sobold_limit(instance.sequences.sequence_length, model_mixtures, n_samples, rng=rng)
     elseif generator == "monte_carlo_limit"
         @info "adding $n_samples scenarios with monte_carlo_limit"
-        new_scenarios_df = monte_carlo_tree_limit(instance.sequences.sequence_length, model_mixtures, n_samples, seed=seed)
+        new_scenarios_df = monte_carlo_tree_limit(instance.sequences.sequence_length, model_mixtures, n_samples, rng=rng)
     else
         error("Cannot find generator $generator")
     end

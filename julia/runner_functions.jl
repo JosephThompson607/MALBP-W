@@ -155,7 +155,6 @@ function MMALBP_W_dynamic_ws( instance::MALBP_W_instance, optimizer, original_fi
     #creates the model
     m = Model(optimizer)
     set_optimizer_attribute(m, "LogFile", output_filepath * "gurobi.log")
-    println("PREPROCESSING AT MMALBP_W_dynamic_ws", preprocessing)
     #defines the model dependent parameters
     define_dynamic_linear!(m, instance, warmstart_vars, preprocessing=preprocessing)
     #writes the model to a file
@@ -432,6 +431,42 @@ function warmstart_dynamic_nonlinear_slurm(config_filepath::String, output_filep
    
 end
 
+
+function oos_dynamic_test(config_filepath::String, original_filepath::String, run_time::Float64, save_variables::Bool, save_lp::Bool, slurm_array_ind::Int;rng=Xoshiro(), xp_folder::String="model_runs", preprocessing::Bool=false, grb_threads::Int=1)
+    instance, warmstart_vars_fp, prev_obj_val = read_md_result(config_filepath, slurm_array_ind)
+    generate_new_sequences!(instance, rng=rng)
+    optimizer = optimizer_with_attributes(() -> Gurobi.Optimizer(GRB_ENV_REF[]), "TimeLimit" => run_time, "Threads" => grb_threads)    #adds the date and time to the output file path
+    now = Dates.now()
+    now = Dates.format(now, "yyyy-mm-dd")
+    original_filepath = xp_folder * "/" * now * "_" * original_filepath 
+    @info "Running instance $(instance.name), from $(config_filepath). \n Output will be saved to $(original_filepath)"
+    #if directory is not made yet, make it
+    if !isnothing(slurm_array_ind)
+        output_filepath = original_filepath * "dynamic/"* instance.name * "/slurm_" * string(slurm_array_ind) * "/"
+    else
+        output_filepath = original_filepath * "dynamic/"* instance.name * "/"
+    end
+    if !isdir(output_filepath )
+        mkpath(output_filepath)
+    end
+    #creates the model
+    m = Model(optimizer)
+    set_optimizer_attribute(m, "LogFile", output_filepath * "gurobi.log")
+    #defines the model dependent parameters
+    define_dynamic_linear_oos!(m, instance, warmstart_vars_fp, preprocessing=preprocessing)
+    #writes the model to a file
+    optimize!(m)
+    if save_variables
+        write_MALBP_W_solution_dynamic(output_filepath, instance, m, false)
+    end
+    if save_lp
+        write_to_file(m, output_filepath * "model.lp")
+    end
+    #saves the objective function, relative gap, run time, and instance_name to a file
+    save_results(original_filepath * "dynamic/", m, run_time, instance, output_filepath, "dynamic_problem_linear_labor_recourse.csv"; prev_obj_val=prev_obj_val)
+    return m
+end
+
 function warmstart_dynamic_slurm(config_filepath::String, output_filepath::String, run_time::Float64, save_variables::Bool, save_lp::Bool, slurm_array_ind::Int; xp_folder::String="model_runs", preprocessing::Bool=false, grb_threads::Int=1)
     instance, warmstart_vars_fp, md_obj_val = read_md_result(config_filepath, slurm_array_ind)
     optimizer = optimizer_with_attributes(() -> Gurobi.Optimizer(GRB_ENV_REF[]), "TimeLimit" => run_time, "Threads" => grb_threads)    #adds the date and time to the output file path
@@ -445,7 +480,7 @@ end
 
 function MMALBP_W_LNS(config_filepath::String, output_filepath::String, run_time::Float64, save_variables::Bool, save_lp::Bool, search_strategy_fp::String; xp_folder::String="model_runs", preprocessing::Bool=false, rng=Xoshiro(), grb_threads=1)
     instances = read_md_results(config_filepath)
-optimizer = optimizer_with_attributes(() -> Gurobi.Optimizer(GRB_ENV_REF[]), "TimeLimit" => run_time, "Threads" => grb_threads)    #adds the date and time to the output file path
+    optimizer = optimizer_with_attributes(() -> Gurobi.Optimizer(GRB_ENV_REF[]), "TimeLimit" => run_time, "Threads" => grb_threads)    #adds the date and time to the output file path
     now = Dates.now()
     now = Dates.format(now, "yyyy-mm-dd")
     output_filepath = xp_folder * "/" * now * "_" * output_filepath 

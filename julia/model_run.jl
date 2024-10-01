@@ -131,6 +131,11 @@ function main()
             error("Slurm array index is required for slurm experiments")
         end
         warmstart_dynamic_slurm(parsed_args["config_file"], output_file,parsed_args["run_time"], parsed_args["save_variables"], parsed_args["save_lp"], parsed_args["slurm_ind"] ;  preprocessing=parsed_args["preprocessing"], grb_threads=parsed_args["grb_threads"])
+    elseif parsed_args["xp_type"] == "oos"
+        if isnothing(parsed_args["slurm_ind"])
+            error("Slurm array index is required for slurm experiments")
+        end
+        oos_dynamic_test(parsed_args["config_file"], output_file,parsed_args["run_time"], parsed_args["save_variables"], parsed_args["save_lp"], parsed_args["slurm_ind"] ;  preprocessing=parsed_args["preprocessing"], grb_threads=parsed_args["grb_threads"])
     elseif parsed_args["xp_type"] == "warmstart_slurm_nonlinear"
         if isnothing(parsed_args["slurm_ind"])
             error("Slurm array index is required for slurm experiments")
