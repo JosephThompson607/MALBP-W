@@ -170,12 +170,12 @@ function read_scenario_csv(file_name::String)
 end
 
 
-function generate_new_sequences!(instance; rng=Xoshiro(), generator::String="monte_carlo_limit")
+function generate_new_sequences!(instance; rng=Xoshiro(), generator::String="monte_carlo_limit", sample_multiplier::Int64=2)
     n_samples = instance.sequences.n_scenarios
     println("scenarioss before", instance.sequences.sequences)
     delete!(instance.sequences.sequences, 1:n_samples)
     instance.sequences.n_scenarios = 0
-    add_more_samples!(instance, n_samples, rng = rng, generator=generator)
+    add_more_samples!(instance, sample_multiplier*n_samples, rng = rng, generator=generator)
     println("scenarios after:", instance.sequences.sequences)
 end
 
