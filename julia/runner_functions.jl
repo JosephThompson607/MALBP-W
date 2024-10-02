@@ -22,6 +22,7 @@ function MMALBP_W_model_dependent(instance::MALBP_W_instance, optimizer, origina
         @info "Writing LP to file $(output_filepath * "model.lp")"
         write_to_file(m, output_filepath * "model.lp")
     end
+    save_results(output_filepath, m, run_time, instance, output_filepath, "model_dependent_problem_linear_labor_recourse.csv")
     save_results(original_filepath * "md/", m, run_time, instance, output_filepath, "model_dependent_problem_linear_labor_recourse.csv")
     
     return m
@@ -50,6 +51,7 @@ function MMALBP_W_model_dependent_nonlinear(instance::MALBP_W_instance, optimize
     if save_lp
         write_to_file(m, output_filepath * "model.lp")
     end
+    save_results(output_filepath, m, run_time, instance, output_filepath, "model_dependent_problem_linear_labor_recourse.csv")
     save_results(original_filepath * "md/", m, run_time, instance, output_filepath, "model_dependent_problem_linear_labor_recourse.csv")
     
     return m
@@ -78,6 +80,7 @@ function MMALBP_W_fixed(instance::MALBP_W_instance, optimizer, original_filepath
     if save_lp
         write_to_file(m, output_filepath * "model.lp")
     end
+    save_results(output_filepath, m, run_time, instance, output_filepath, "model_dependent_problem_linear_labor_recourse.csv")
     save_results(original_filepath * "fixed/", m, run_time, instance, output_filepath, "fixed_problem_linear_labor_recourse.csv")
     
     return m
@@ -108,6 +111,7 @@ function MMALBP_W_dynamic( instance::MALBP_W_instance, optimizer, original_filep
         write_to_file(m, output_filepath * "model.lp")
     end
     #saves the objective function, relative gap, run time, and instance_name to a file
+    save_results(output_filepath, m, run_time, instance, output_filepath, "model_dependent_problem_linear_labor_recourse.csv")
     save_results(original_filepath * "dynamic/", m, run_time, instance, output_filepath, "dynamic_problem_linear_labor_recourse.csv")
     return m
 end
@@ -138,6 +142,7 @@ function MMALBP_W_dynamic_nonlinear( instance::MALBP_W_instance, optimizer, orig
         write_to_file(m, output_filepath * "model.lp")
     end
     #saves the objective function, relative gap, run time, and instance_name to a file
+    save_results(output_filepath, m, run_time, instance, output_filepath, "model_dependent_problem_linear_labor_recourse.csv")
     save_results(original_filepath * "dynamic/", m, run_time, instance, output_filepath, "dynamic_problem_linear_labor_recourse.csv")
     return m
 end
@@ -166,6 +171,7 @@ function MMALBP_W_dynamic_ws( instance::MALBP_W_instance, optimizer, original_fi
         write_to_file(m, output_filepath * "model.lp")
     end
     #saves the objective function, relative gap, run time, and instance_name to a file
+    save_results(output_filepath, m, run_time, instance, output_filepath, "model_dependent_problem_linear_labor_recourse.csv")
     save_results(original_filepath * "dynamic/", m, run_time, instance, output_filepath, "dynamic_problem_linear_labor_recourse.csv"; prev_obj_val=md_obj_val)
     return m
 end
@@ -194,6 +200,7 @@ function MMALBP_W_dynamic_nonlinear_ws( instance::MALBP_W_instance, optimizer, o
         write_to_file(m, output_filepath * "model.lp")
     end
     #saves the objective function, relative gap, run time, and instance_name to a file
+    save_results(output_filepath, m, run_time, instance, output_filepath, "model_dependent_problem_linear_labor_recourse.csv")
     save_results(original_filepath * "dynamic/", m, run_time, instance, output_filepath, "dynamic_problem_linear_labor_recourse.csv"; prev_obj_val=md_obj_val)
     return m
 end
@@ -225,6 +232,7 @@ function MMALBP_W_dynamic_nonlinear_lns( instance::MALBP_W_instance, optimizer, 
         write_to_file(m, output_filepath * "model.lp")
     end
     #saves the objective function, relative gap, run time, and instance_name to a file
+    save_results(output_filepath, m, run_time, instance, output_filepath, "model_dependent_problem_linear_labor_recourse.csv")
     save_results(original_filepath * "dynamic/", m, run_time, instance, output_filepath, "dynamic_problem_linear_labor_recourse.csv"; prev_obj_val=md_obj_val, best_obj_val = best_obj)
     return m
 end
@@ -256,6 +264,7 @@ function MMALBP_W_dynamic_lns( instance::MALBP_W_instance, optimizer, original_f
         write_to_file(m, output_filepath * "model.lp")
     end
     #saves the objective function, relative gap, run time, and instance_name to a file
+    save_results(output_filepath, m, run_time, instance, output_filepath, "model_dependent_problem_linear_labor_recourse.csv")
     save_results(original_filepath * "dynamic/", m, run_time, instance, output_filepath, "dynamic_problem_linear_labor_recourse.csv"; prev_obj_val=md_obj_val, best_obj_val = best_obj)
     return m
 end
@@ -332,6 +341,7 @@ function MMALBP_W_md_lns( instance::MALBP_W_instance, optimizer, original_filepa
         write_to_file(m, output_filepath * "model.lp")
     end
     #saves the objective function, relative gap, run time, and instance_name to a file
+    save_results(output_filepath, m, run_time, instance, output_filepath, "model_dependent_problem_linear_labor_recourse.csv")
     save_results(original_filepath * "md/", m, run_time, instance, output_filepath, "md_lns_results.csv"; best_obj_val = best_obj)
     return m
 end
