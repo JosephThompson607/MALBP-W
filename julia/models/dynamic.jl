@@ -49,7 +49,13 @@ end
 
 #defines the constraints of the model dependent MALBP-W model
 function define_dynamic_linear_constraints!(m::Model, instance::MALBP_W_instance)
-    
+    #Turns off non-anticipativity constraints if EVPI_run
+    if "EVPI_run" in instance.MILP_models
+        EVPI_run = true
+    else
+        EVPI_run = false
+    end
+
     #model variables
     x_wsoj = m[:x_wsoj]
     u_se = m[:u_se]
@@ -112,10 +118,13 @@ function define_dynamic_linear_constraints!(m::Model, instance::MALBP_W_instance
             end
         end
     end
-    #Constraint 6: non-anticipativity
-    for w in 1:instance.sequences.n_scenarios
-        for w_prime in (w+1):instance.sequences.n_scenarios
-            add_non_anticipativity_constraints!(m, instance, w, w_prime)
+    if !EVPI_run
+        println("adding non-anticipativity constraints now")
+        #Constraint 6: non-anticipativity
+        for w in 1:instance.sequences.n_scenarios
+            for w_prime in (w+1):instance.sequences.n_scenarios
+                add_non_anticipativity_constraints!(m, instance, w, w_prime)
+            end
         end
     end
 end

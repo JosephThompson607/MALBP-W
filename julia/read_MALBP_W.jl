@@ -289,6 +289,10 @@ function overwrite_config_settings(row, config_file, models_instance, equip_inst
         @info "Using number of stations from csv file: $(row.n_stations)" 
         config_file["n_stations"] = Int(row.n_stations)
     end
+    if hasproperty(row, :EVPI_run) && (row.EVPI_run =="true" || row.EVPI_run ==1)
+        @info "EVPI_run, relaxing dynamic non-anticipativity constraints"
+        push!(config_file["milp_models"], "EVPI_run")
+    end
     #If the row has max_workers, use the max_workers from the row
     if hasproperty(row, :max_workers) && row.max_workers != ""
         @info "Using max workers from csv file : $(row.max_workers)"
