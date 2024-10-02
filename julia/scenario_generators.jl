@@ -172,11 +172,9 @@ end
 
 function generate_new_sequences!(instance; rng=Xoshiro(), generator::String="monte_carlo_limit", n_new_samples::Int64=40)
     n_samples = instance.sequences.n_scenarios
-    println("scenarioss before", instance.sequences.sequences)
     delete!(instance.sequences.sequences, 1:n_samples)
     instance.sequences.n_scenarios = 0
     add_more_samples!(instance, n_new_samples, rng = rng, generator=generator)
-    println("scenarios after:", instance.sequences.sequences)
 end
 
 function add_more_samples!(instance, n_samples::Int64;rng=Xoshiro(), generator::String="monte_carlo_limit", )
