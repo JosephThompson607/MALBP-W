@@ -17,11 +17,17 @@ function define_dynamic_linear_obj!(m::Model, instance::MALBP_W_instance)
     y = m[:y]
     y_w = m[:y_w]
     u_se = m[:u_se]
+    #If we had perfect information on the sequence, we would hire enough workers ahead of time
+    if "EVPI_run" in instance.MILP_models
+        recourse_cost = instance.worker_cost
+    else
+        recourse_cost = instance.recourse_cost
+    end
     
     @objective(m, 
             Min, 
             instance.worker_cost * y + 
-            instance.recourse_cost * sum(y_w[w] * instance.sequences.sequences[w, "probability"] for w in 1:instance.sequences.n_scenarios) + 
+            recourse_cost * sum(y_w[w] * instance.sequences.sequences[w, "probability"] for w in 1:instance.sequences.n_scenarios) + 
             sum(instance.equipment.c_se[s][e] * u_se[s, e] for s in 1:instance.equipment.n_stations, e in 1:instance.equipment.n_equipment)
             )
 end
