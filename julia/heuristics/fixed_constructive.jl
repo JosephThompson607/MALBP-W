@@ -167,6 +167,18 @@ function task_equip_heuristic_combined_precedence_fixed(orig_instance::MALBP_W_i
     return x_so, equipment_assignments, instance
 end
 
+function ehsans_task_only_fixed(orig_instance::MALBP_W_instance; order_function::Function = positional_weight_order, order_kwargs...)
+    instance = combine_to_new_instance(orig_instance)
+    x_so = ehsans_heuristic(instance, order_function= order_function, order_kwargs...)
+    #y, y_w, y_wts, equipment_assignments
+    #x_soi is x_so copied to a 3D array with orig_instance number of models
+    x_soi = zeros(Int, instance.equipment.n_stations, instance.equipment.n_tasks, orig_instance.models.n_models)
+    for model in 1:orig_instance.models.n_models
+        x_soi[:,:,model] = x_so[:,:,1]
+    end
+    return x_soi, nothing, nothing, nothing, nothing
+end
+
 #This function creates a new instance with a single model that combines all the models of the original instance and then solves the problem
 function task_equip_heuristic_task_only_combined_precedence(orig_instance::MALBP_W_instance; order_function::Function = positional_weight_order, productivity_per_worker::Vector{Float64}= [1., 1., 1., 1.],
     set_cover_heuristic::Function = greedy_set_cover)
