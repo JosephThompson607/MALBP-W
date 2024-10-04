@@ -5,7 +5,7 @@ function define_md_nonlinear_vars!(m::Model, instance::MALBP_W_instance)
     #defines the variables
     @variable(m, x_soi[1:instance.equipment.n_stations, 1:instance.equipment.n_tasks, 1:instance.models.n_models], Bin, base_name="x_soi")
     @variable(m, u_se[1:instance.equipment.n_stations, 1:instance.equipment.n_equipment], Bin, base_name="u_se")
-    @variable(m, y_lwts[1:instance.max_workers, 1:instance.sequences.n_scenarios, 1:instance.num_cycles, 1:instance.n_stations], Bin, base_name="y_lwts")
+    @variable(m, y_lwts[1:instance.max_workers, 1:instance.sequences.n_scenarios, 1:instance.n_cycles, 1:instance.n_stations], Bin, base_name="y_lwts")
     @variable(m, y_w[1:instance.sequences.n_scenarios]>=0, Int, base_name="y_w")
     @variable(m, y>=0, Int, base_name="y")
 
@@ -37,7 +37,7 @@ function define_md_nonlinear_constraints!(m::Model, instance::MALBP_W_instance)
     y = m[:y]
     #constraint 1: y_w and y must sum to the sum accross all stations of y_lwts for each scenario and cycle
     for w in 1:instance.sequences.n_scenarios
-        for t in 1:instance.num_cycles
+        for t in 1:instance.n_cycles
         @constraint(m, y +  y_w[w] >= sum(y_lwts[l, w, t, s] for s in 1:instance.equipment.n_stations for l in 1:instance.max_workers))
         end
     end
@@ -55,7 +55,7 @@ function define_md_nonlinear_constraints!(m::Model, instance::MALBP_W_instance)
    #constraint 3: sum of task times of each assigned task for each model must be less than the cycle time times the number of workers y_lwts
    for w in eachrow(instance.sequences.sequences)
     w_index = rownumber(w)
-        for t in 1:instance.num_cycles
+        for t in 1:instance.n_cycles
             for s in 1:instance.equipment.n_stations
                 if 1 <= t - s +1<= instance.sequences.sequence_length 
                     j = t-s + 1
@@ -89,7 +89,7 @@ function define_md_nonlinear_constraints!(m::Model, instance::MALBP_W_instance)
     end
     #Constraint 6: cannot assign another worker if the previous worker is not assigned
     for w in 1:instance.sequences.n_scenarios
-        for t in 1:instance.num_cycles
+        for t in 1:instance.n_cycles
             for s in 1:instance.equipment.n_stations
                 for l in 2:instance.max_workers
                     @constraint(m, y_lwts[l,w, t, s] <= y_lwts[l-1,w, t, s])
@@ -175,7 +175,7 @@ function set_nonlinear_initial_values!(m::Model, instance::MALBP_W_instance;
                                     x_soi_start::Array{Int,3} = zeros(Int, instance.equipment.n_stations, instance.equipment.n_tasks, instance.models.n_models),
                                     y_start::Int = 0,
                                     y_w_start::Array{Int,1} = zeros(Int, instance.sequences.n_scenarios),
-                                    y_lwts_start::Array{Int,4} = zeros(Int, instance.max_workers, instance.sequences.n_scenarios, instance.num_cycles, instance.equipment.n_stations),
+                                    y_lwts_start::Array{Int,4} = zeros(Int, instance.max_workers, instance.sequences.n_scenarios, instance.n_cycles, instance.equipment.n_stations),
                                     equipment_assignments:: Dict{Int64, Vector{Int64}} = zeros(Int, instance.equipment.n_stations, instance.equipment.n_equipment)) 
     
     model_indexes = [i for (i, model_dict) in instance.models.models]
@@ -198,7 +198,7 @@ function set_nonlinear_initial_values!(m::Model, instance::MALBP_W_instance;
 
     for w in 1:instance.sequences.n_scenarios
         set_start_value(y_w[w], y_w_start[w])
-        for t in 1:instance.num_cycles
+        for t in 1:instance.n_cycles
             for l in 1:instance.max_workers
                 for s in 1:instance.equipment.n_stations
                         set_start_value(y_lwts[l, w, t, s], y_lwts_start[l, w, t, s])
@@ -223,9 +223,9 @@ end
 
 #Turns the integer heuristic solution into a binary solutions for number of workers
 function get_lwts_start(y_wts_start, instance)
-    y_lwts_start = zeros(Int, instance.max_workers, instance.sequences.n_scenarios, instance.num_cycles, instance.equipment.n_stations)
+    y_lwts_start = zeros(Int, instance.max_workers, instance.sequences.n_scenarios, instance.n_cycles, instance.equipment.n_stations)
     for w in 1:instance.sequences.n_scenarios
-        for t in 1:instance.num_cycles
+        for t in 1:instance.n_cycles
             for s in 1:instance.equipment.n_stations
                 for l in 1:y_wts_start[ w, t, s]
                 y_lwts_start[l, w, t, s] = 1

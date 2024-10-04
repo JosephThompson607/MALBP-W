@@ -142,7 +142,7 @@ function necessary_workers(tasks::Vector{String}, cycle_time::Real, model::Model
     return length(productivity_per_worker) 
 end
 
-function base_worker_assign_func(instance::MALBP_W_instance, x_soi::Array{Int64,3}; productivity_per_worker::Vector{Float64}= [1., 1., 1., 1.], start_station::Int=1, end_station::Int=instance.equipment.n_stations, assign_matrix::Array{Int,3}=zeros(Int, instance.sequences.n_scenarios, instance.num_cycles, instance.equipment.n_stations))
+function base_worker_assign_func(instance::MALBP_W_instance, x_soi::Array{Int64,3}; productivity_per_worker::Vector{Float64}= [1., 1., 1., 1.], start_station::Int=1, end_station::Int=instance.equipment.n_stations, assign_matrix::Array{Int,3}=zeros(Int, instance.sequences.n_scenarios, instance.n_cycles, instance.equipment.n_stations))
     model_index = [i for (i, model_dict) in instance.models.models]
     for (w,scenario) in enumerate(eachrow(instance.sequences.sequences))
         for (j, model) in enumerate(scenario.sequence)
@@ -168,7 +168,7 @@ function worker_assignment_heuristic(instance::MALBP_W_instance, x_soi::Array{In
     y = 0
     peak_wts = (0,0, 0)
     for (w, scenario) in enumerate(eachrow(instance.sequences.sequences))
-        for t in 1:instance.num_cycles
+        for t in 1:instance.n_cycles
             y_current = 0
             peak_current =0
             station_index = (0,0,0)

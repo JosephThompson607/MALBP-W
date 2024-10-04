@@ -59,7 +59,7 @@ function mixed_to_single(model::ModelInstance, instance::MALBP_W_instance; equip
                                     instance.worker_cost,
                                     instance.recourse_cost,
                                     instance.sequences.sequence_length,
-                                    instance.num_cycles,
+                                    instance.n_cycles,
                                     instance.MILP_models)
     return new_instance
 end

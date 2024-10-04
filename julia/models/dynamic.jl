@@ -5,7 +5,7 @@ function define_dynamic_linear_vars!(m::Model, instance::MALBP_W_instance)
     #defines the variables
     @variable(m, x_wsoj[1:instance.sequences.n_scenarios, 1:instance.equipment.n_stations, 1:instance.equipment.n_tasks, 1:instance.sequences.sequence_length], Bin, base_name="x_wsoj")
     @variable(m, u_se[1:instance.equipment.n_stations, 1:instance.equipment.n_equipment], Bin, base_name="u_se")
-    @variable(m, instance.max_workers>=y_wts[1:instance.sequences.n_scenarios, 1:instance.num_cycles, 1:instance.n_stations] >=0, Int, base_name="y_wts")
+    @variable(m, instance.max_workers>=y_wts[1:instance.sequences.n_scenarios, 1:instance.n_cycles, 1:instance.n_stations] >=0, Int, base_name="y_wts")
     @variable(m, y_w[1:instance.sequences.n_scenarios]>=0, Int, base_name="y_w")
     @variable(m, y>=0, Int, base_name="y")
 
@@ -70,7 +70,7 @@ function define_dynamic_linear_constraints!(m::Model, instance::MALBP_W_instance
     y = m[:y]
     #constraint 1: y_w and y must sum to the sum accross all stations of y_wts for each scenario and cycle
     for w in 1:instance.sequences.n_scenarios
-        for t in 1:instance.num_cycles
+        for t in 1:instance.n_cycles
         @constraint(m, y +  y_w[w] >= sum(y_wts[w, t, s] for s in 1:instance.equipment.n_stations))
         end
     end
@@ -89,7 +89,7 @@ function define_dynamic_linear_constraints!(m::Model, instance::MALBP_W_instance
     #constraint 3: sum of task times of each assigned task for each model must be less than the cycle time times the number of workers y_wts
     for w in eachrow(instance.sequences.sequences)
         w_index = rownumber(w)
-        for t in 1:instance.num_cycles
+        for t in 1:instance.n_cycles
             for s in 1:instance.equipment.n_stations
                 if 1 <= t - s +1<= instance.sequences.sequence_length 
                     j = t-s + 1
@@ -204,7 +204,11 @@ function warmstart_dynamic_from_md_setup!(m::Model, vars_fp::String, instance::M
             t = row.cycle
             s = row.station
             value = row.value
-            set_start_value(y_wts[w, t, s], value)
+            if row.cycle <= instance.n_cycles
+                set_start_value(y_wts[w, t, s], value)
+            else 
+                @warn "more worker assignments than cycles in instance w,t,s $w, $t, $s, n_cycles = $(instance.n_cycles)"
+            end
         end
     end
 

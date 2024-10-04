@@ -5,7 +5,7 @@ function define_md_linear_vars!(m::Model, instance::MALBP_W_instance)
     #defines the variables
     @variable(m, x_soi[1:instance.equipment.n_stations, 1:instance.equipment.n_tasks, 1:instance.models.n_models], Bin, base_name="x_soi")
     @variable(m, u_se[1:instance.equipment.n_stations, 1:instance.equipment.n_equipment], Bin, base_name="u_se")
-    @variable(m, instance.max_workers>=y_wts[1:instance.sequences.n_scenarios, 1:instance.num_cycles, 1:instance.n_stations] >=0, Int, base_name="y_wts")
+    @variable(m, instance.max_workers>=y_wts[1:instance.sequences.n_scenarios, 1:instance.n_cycles, 1:instance.n_stations] >=0, Int, base_name="y_wts")
     @variable(m, y_w[1:instance.sequences.n_scenarios]>=0, Int, base_name="y_w")
     @variable(m, y>=0, Int, base_name="y")
 
@@ -43,7 +43,7 @@ function define_md_linear_constraints!(m::Model, instance::MALBP_W_instance)
     y = m[:y]
     #constraint 1: y_w and y must sum to the sum accross all stations of y_wts for each scenario and cycle
     for w in 1:instance.sequences.n_scenarios
-        for t in 1:instance.num_cycles
+        for t in 1:instance.n_cycles
         @constraint(m, y +  y_w[w] >= sum(y_wts[w, t, s] for s in 1:instance.equipment.n_stations))
         end
     end
@@ -61,7 +61,7 @@ function define_md_linear_constraints!(m::Model, instance::MALBP_W_instance)
     # #constraint 3: sum of task times of each assigned task for each model must be less than the cycle time times the number of workers y_wts
     for w in eachrow(instance.sequences.sequences)
         w_index = rownumber(w)
-        for t in 1:instance.num_cycles
+        for t in 1:instance.n_cycles
             for s in 1:instance.equipment.n_stations
                 if 1 <= t - s +1<= instance.sequences.sequence_length 
                     j = t-s + 1
@@ -171,7 +171,7 @@ function set_initial_values!(m::Model, instance::MALBP_W_instance;
                                     x_soi_start::Union{Array{Int,3},Nothing} = zeros(Int, instance.equipment.n_stations, instance.equipment.n_tasks, instance.models.n_models),
                                     y_start::Union{Int,Nothing} = 0,
                                     y_w_start::Union{Array{Int,1},Nothing} = zeros(Int, instance.sequences.n_scenarios),
-                                    y_wts_start::Union{Array{Int,3},Nothing} = zeros(Int, instance.sequences.n_scenarios, instance.num_cycles, instance.equipment.n_stations),
+                                    y_wts_start::Union{Array{Int,3},Nothing} = zeros(Int, instance.sequences.n_scenarios, instance.n_cycles, instance.equipment.n_stations),
                                     equipment_assignments:: Union{Dict{Int64, Vector{Int64}}, Nothing} = zeros(Int, instance.equipment.n_stations, instance.equipment.n_equipment)) 
     
     model_indexes = [i for (i, model_dict) in instance.models.models]
@@ -195,7 +195,7 @@ function set_initial_values!(m::Model, instance::MALBP_W_instance;
     if !isnothing(y_w_start)
         for w in 1:instance.sequences.n_scenarios
             set_start_value(y_w[w], y_w_start[w])
-            for t in 1:instance.num_cycles
+            for t in 1:instance.n_cycles
                 for s in 1:instance.equipment.n_stations
                         set_start_value(y_wts[w, t, s], y_wts_start[w, t, s])
                 end

@@ -43,7 +43,7 @@ end
 #Calculates the task times for x_soi
 function get_task_assignment_times_x_wsot(instance, x_soi)
     #task times is a 3D array where each row is a station, each column is a task, and each depth is a model
-    task_times = zeros(Real, instance.sequences.n_scenarios, instance.equipment.n_stations, instance.equipment.n_tasks, instance.num_cycles )
+    task_times = zeros(Real, instance.sequences.n_scenarios, instance.equipment.n_stations, instance.equipment.n_tasks, instance.n_cycles )
     model_indexes = [i for (i, model_dict) in instance.models.models]
     model_to_index = Dict{String, Int}(zip(model_indexes, 1:length(model_indexes)))
 
@@ -70,7 +70,7 @@ end
 #This function stores the task times for each model in each station in each cycle for each model and scenario
 function get_task_assignment_times_x_wsoit(instance, x_soi)
     #task times is a 3D array where each row is a station, each column is a task, and each depth is a model
-    task_times = zeros(Real, instance.sequences.n_scenarios, instance.equipment.n_stations, instance.equipment.n_tasks, instance.models.n_models, instance.num_cycles )
+    task_times = zeros(Real, instance.sequences.n_scenarios, instance.equipment.n_stations, instance.equipment.n_tasks, instance.models.n_models, instance.n_cycles )
     model_indexes = [i for (i, model_dict) in instance.models.models]
     model_to_index = Dict{String, Int}(zip(model_indexes, 1:length(model_indexes)))
 

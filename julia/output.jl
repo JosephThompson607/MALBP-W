@@ -85,7 +85,7 @@ function write_y_wts_solution(output_filepath::String, instance::MALBP_W_instanc
     #writes the solution to a file
     y_wts_solution = []
     for w in 1:instance.sequences.n_scenarios
-        for t in 1:instance.num_cycles
+        for t in 1:instance.n_cycles
             for s in 1:instance.equipment.n_stations
                 if only_nonzero && value(y_wts[w, t, s]) == 0
                     continue
@@ -105,7 +105,7 @@ function write_y_lwts_solution(output_filepath::String, instance::MALBP_W_instan
     y_wts_solution = []
     for l in 1:instance.max_workers
         for w in 1:instance.sequences.n_scenarios
-            for t in 1:instance.num_cycles
+            for t in 1:instance.n_cycles
                 for s in 1:instance.equipment.n_stations
                     if only_nonzero && value(y_wts[w, t, s]) == 0
                         continue

@@ -51,7 +51,7 @@ function combine_to_new_instance(orig_instance)
     models_dict = Dict{String, ModelInstance}()
     models_dict["combined_model"] = combined_model
     new_models = ModelsInstance("combined_model", "combined_model", n_models , instance.models.cycle_time, models_dict)
-    new_instance = MALBP_W_instance(instance.filepath, instance.name, instance.config_name, new_models, instance.sequences, instance.equipment, instance.n_stations, instance.max_workers, instance.productivity_per_worker, instance.worker_cost, instance.recourse_cost, instance.num_cycles, instance.MILP_models)
+    new_instance = MALBP_W_instance(instance.filepath, instance.name, instance.config_name, new_models, instance.sequences, instance.equipment, instance.n_stations, instance.max_workers, instance.productivity_per_worker, instance.worker_cost, instance.recourse_cost, instance.n_cycles, instance.MILP_models)
     return new_instance
 end
 

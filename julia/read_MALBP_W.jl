@@ -52,7 +52,7 @@ struct MALBP_W_instance
     productivity_per_worker:: Dict{Int64, Float64}
     worker_cost:: Int
     recourse_cost:: Int
-    num_cycles:: Int
+    n_cycles:: Int
     MILP_models::Array{String}
 end
 
@@ -64,7 +64,7 @@ function calculate_scenarios(scenarios::DataFrame)
 end
 
 function MALBP_W_instance(filepath::String,config_name::String, models::ModelsInstance, sequences::ProdSequences, equipment::EquipmentInstance, n_stations:: Int, max_workers:: Int, 
-                            worker_cost:: Int, recourse_cost:: Int, num_cycles:: Int, MILP_models::Array{String}, productivity_per_worker::Dict{Int64, Float64} =  Dict(1=>1., 2=>1., 3=>1., 4=>1.))
+                            worker_cost:: Int, recourse_cost:: Int, n_cycles:: Int, MILP_models::Array{String}, productivity_per_worker::Dict{Int64, Float64} =  Dict(1=>1., 2=>1., 3=>1., 4=>1.))
     name =  models.name  * "_" *equipment.name
     return MALBP_W_instance(filepath,
                                 name,
@@ -77,7 +77,7 @@ function MALBP_W_instance(filepath::String,config_name::String, models::ModelsIn
                                 productivity_per_worker,
                                 worker_cost, 
                                 recourse_cost,  
-                                num_cycles, 
+                                n_cycles, 
                                 MILP_models)
 end
 
@@ -191,7 +191,7 @@ function read_MALBP_W_instances(file_name::String; scenario_generator::Union{Not
             equip_instance = read_equipment_instance(equip)
             check_instance(config_file,models_instance, equip_instance)
             scenarios = read_scenario_tree(config_file["scenario"], get_model_mixture(models_instance), rng=rng)
-            num_cycles = config_file["scenario"]["sequence_length"] + config_file["n_stations"] - 1
+            n_cycles = config_file["scenario"]["sequence_length"] + config_file["n_stations"] - 1
             if haskey(config_file, "productivity_per_worker")
                 productivity_per_worker = Dict{Int64,Float64}(k => v for (k,v) in pairs(config_file["productivity_per_worker"])) 
                 current_instance = MALBP_W_instance( file_name,
@@ -203,7 +203,7 @@ function read_MALBP_W_instances(file_name::String; scenario_generator::Union{Not
                             config_file["max_workers"], 
                             config_file["worker_cost"], 
                             config_file["recourse_cost"], 
-                            num_cycles, 
+                            n_cycles, 
                             config_file["milp_models"],
                             productivity_per_worker)
             else
@@ -217,7 +217,7 @@ function read_MALBP_W_instances(file_name::String; scenario_generator::Union{Not
                             config_file["max_workers"], 
                             config_file["worker_cost"], 
                             config_file["recourse_cost"], 
-                            num_cycles, 
+                            n_cycles, 
                             config_file["milp_models"])
             end
             push!(instances, current_instance)
@@ -238,7 +238,7 @@ function read_md_result(file_name::String, res_index::Int; sequence_csv_name::St
     config_file = overwrite_config_settings(row, config_file, models_instance, equip_instance)
     scenarios_fp = row.output_folder * sequence_csv_name
     scenarios = read_scenario_csv(scenarios_fp)
-    num_cycles = config_file["scenario"]["sequence_length"] + config_file["n_stations"] - 1
+    n_cycles = config_file["scenario"]["sequence_length"] + config_file["n_stations"] - 1
     current_instance = MALBP_W_instance(String(row.instance_fp),
                     config_file["config_name"], 
                     models_instance, 
@@ -248,7 +248,7 @@ function read_md_result(file_name::String, res_index::Int; sequence_csv_name::St
                     config_file["max_workers"], 
                     config_file["worker_cost"], 
                     config_file["recourse_cost"], 
-                    num_cycles, 
+                    n_cycles, 
                     config_file["milp_models"])
     return current_instance, row.output_folder, obj_val
 end
@@ -265,7 +265,7 @@ function read_md_results(file_name::String; sequence_csv_name::String="sequences
         config_file = overwrite_config_settings(row, config_file, models_instance, equip_instance)
         scenarios_fp = row.output_folder * sequence_csv_name
         scenarios = read_scenario_csv(scenarios_fp)
-        num_cycles = config_file["scenario"]["sequence_length"] + config_file["n_stations"] - 1
+        n_cycles = config_file["scenario"]["sequence_length"] + config_file["n_stations"] - 1
         current_instance = MALBP_W_instance(row.instance_fp,
                         config_file["config_name"], 
                         models_instance, 
@@ -275,7 +275,7 @@ function read_md_results(file_name::String; sequence_csv_name::String="sequences
                         config_file["max_workers"], 
                         config_file["worker_cost"], 
                         config_file["recourse_cost"], 
-                        num_cycles, 
+                        n_cycles, 
                         config_file["milp_models"])
         push!(instances, (instance=current_instance, vars= row.output_folder, objective_value = row.objective_value))
 
@@ -349,7 +349,7 @@ function read_slurm_csv(file_name::String, slurm_ind::Int;scenario_generator::Un
     else
         scenarios = read_scenario_tree(config_file["scenario"], get_model_mixture(models_instance), rng=rng)
     end
-    num_cycles = config_file["scenario"]["sequence_length"] + config_file["n_stations"] - 1
+    n_cycles = config_file["scenario"]["sequence_length"] + config_file["n_stations"] - 1
     if haskey(config_file, "productivity_per_worker")
         current_instance = MALBP_W_instance(String(row.config_yaml),
                     config_file["config_name"], 
@@ -360,7 +360,7 @@ function read_slurm_csv(file_name::String, slurm_ind::Int;scenario_generator::Un
                     config_file["max_workers"], 
                     config_file["worker_cost"], 
                     config_file["recourse_cost"], 
-                    num_cycles, 
+                    n_cycles, 
                     config_file["milp_models"],
                     config_file["productivity_per_worker"])
     else
@@ -374,7 +374,7 @@ function read_slurm_csv(file_name::String, slurm_ind::Int;scenario_generator::Un
                     config_file["max_workers"], 
                     config_file["worker_cost"], 
                     config_file["recourse_cost"], 
-                    num_cycles, 
+                    n_cycles, 
                     config_file["milp_models"])
     end
     return config_file, current_instance
@@ -394,7 +394,7 @@ function read_csv(file_name::String; rng=Xoshiro())
         else
             scenarios = read_scenario_tree(config_file["scenario"], get_model_mixture(models_instance), rng=rng)
         end
-        num_cycles = config_file["scenario"]["sequence_length"] + config_file["n_stations"] - 1
+        n_cycles = config_file["scenario"]["sequence_length"] + config_file["n_stations"] - 1
         if haskey(config_file, "productivity_per_worker")
             current_instance = MALBP_W_instance(String(row.config_yaml),
                         config_file["config_name"], 
@@ -405,7 +405,7 @@ function read_csv(file_name::String; rng=Xoshiro())
                         config_file["max_workers"], 
                         config_file["worker_cost"], 
                         config_file["recourse_cost"], 
-                        num_cycles, 
+                        n_cycles, 
                         config_file["milp_models"],
                         config_file["productivity_per_worker"])
         else
@@ -419,7 +419,7 @@ function read_csv(file_name::String; rng=Xoshiro())
                         config_file["max_workers"], 
                         config_file["worker_cost"], 
                         config_file["recourse_cost"], 
-                        num_cycles, 
+                        n_cycles, 
                         config_file["milp_models"])
         end
         push!(instances, (current_instance, config_file))
