@@ -317,6 +317,10 @@ function overwrite_config_settings(row, config_file, models_instance, equip_inst
         @info "Using number of scenarios from csv file : $(row.n_samples)"
         config_file["scenario"]["n_samples"] = Int(row.n_samples)
     end
+    if hasproperty(row, :milp_models) && row.milp_models == "EVPI_run"
+        @info "setting to EVPI_run "
+        config_file["milp_models"] = ["EVPI_run"]
+    end
     if hasproperty(row, :cycle_time) && row.cycle_time !=""
         @info "Using cycle time from csv file : $(row.cycle_time)"
         models_instance.cycle_time = Int(row.cycle_time)

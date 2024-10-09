@@ -246,6 +246,7 @@ function save_results(output_filepath::String, m::Model, run_time::Real, instanc
     end
     if !isnothing(prev_obj_val)
     results = DataFrame(instance_name=instance.name, 
+                        milp_models = instance.MILP_models,     
                         prev_obj_val=prev_obj_val,
                         best_obj_val = best_obj_val,
                         objective_value=obj_val, 
@@ -267,6 +268,7 @@ function save_results(output_filepath::String, m::Model, run_time::Real, instanc
                         )
     else
         results = DataFrame(instance_name=instance.name, 
+                        milp_models = instance.MILP_models,     
                         objective_value=obj_val, 
                         best_obj_val = best_obj_val,
                         relative_gap=rel_gap, 

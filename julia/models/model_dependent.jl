@@ -18,6 +18,7 @@ function define_md_linear_obj!(m::Model, instance::MALBP_W_instance)
     u_se = m[:u_se]
     #If we had perfect information on the sequence, we would hire enough workers ahead of time
     if "EVPI_run" in instance.MILP_models
+        @info "changing recourse cost to normal worker cost bc of EVPI_run"
         recourse_cost = instance.worker_cost
     else
         recourse_cost = instance.recourse_cost
