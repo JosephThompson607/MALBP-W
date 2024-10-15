@@ -133,7 +133,7 @@ end
 
 #increases the size of destroy block if no improvement until it reaches a limit, then changes the destroy operator
 #If there is an improvement, makes it destroy less
-function change_destroy_increase_size_reduce_improve!(iter_no_improve::Int, lns_obj::LNSConf, m::Model; filter_out_current=true, rng=Xoshiro(), size_issue::Bool=false, _...)
+function change_destroy_increase_size_reduce_improve!(iter_no_improve::Int, lns_obj::LNSConf, m::Model; filter_out_current=false, rng=Xoshiro(), size_issue::Bool=false, _...)
     #if size of destruction is already >1, then reset the destruction size to old value
     if lns_obj.des.kwargs[:percent_destroy] >= 1.0 || iter_no_improve == 0
         lns_obj.des.kwargs[:percent_destroy] = max(lns_obj.des.kwargs[:percent_destroy]-lns_obj.des.kwargs[:min_destroy], lns_obj.des.kwargs[:min_destroy])
