@@ -596,6 +596,16 @@ function MMALBP_W_LNS_md_nonlinear_slurm(config_filepath::String, output_filepat
     #runner_function(instance, optimizer, output_filepath, run_time,  search_strategy_fp; save_variables= save_variables, save_lp=save_lp, warmstart_vars= warmstart_vars_fp, md_obj_val= md_obj_val, slurm_array_ind=slurm_array_ind, preprocessing=preprocessing, rng=rng, md_heuristic=md_heuristic)
 end
 
+#Runs the LNS model on a list of instances using a slurm array index
+function MMALBP_W_LNS_slurm(config_filepath::String, output_filepath::String, run_time::Float64, save_variables::Bool, save_lp::Bool, search_strategy_fp::String, slurm_array_ind::Int; xp_folder::String="model_runs", preprocessing::Bool=false, rng=Xoshiro(), runner_function = MMALBP_W_dynamic_lns, grb_threads=1)
+    instance, warmstart_vars_fp, md_obj_val = read_md_result(config_filepath, slurm_array_ind)
+    optimizer = optimizer_with_attributes(() -> Gurobi.Optimizer(GRB_ENV_REF[]), "TimeLimit" => run_time, "Threads" => grb_threads)    #adds the date and time to the output file path
+    now = Dates.now()
+    now = Dates.format(now, "yyyy-mm-dd")
+    output_filepath = xp_folder * "/" * now * "_" * output_filepath 
+    @info "Running instance $(instance.name), from $(config_filepath). \n Output will be saved to $(output_filepath)"
+    runner_function(instance, optimizer, output_filepath, run_time,  search_strategy_fp; save_variables= save_variables, save_lp=save_lp, warmstart_vars= warmstart_vars_fp, md_obj_val= md_obj_val, slurm_array_ind=slurm_array_ind, preprocessing=preprocessing, rng=rng)
+end
 
 
 

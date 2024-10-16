@@ -30,7 +30,7 @@ function random_model_destroy!(m::Model, instance::MALBP_W_instance; rng = Xoshi
                     if haskey(m, :y_wts)
                         fix(y_wts[w, t, s], start_value(y_wts[w, t, s]), force=true)
                     elseif haskey(m, :y_lwts)
-                             fix.(y_wts[:, w, t, s], start_value(y_wts[:, w, t, s]), force=true)
+                             fix.(y_wts[:, w, t, s], start_value.(y_wts[:, w, t, s]), force=true)
                     end
                 end
 
