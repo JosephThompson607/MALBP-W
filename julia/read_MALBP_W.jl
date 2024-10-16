@@ -325,6 +325,11 @@ function overwrite_config_settings(row, config_file, models_instance, equip_inst
         @info "Using cycle time from csv file : $(row.cycle_time)"
         models_instance.cycle_time = Int(row.cycle_time)
     end
+    if hasproperty(row, :n_stations) && row.n_stations !=""
+        @info "using n_stations from config file $(row.n_stations)"
+        config_file["n_stations"] =  row.n_stations
+        equip_instance.n_stations = row.n_stations
+    end
     return config_file
 
 end

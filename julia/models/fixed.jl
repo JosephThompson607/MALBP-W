@@ -11,18 +11,27 @@ function define_fixed_linear_vars!(m::Model, instance::MALBP_W_instance)
 
 end
 #defines the objective function of the model dependent MALBP-W model
-function define_fixed_linear_obj!(m::Model, instance::MALBP_W_instance)
+function define_fixed_linear_obj!(m::Model, instance::MALBP_W_instance; same_e_cost=true)
     #defines the objective function of the model
     y = m[:y]
     y_w = m[:y_w]
     u_se = m[:u_se]
     
-    @objective(m, 
-            Min, 
-            instance.worker_cost * y + 
-            instance.recourse_cost * sum(y_w[w] * instance.sequences.sequences[w, "probability"] for w in 1:instance.sequences.n_scenarios) + 
-            sum(instance.equipment.c_se[s][e] * u_se[s, e] for s in 1:instance.equipment.n_stations, e in 1:instance.equipment.n_equipment)
-            )
+    if same_e_cost#default, equipment costs the same at every station
+        @objective(m, 
+                Min, 
+                instance.worker_cost * y + 
+                recourse_cost * sum(y_w[w] * instance.sequences.sequences[w, "probability"] for w in 1:instance.sequences.n_scenarios) + 
+                sum(instance.equipment.c_se[1][e] * u_se[s, e] for s in 1:instance.equipment.n_stations, e in 1:instance.equipment.n_equipment)
+                )
+    else
+        @objective(m, 
+                Min, 
+                instance.worker_cost * y + 
+                recourse_cost * sum(y_w[w] * instance.sequences.sequences[w, "probability"] for w in 1:instance.sequences.n_scenarios) + 
+                sum(instance.equipment.c_se[s][e] * u_se[s, e] for s in 1:instance.equipment.n_stations, e in 1:instance.equipment.n_equipment)
+                )
+    end
 end
 
 #defines the constraints of the model dependent MALBP-W model

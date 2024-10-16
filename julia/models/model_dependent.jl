@@ -11,7 +11,7 @@ function define_md_linear_vars!(m::Model, instance::MALBP_W_instance)
 
 end
 #defines the objective function of the model dependent MALBP-W model
-function define_md_linear_obj!(m::Model, instance::MALBP_W_instance)
+function define_md_linear_obj!(m::Model, instance::MALBP_W_instance; same_e_cost=true)
     #defines the objective function of the model
     y = m[:y]
     y_w = m[:y_w]
@@ -24,12 +24,21 @@ function define_md_linear_obj!(m::Model, instance::MALBP_W_instance)
         recourse_cost = instance.recourse_cost
     end
     
-    @objective(m, 
-            Min, 
-            instance.worker_cost * y + 
-            recourse_cost * sum(y_w[w] * instance.sequences.sequences[w, "probability"] for w in 1:instance.sequences.n_scenarios) + 
-            sum(instance.equipment.c_se[s][e] * u_se[s, e] for s in 1:instance.equipment.n_stations, e in 1:instance.equipment.n_equipment)
-            )
+    if same_e_cost
+        @objective(m, 
+                Min, 
+                instance.worker_cost * y + 
+                recourse_cost * sum(y_w[w] * instance.sequences.sequences[w, "probability"] for w in 1:instance.sequences.n_scenarios) + 
+                sum(instance.equipment.c_se[1][e] * u_se[s, e] for s in 1:instance.equipment.n_stations, e in 1:instance.equipment.n_equipment)
+                )
+    else
+        @objective(m, 
+                Min, 
+                instance.worker_cost * y + 
+                recourse_cost * sum(y_w[w] * instance.sequences.sequences[w, "probability"] for w in 1:instance.sequences.n_scenarios) + 
+                sum(instance.equipment.c_se[s][e] * u_se[s, e] for s in 1:instance.equipment.n_stations, e in 1:instance.equipment.n_equipment)
+                )
+    end
 end
 
 #defines the constraints of the model dependent MALBP-W model
