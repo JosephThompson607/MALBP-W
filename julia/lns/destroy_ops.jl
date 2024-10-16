@@ -154,7 +154,11 @@ function random_station_destroy_md!(m::Model, instance::MALBP_W_instance; rng = 
 
     x_soi = m[:x_soi]
     u_se = m[:u_se]
-    y_wts = m[:y_wts]
+    if haskey(m, :y_wts)
+        y_wts = m[:y_wts]
+    elseif haskey(m, :y_lwts)
+        y_wts = m[:y_lwts]
+    end
     #fixes the task assignment, equipment, and worker assignment for the stations that are not in the stations list
     for s in 1:instance.equipment.n_stations
         if s in stations
@@ -162,7 +166,11 @@ function random_station_destroy_md!(m::Model, instance::MALBP_W_instance; rng = 
         else
             fix.(x_soi[ s, :, :], start_value.(x_soi[ s, :, :]), force=true)
             fix.(u_se[s, :], start_value.(u_se[s, :]), force=true)
-            fix.(y_wts[:, :, s], start_value.(y_wts[:, :, s]), force=true)
+            if haskey(m, :y_wts)
+                fix.(y_wts[:, :, s], start_value.(y_wts[:, :, s]), force=true)
+            elseif haskey(m, :y_lwts)
+                fix.(y_wts[:, :, :, s], start_value.(y_wts[:, :, :, s]), force=true)
+            end
         end
     end
 end

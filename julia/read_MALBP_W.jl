@@ -355,7 +355,11 @@ function read_slurm_csv(file_name::String, slurm_ind::Int;scenario_generator::Un
     end
     n_cycles = config_file["scenario"]["sequence_length"] + config_file["n_stations"] - 1
     if haskey(config_file, "productivity_per_worker")
-        current_instance = MALBP_W_instance(String(row.config_yaml),
+        productivity_per_worker = Dict{Int64, Float64}()
+        for (worker, productivity) in pairs(config_file["productivity_per_worker"])
+            productivity_per_worker[worker]=productivity
+        end
+        current_instance =MALBP_W_instance(String(row.config_yaml),
                     config_file["config_name"], 
                     models_instance, 
                     scenarios, 
@@ -366,7 +370,7 @@ function read_slurm_csv(file_name::String, slurm_ind::Int;scenario_generator::Un
                     config_file["recourse_cost"], 
                     n_cycles, 
                     config_file["milp_models"],
-                    config_file["productivity_per_worker"])
+                    productivity_per_worker)
     else
         @info "No productivity per worker defined, using default values (only applies to nonlinear productivity)"
         current_instance = MALBP_W_instance(String(row.config_yaml),
