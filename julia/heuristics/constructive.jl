@@ -190,13 +190,17 @@ function worker_assignment_heuristic(instance::MALBP_W_instance, x_soi::Array{In
     return y, y_w, y_wts, peak_wts
 end
 
-function greedy_set_cover(tasks_to_assign::Vector{Int}, instance::MALBP_W_instance, station::Int)
+function greedy_set_cover(tasks_to_assign::Vector{Int}, instance::MALBP_W_instance, station::Int; same_equip_cost=true)
     #if no tasks to assign, return empty list
     if length(tasks_to_assign) == 0
         return [], zeros(Int, instance.equipment.n_tasks), 0
     end
     #assigns the equipment to the stations
-    equipment_costs = instance.equipment.c_se[station,:][1]
+    if same_equip_cost
+        equipment_costs = instance.equipment.c_se[1,:][1]
+    else
+        equipment_costs = instance.equipment.c_se[station,:][1]
+    end
     #sorts the equipment by cost, keeping track of their index in the original list
     equipment_costs_tup = sort(collect(enumerate(equipment_costs)), by=x->x[2])
     equipment_assignments = Vector{Int64}()
@@ -344,7 +348,7 @@ function fill_station!(instance::MALBP_W_instance,
                         equipment_assignments::Dict{Int64, Vector{Int64}}, 
                         capabilities_so::Array{Int,2}, 
                         precedence_matrices::Dict{String, Dict};
-                        set_cover_heuristic::Function=greedy_set_cover)
+                        set_cover_heuristic::Function=greedy_set_cover_v2)
     while any(c_time_si[station,:] .> 0) && any([length(unfinished_tasks[i])>0 for i in 1:length(unfinished_tasks)]) 
         for (model, i) in models
             #skip if there is no capacity at the station or the model is finished

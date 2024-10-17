@@ -80,7 +80,36 @@ function MMALBP_W_fixed(instance::MALBP_W_instance, optimizer, original_filepath
     if save_lp
         write_to_file(m, output_filepath * "model.lp")
     end
-    save_results(output_filepath, m, run_time, instance, output_filepath, "model_dependent_problem_linear_labor_recourse.csv")
+    save_results(output_filepath, m, run_time, instance, output_filepath, "fixed_problem_linear_labor_recourse.csv")
+    save_results(original_filepath * "fixed/", m, run_time, instance, output_filepath, "fixed_problem_linear_labor_recourse.csv")
+    
+    return m
+end
+
+function MMALBP_W_fixed_nonlinear(instance::MALBP_W_instance, optimizer, original_filepath::String, run_time::Real;preprocessing::Bool=false, save_variables::Bool=true, save_lp::Bool=false, slurm_array_ind::Union{Int, Nothing}=nothing)
+    #if directory is not made yet, make it
+    if !isnothing(slurm_array_ind)
+        output_filepath = original_filepath * "fixed/"* instance.name * "/slurm_" * string(slurm_array_ind) * "/"
+    else
+        output_filepath = original_filepath * "fixed/"* instance.name * "/"
+    end
+    if !isdir(output_filepath)
+        mkpath(output_filepath)
+    end
+    #creates the model
+    m = Model(optimizer)
+    set_optimizer_attribute(m, "LogFile", output_filepath * "gurobi.log")
+    #defines the model dependent parameters
+    define_fixed_nonlinear!(m, instance; preprocess=preprocessing)
+    #writes the model to a file
+    optimize!(m)
+    if save_variables
+        write_MALBP_W_solution_fixed(output_filepath, instance, m, false)
+    end
+    if save_lp
+        write_to_file(m, output_filepath * "model.lp")
+    end
+    save_results(output_filepath, m, run_time, instance, output_filepath, "fixed_problem_linear_labor_recourse.csv")
     save_results(original_filepath * "fixed/", m, run_time, instance, output_filepath, "fixed_problem_linear_labor_recourse.csv")
     
     return m
@@ -459,6 +488,8 @@ function MMALBP_from_csv_slurm(config_filepath::String, output_filepath::String,
                 m = MMALBP_W_dynamic(instance, optimizer, output_filepath, run_time; save_variables= save_variables, save_lp=save_lp, slurm_array_ind=slurm_array_ind, preprocessing=preprocessing)
             elseif milp == "fixed_problem_linear_labor_recourse"
                 m = MMALBP_W_fixed(instance, optimizer, output_filepath, run_time; save_variables= save_variables, save_lp=save_lp, slurm_array_ind=slurm_array_ind)
+            elseif milp == "fixed_problem_nonlinear_labor_recourse"
+                m = MMALBP_W_fixed_nonlinear(instance, optimizer, output_filepath, run_time; save_variables= save_variables, save_lp=save_lp, slurm_array_ind=slurm_array_ind)
             end
     end
 end

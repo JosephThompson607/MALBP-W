@@ -80,15 +80,19 @@ function greedy_set_cover_v2(tasks::Vector{String}, instance::MALBP_W_instance, 
     return greedy_set_cover_v2(tasks, instance, station)
 end
 
-#Greedy set cover with aln n error bounds
-function greedy_set_cover_v2(tasks::Vector{Int}, instance::MALBP_W_instance, station::Int)
+#Greedy set cover with a ln(n) error bounds
+function greedy_set_cover_v2(tasks::Vector{Int}, instance::MALBP_W_instance, station::Int;  same_cost=true)
     tasks_to_assign = copy(tasks)
     #if no tasks to assign, return empty list
     if length(tasks_to_assign) == 0
         return [], zeros(Int, instance.equipment.n_tasks), 0
     end
     #assigns the equipment to the stations
-    equipment_costs = instance.equipment.c_se[station,:][1]
+    if same_cost #if we assume same equipment cost for each station
+        equipment_costs = instance.equipment.c_se[1,:][1]
+    else
+        equipment_costs = instance.equipment.c_se[station,:][1]
+    end
     #sorts the equipment by cost, keeping track of their index in the original list
     #equipment_costs = sort(collect(enumerate(equipment_costs)), by=x->x[2])
 
@@ -114,7 +118,7 @@ function greedy_set_cover_v2(tasks::Vector{Int}, instance::MALBP_W_instance, sta
 end
 
 #This function creates a new instance with a single model that combines all the models of the original instance and then solves the problem
-function task_equip_heuristic_combined_precedence(orig_instance::MALBP_W_instance; order_function::Function = positional_weight_order, productivity_per_worker::Vector{Float64}= [1., 1., 1., 1.], set_cover_heuristic=greedy_set_cover)
+function task_equip_heuristic_combined_precedence(orig_instance::MALBP_W_instance; order_function::Function = positional_weight_order, productivity_per_worker::Vector{Float64}= [1., 1., 1., 1.], set_cover_heuristic=greedy_set_cover_v2)
     instance = combine_to_new_instance(orig_instance)
     precedence_matrices = create_precedence_matrices(instance; order_function= order_function)
     #orders the models by decreasing probability
@@ -148,7 +152,7 @@ function task_equip_heuristic_combined_precedence(orig_instance::MALBP_W_instanc
 end
 
 #This function creates a new instance with a single model that combines all the models of the original instance and then solves the problem
-function task_equip_heuristic_combined_precedence_fixed(orig_instance::MALBP_W_instance; order_function::Function = positional_weight_order,  set_cover_heuristic=greedy_set_cover)
+function task_equip_heuristic_combined_precedence_fixed(orig_instance::MALBP_W_instance; order_function::Function = positional_weight_order,  set_cover_heuristic=greedy_set_cover_v2)
     instance = combine_to_new_instance(orig_instance)
     precedence_matrices = create_precedence_matrices(instance; order_function= order_function)
     #orders the models by decreasing probability
@@ -181,7 +185,7 @@ end
 
 #This function creates a new instance with a single model that combines all the models of the original instance and then solves the problem
 function task_equip_heuristic_task_only_combined_precedence(orig_instance::MALBP_W_instance; order_function::Function = positional_weight_order, productivity_per_worker::Vector{Float64}= [1., 1., 1., 1.],
-    set_cover_heuristic::Function = greedy_set_cover)
+    set_cover_heuristic::Function = greedy_set_cover_v2)
     instance = combine_to_new_instance(orig_instance)
     precedence_matrices = create_precedence_matrices(instance; order_function= order_function)
     #orders the models by decreasing probability
