@@ -109,8 +109,8 @@ function MMALBP_W_fixed_nonlinear(instance::MALBP_W_instance, optimizer, origina
     if save_lp
         write_to_file(m, output_filepath * "model.lp")
     end
-    save_results(output_filepath, m, run_time, instance, output_filepath, "fixed_problem_linear_labor_recourse.csv")
-    save_results(original_filepath * "fixed/", m, run_time, instance, output_filepath, "fixed_problem_linear_labor_recourse.csv")
+    save_results(output_filepath, m, run_time, instance, output_filepath, "fixed_problem_nonlinear_labor_recourse.csv")
+    save_results(original_filepath * "fixed/", m, run_time, instance, output_filepath, "fixed_problem_nonlinear_labor_recourse.csv")
     
     return m
 end
