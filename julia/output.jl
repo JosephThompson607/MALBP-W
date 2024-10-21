@@ -118,7 +118,7 @@ function write_y_lwts_solution(output_filepath::String, instance::MALBP_W_instan
     end
     #writes the y_wts_solution as a csv
     y_wts_solution_df = DataFrame(y_wts_solution)
-    CSV.write(output_filepath * "y_wts_solution.csv", y_wts_solution_df)
+    CSV.write(output_filepath * "y_lwts_solution.csv", y_wts_solution_df)
 end
 
 function write_y_w_solution(output_filepath::String, instance::MALBP_W_instance, y_w, y; only_nonzero::Bool=false)
